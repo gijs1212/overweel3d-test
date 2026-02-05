@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Logo } from "./Logo";
 import { Mail, MapPin, Clock } from "lucide-react";
 
 export function Footer() {
@@ -10,7 +9,14 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="mb-4">
-              <Logo size="lg" showTagline />
+              <div className="flex items-center gap-3">
+                <span className="text-3xl font-bold text-primary-foreground tracking-tight">
+                  Overweel<span className="text-accent">3D</span>
+                </span>
+              </div>
+              <span className="text-sm text-primary-foreground/70 tracking-wide">
+                Vorm. Functie. Filament.
+              </span>
             </div>
             <p className="text-primary-foreground/70 max-w-md mt-4">
               Breng je ideeën tot leven met onze professionele 3D-printservice. 
@@ -56,7 +62,7 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-primary-foreground/70">
                 <Mail className="w-4 h-4 text-accent" />
-                <span>info@overweel3d.nl</span>
+                <span>overweel3d@hotmail.com</span>
               </li>
               <li className="flex items-center gap-3 text-primary-foreground/70">
                 <MapPin className="w-4 h-4 text-accent" />

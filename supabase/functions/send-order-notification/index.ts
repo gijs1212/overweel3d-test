@@ -9,14 +9,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface OrderDetails {
-  fileName: string;
-  material: string;
-  color: string;
+interface OrderItem {
+  name: string;
+  type: "custom" | "prebuilt";
+  material?: string;
+  color?: string;
   quantity: number;
-  estimatedPrice: string;
+  price: string;
   dimensions?: { x: number; y: number; z: number };
   volume?: number;
+}
+
+interface OrderDetails {
+  items: OrderItem[];
+  totalPrice: string;
 }
 
 interface Customer {
@@ -58,6 +64,19 @@ const handler = async (req: Request): Promise<Response> => {
       timeStyle: "short",
     });
 
+    // Generate items HTML
+    const itemsHtml = orderDetails.items.map(item => `
+      <div class="row" style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee;">
+        <div>
+          <span class="value" style="font-weight: 600; color: #1B365D;">${item.name}</span>
+          ${item.material ? `<br><span style="color: #64748b; font-size: 12px;">${item.material}${item.color ? ` - ${item.color}` : ''}</span>` : ''}
+          <br><span style="color: #64748b; font-size: 12px;">${item.quantity}x</span>
+          ${item.dimensions ? `<br><span style="color: #64748b; font-size: 12px;">${item.dimensions.x} × ${item.dimensions.y} × ${item.dimensions.z} mm</span>` : ''}
+        </div>
+        <span style="font-weight: 600; color: #00b4d8;">€${item.price}</span>
+      </div>
+    `).join('');
+
     // Send notification email to Overweel3D
     const emailResponse = await resend.emails.send({
       from: "Overweel3D <onboarding@resend.dev>",
@@ -81,6 +100,7 @@ const handler = async (req: Request): Promise<Response> => {
             .price { font-size: 24px; color: #00b4d8; font-weight: bold; text-align: center; padding: 20px; }
             .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
             .badge { background: #00b4d8; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+            .warning { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 16px 0; }
           </style>
         </head>
         <body>
@@ -90,38 +110,15 @@ const handler = async (req: Request): Promise<Response> => {
           <div class="content">
             <div class="section">
               <h2>📦 Bestelgegevens</h2>
-              <div class="row">
-                <span class="label">Bestand</span>
-                <span class="value">${orderDetails.fileName}</span>
-              </div>
-              <div class="row">
-                <span class="label">Materiaal</span>
-                <span class="value">${orderDetails.material}</span>
-              </div>
-              <div class="row">
-                <span class="label">Kleur</span>
-                <span class="value">${orderDetails.color}</span>
-              </div>
-              <div class="row">
-                <span class="label">Aantal</span>
-                <span class="value">${orderDetails.quantity}x</span>
-              </div>
-              ${orderDetails.dimensions ? `
-              <div class="row">
-                <span class="label">Afmetingen</span>
-                <span class="value">${orderDetails.dimensions.x} × ${orderDetails.dimensions.y} × ${orderDetails.dimensions.z} mm</span>
-              </div>
-              ` : ""}
-              ${orderDetails.volume ? `
-              <div class="row">
-                <span class="label">Volume</span>
-                <span class="value">~${orderDetails.volume} cm³</span>
-              </div>
-              ` : ""}
+              ${itemsHtml}
             </div>
 
             <div class="price">
-              Geschatte prijs: €${orderDetails.estimatedPrice}
+              Geschatte totaal: €${orderDetails.totalPrice}
+            </div>
+
+            <div class="warning">
+              ⚠️ <strong>Let op:</strong> Dit is een geschatte prijs. Controleer de bestelling en bevestig of pas de prijs aan.
             </div>
 
             <div class="section">
@@ -166,9 +163,85 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Notification email sent:", emailResponse);
 
-    return new Response(JSON.stringify({ success: true, emailResponse }), {
+    // Send confirmation email to customer
+    const customerEmailResponse = await resend.emails.send({
+      from: "Overweel3D <onboarding@resend.dev>",
+      to: [customer.email],
+      subject: `✅ Bevestiging van je bestelling bij Overweel3D`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1B365D; max-width: 600px; margin: 0 auto; }
+            .header { background: linear-gradient(135deg, #1B365D 0%, #2d4a7c 100%); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; background: #f8fafc; }
+            .section { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+            .section h2 { color: #1B365D; margin-top: 0; font-size: 18px; border-bottom: 2px solid #00b4d8; padding-bottom: 10px; }
+            .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .row:last-child { border-bottom: none; }
+            .label { color: #64748b; }
+            .value { font-weight: 600; color: #1B365D; }
+            .price { font-size: 24px; color: #00b4d8; font-weight: bold; text-align: center; padding: 20px; }
+            .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+            .warning { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 16px 0; font-size: 14px; }
+            .info { background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px; margin: 16px 0; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Bedankt voor je bestelling! 🎉</h1>
+          </div>
+          <div class="content">
+            <p>Beste ${customer.name},</p>
+            <p>Bedankt voor je bestelling bij Overweel3D! We hebben je aanvraag ontvangen en gaan er direct mee aan de slag.</p>
+
+            <div class="section">
+              <h2>📦 Jouw bestelling</h2>
+              ${itemsHtml}
+            </div>
+
+            <div class="price">
+              Geschatte totaal: €${orderDetails.totalPrice}
+            </div>
+
+            <div class="warning">
+              ⚠️ <strong>Let op:</strong> Dit is een geschatte prijs. De definitieve prijs kan nog aangepast worden na controle van je bestelling. We nemen contact met je op als dit het geval is.
+            </div>
+
+            <div class="info">
+              ℹ️ Op de kant-en-klare modellen na worden onderdelen niet in elkaar gezet geleverd.
+            </div>
+
+            <div class="section">
+              <h2>📍 Bezorgadres</h2>
+              <p style="margin: 0;">
+                ${customer.name}<br>
+                ${customer.address}<br>
+                ${customer.postalCode} ${customer.city}
+              </p>
+            </div>
+
+            <div class="section">
+              <h2>❓ Vragen?</h2>
+              <p>Heb je vragen over je bestelling? Neem gerust contact met ons op via <a href="mailto:overweel3d@hotmail.com" style="color: #00b4d8;">overweel3d@hotmail.com</a>.</p>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Met vriendelijke groet,<br><strong>Team Overweel3D</strong></p>
+            <p style="margin-top: 20px;">Overweel3D - Vorm. Functie. Filament.</p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    console.log("Customer confirmation email sent:", customerEmailResponse);
+
+    return new Response(JSON.stringify({ success: true, emailResponse, customerEmailResponse }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
