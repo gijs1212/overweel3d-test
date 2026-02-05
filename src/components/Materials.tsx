@@ -13,7 +13,8 @@ const materials = [
     pros: ["Milieuvriendelijk", "Geen warping", "Mooie afwerking"],
     price: "€0,08/gram",
     popular: true,
-    colors: ["#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF"],
+    colors: ["#FFFFFF", "#000000", "#0066FF", "#00CC00", "#228B22", "#FF0000", "#FFDD00", "#808080"],
+    colorNames: ["Wit", "Zwart", "Blauw", "Groen", "Bladgroen", "Rood", "Geel", "Grijs"],
   },
   {
     name: "PETG",
@@ -21,23 +22,17 @@ const materials = [
     pros: ["Waterbestendig", "Hittebestendig", "Flexibel"],
     price: "€0,10/gram",
     popular: false,
-    colors: ["#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", "#FFA500"],
-  },
-  {
-    name: "ABS",
-    description: "Industriële kwaliteit, zeer sterk en duurzaam",
-    pros: ["Zeer sterk", "Hittebestendig", "Slagvast"],
-    price: "€0,12/gram",
-    popular: false,
-    colors: ["#000000", "#FFFFFF", "#808080", "#FF0000"],
+    colors: ["#FFFFFF", "#000000", "#FF0000"],
+    colorNames: ["Wit", "Zwart", "Rood"],
   },
   {
     name: "TPU",
     description: "Flexibel rubber-achtig materiaal",
     pros: ["Flexibel", "Schokabsorberend", "Duurzaam"],
-    price: "€0,15/gram",
+    price: "€0,10/gram",
     popular: false,
-    colors: ["#000000", "#FFFFFF", "#FF0000", "#0000FF"],
+    colors: ["#000000"],
+    colorNames: ["Zwart"],
   },
 ];
 
@@ -60,7 +55,7 @@ export function Materials() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {materials.map((material, index) => (
             <motion.div
               key={material.name}
@@ -107,12 +102,18 @@ export function Materials() {
               <div className="mb-4">
                 <p className="text-xs text-muted-foreground mb-2">Beschikbare kleuren:</p>
                 <div className="flex flex-wrap gap-2">
-                  {material.colors.map((color) => (
-                    <div
-                      key={color}
-                      className="w-6 h-6 rounded-full border-2 border-border shadow-sm"
-                      style={{ backgroundColor: color }}
-                    />
+                  {material.colors.map((color, idx) => (
+                    <Tooltip key={color}>
+                      <TooltipTrigger>
+                        <div
+                          className="w-6 h-6 rounded-full border-2 border-border shadow-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{material.colorNames[idx]}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   ))}
                 </div>
               </div>

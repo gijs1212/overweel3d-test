@@ -7,40 +7,107 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Upload, Check, Package, Loader2, FileType, Ruler, Box, AlertCircle } from "lucide-react";
+import { Upload, Check, Package, Loader2, FileType, Ruler, Box, AlertCircle, ShoppingCart, Trash2, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const MAX_PRINT_SIZE = { x: 220, y: 220, z: 200 };
+const MAX_FILE_SIZE_MB = 10;
+
 const materials = [
-  { id: "pla", name: "PLA", price: 0.08 },
-  { id: "petg", name: "PETG", price: 0.10 },
-  { id: "abs", name: "ABS", price: 0.12 },
-  { id: "tpu", name: "TPU", price: 0.15 },
+  { 
+    id: "pla", 
+    name: "PLA", 
+    price: 0.08,
+    colors: [
+      { id: "white", name: "Wit", hex: "#FFFFFF" },
+      { id: "black", name: "Zwart", hex: "#000000" },
+      { id: "blue", name: "Blauw", hex: "#0066FF" },
+      { id: "green", name: "Groen", hex: "#00CC00" },
+      { id: "leafgreen", name: "Bladgroen", hex: "#228B22" },
+      { id: "red", name: "Rood", hex: "#FF0000" },
+      { id: "yellow", name: "Geel", hex: "#FFDD00" },
+      { id: "grey", name: "Grijs", hex: "#808080" },
+    ]
+  },
+  { 
+    id: "petg", 
+    name: "PETG", 
+    price: 0.10,
+    colors: [
+      { id: "white", name: "Wit", hex: "#FFFFFF" },
+      { id: "black", name: "Zwart", hex: "#000000" },
+      { id: "red", name: "Rood", hex: "#FF0000" },
+    ]
+  },
+  { 
+    id: "tpu", 
+    name: "TPU", 
+    price: 0.10,
+    colors: [
+      { id: "black", name: "Zwart", hex: "#000000" },
+    ]
+  },
 ];
 
-const colors = [
-  { id: "black", name: "Zwart", hex: "#000000" },
-  { id: "white", name: "Wit", hex: "#FFFFFF" },
-  { id: "red", name: "Rood", hex: "#FF0000" },
-  { id: "blue", name: "Blauw", hex: "#0066FF" },
-  { id: "green", name: "Groen", hex: "#00CC00" },
-  { id: "yellow", name: "Geel", hex: "#FFDD00" },
-  { id: "orange", name: "Oranje", hex: "#FF6600" },
-  { id: "grey", name: "Grijs", hex: "#808080" },
+// Kant-en-klare modellen met vaste prijs
+const prebuiltModels = [
+  {
+    id: "phone-stand",
+    name: "Telefoonhouder",
+    description: "Universele telefoonstandaard",
+    price: 8.50,
+    image: "📱",
+  },
+  {
+    id: "keychain",
+    name: "Sleutelhanger (aangepast)",
+    description: "Gepersonaliseerde sleutelhanger met tekst",
+    price: 5.00,
+    image: "🔑",
+  },
+  {
+    id: "cable-organizer",
+    name: "Kabelhouder (3-pack)",
+    description: "Houd je kabels netjes",
+    price: 6.50,
+    image: "🔌",
+  },
+  {
+    id: "plant-pot",
+    name: "Mini Plantenpot",
+    description: "Decoratieve pot voor kleine planten",
+    price: 12.00,
+    image: "🪴",
+  },
 ];
+
+interface CartItem {
+  id: string;
+  type: "custom" | "prebuilt";
+  name: string;
+  material?: string;
+  color?: string;
+  quantity: number;
+  price: number;
+  file?: File;
+  fileAnalysis?: {
+    name: string;
+    size: string;
+    estimatedVolume: number;
+    dimensions: { x: number; y: number; z: number };
+  };
+  prebuiltId?: string;
+}
 
 export default function Bestellen() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+
+  // Cart state
+  const [cart, setCart] = useState<CartItem[]>([]);
 
   // File state
   const [file, setFile] = useState<File | null>(null);
@@ -51,6 +118,8 @@ export default function Bestellen() {
     estimatedVolume: number;
     dimensions: { x: number; y: number; z: number };
   } | null>(null);
+  const [fileTooLarge, setFileTooLarge] = useState(false);
+  const [printTooLarge, setPrintTooLarge] = useState(false);
 
   // Selection state
   const [selectedMaterial, setSelectedMaterial] = useState("");
@@ -107,30 +176,120 @@ export default function Bestellen() {
       return;
     }
 
+    // Check file size (10MB limit)
+    const fileSizeMB = file.size / 1024 / 1024;
+    if (fileSizeMB > MAX_FILE_SIZE_MB) {
+      setFileTooLarge(true);
+      toast({
+        title: "Bestand te groot",
+        description: `Maximum bestandsgrootte is ${MAX_FILE_SIZE_MB}MB. Dit bestand is ${fileSizeMB.toFixed(1)}MB.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setFileTooLarge(false);
+
     setFile(file);
     
     // Simulate file analysis (in real app, this would parse the 3D file)
     const randomVolume = Math.floor(Math.random() * 150) + 20;
+    const dimensions = {
+      x: Math.floor(Math.random() * 180) + 20,
+      y: Math.floor(Math.random() * 180) + 20,
+      z: Math.floor(Math.random() * 150) + 10,
+    };
+
+    // Check if print is too large
+    const isTooLarge = dimensions.x > MAX_PRINT_SIZE.x || 
+                       dimensions.y > MAX_PRINT_SIZE.y || 
+                       dimensions.z > MAX_PRINT_SIZE.z;
+    setPrintTooLarge(isTooLarge);
+
     setFileAnalysis({
       name: file.name,
       size: (file.size / 1024 / 1024).toFixed(2) + " MB",
       estimatedVolume: randomVolume,
-      dimensions: {
-        x: Math.floor(Math.random() * 100) + 20,
-        y: Math.floor(Math.random() * 100) + 20,
-        z: Math.floor(Math.random() * 50) + 10,
-      },
+      dimensions,
     });
   };
 
-  const calculatePrice = () => {
-    if (!fileAnalysis || !selectedMaterial) return 0;
+  const getCurrentMaterialColors = () => {
     const material = materials.find(m => m.id === selectedMaterial);
+    return material?.colors || [];
+  };
+
+  const calculateItemPrice = (volume: number, materialId: string, qty: number) => {
+    const material = materials.find(m => m.id === materialId);
     if (!material) return 0;
-    
-    const basePrice = fileAnalysis.estimatedVolume * material.price;
+    const basePrice = volume * material.price;
     const setupFee = 5;
-    return (basePrice + setupFee) * quantity;
+    return (basePrice + setupFee) * qty;
+  };
+
+  const calculateCartTotal = () => {
+    return cart.reduce((total, item) => total + item.price, 0);
+  };
+
+  const addToCart = () => {
+    if (!file || !fileAnalysis || !selectedMaterial || !selectedColor || printTooLarge) return;
+
+    const newItem: CartItem = {
+      id: `custom-${Date.now()}`,
+      type: "custom",
+      name: file.name,
+      material: selectedMaterial,
+      color: selectedColor,
+      quantity,
+      price: calculateItemPrice(fileAnalysis.estimatedVolume, selectedMaterial, quantity),
+      file,
+      fileAnalysis,
+    };
+
+    setCart([...cart, newItem]);
+    
+    // Reset form
+    setFile(null);
+    setFileAnalysis(null);
+    setSelectedMaterial("");
+    setSelectedColor("");
+    setQuantity(1);
+    setPrintTooLarge(false);
+
+    toast({
+      title: "Toegevoegd aan winkelwagen",
+      description: `${file.name} is toegevoegd.`,
+    });
+  };
+
+  const addPrebuiltToCart = (model: typeof prebuiltModels[0]) => {
+    const existingItem = cart.find(item => item.prebuiltId === model.id);
+    
+    if (existingItem) {
+      setCart(cart.map(item => 
+        item.prebuiltId === model.id 
+          ? { ...item, quantity: item.quantity + 1, price: model.price * (item.quantity + 1) }
+          : item
+      ));
+    } else {
+      const newItem: CartItem = {
+        id: `prebuilt-${Date.now()}`,
+        type: "prebuilt",
+        name: model.name,
+        quantity: 1,
+        price: model.price,
+        prebuiltId: model.id,
+      };
+      setCart([...cart, newItem]);
+    }
+
+    toast({
+      title: "Toegevoegd aan winkelwagen",
+      description: `${model.name} is toegevoegd.`,
+    });
+  };
+
+  const removeFromCart = (itemId: string) => {
+    setCart(cart.filter(item => item.id !== itemId));
   };
 
   const handleSubmit = async () => {
@@ -143,6 +302,15 @@ export default function Bestellen() {
       return;
     }
 
+    if (cart.length === 0) {
+      toast({
+        title: "Winkelwagen leeg",
+        description: "Voeg eerst items toe aan je winkelwagen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -150,13 +318,17 @@ export default function Bestellen() {
       const { error } = await supabase.functions.invoke("send-order-notification", {
         body: {
           orderDetails: {
-            fileName: file?.name || "Onbekend",
-            material: materials.find(m => m.id === selectedMaterial)?.name || selectedMaterial,
-            color: colors.find(c => c.id === selectedColor)?.name || selectedColor,
-            quantity,
-            estimatedPrice: calculatePrice().toFixed(2),
-            dimensions: fileAnalysis?.dimensions,
-            volume: fileAnalysis?.estimatedVolume,
+            items: cart.map(item => ({
+              name: item.name,
+              type: item.type,
+              material: item.material ? materials.find(m => m.id === item.material)?.name : undefined,
+              color: item.color ? materials.find(m => m.id === item.material)?.colors.find(c => c.id === item.color)?.name : undefined,
+              quantity: item.quantity,
+              price: item.price.toFixed(2),
+              dimensions: item.fileAnalysis?.dimensions,
+              volume: item.fileAnalysis?.estimatedVolume,
+            })),
+            totalPrice: calculateCartTotal().toFixed(2),
           },
           customer: {
             name: formData.name,
@@ -189,9 +361,9 @@ export default function Bestellen() {
     }
   };
 
-  const canProceedToStep2 = file && fileAnalysis;
-  const canProceedToStep3 = selectedMaterial && selectedColor;
-  const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && formData.notALightsaber;
+  const canAddToCart = file && fileAnalysis && selectedMaterial && selectedColor && !printTooLarge;
+  const canProceedToStep2 = cart.length > 0;
+  const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && formData.notALightsaber && cart.length > 0;
 
   if (orderComplete) {
     return (
@@ -218,7 +390,7 @@ export default function Bestellen() {
               </h1>
               <p className="text-muted-foreground mb-8">
                 Je bestelling vliegt nu digitaal naar ons toe. We gaan direct aan de slag 
-                en je ontvangt een bevestigingsmail met alle details.
+                en je ontvangt een bevestigingsmail met alle details op {formData.email}.
               </p>
 
               <motion.div
@@ -228,16 +400,31 @@ export default function Bestellen() {
                 className="bg-card rounded-2xl p-6 shadow-overweel-card text-left"
               >
                 <h3 className="font-semibold mb-4">Samenvatting</h3>
-                <div className="space-y-2 text-sm">
-                  <p><span className="text-muted-foreground">Bestand:</span> {file?.name}</p>
-                  <p><span className="text-muted-foreground">Materiaal:</span> {materials.find(m => m.id === selectedMaterial)?.name}</p>
-                  <p><span className="text-muted-foreground">Kleur:</span> {colors.find(c => c.id === selectedColor)?.name}</p>
-                  <p><span className="text-muted-foreground">Aantal:</span> {quantity}</p>
+                <div className="space-y-3">
+                  {cart.map(item => (
+                    <div key={item.id} className="flex justify-between text-sm border-b border-border pb-2">
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        {item.material && (
+                          <p className="text-muted-foreground text-xs">
+                            {materials.find(m => m.id === item.material)?.name} - {item.quantity}x
+                          </p>
+                        )}
+                      </div>
+                      <span className="font-medium">€{item.price.toFixed(2)}</span>
+                    </div>
+                  ))}
                   <p className="text-lg font-bold text-accent pt-2">
-                    Geschatte prijs: €{calculatePrice().toFixed(2)}
+                    Geschatte totaal: €{calculateCartTotal().toFixed(2)}
                   </p>
                 </div>
               </motion.div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-left">
+                <p className="text-sm text-amber-800">
+                  ⚠️ <strong>Let op:</strong> De prijs is niet definitief en kan nog afgewezen of aangepast worden na controle van de bestelling.
+                </p>
+              </div>
 
               <p className="text-sm text-muted-foreground mt-8">
                 PS: Het geheime codewoord is <span className="font-mono text-accent">PLAFTASTIC</span> 🤫
@@ -265,14 +452,28 @@ export default function Bestellen() {
               Plaats je bestelling
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload je 3D-model, kies je voorkeuren, en wij doen de rest.
+              Upload je 3D-model of kies een kant-en-klaar product, en wij doen de rest.
             </p>
           </motion.div>
+
+          {/* Disclaimers */}
+          <div className="max-w-4xl mx-auto mb-8 space-y-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-800">
+                ⚠️ <strong>Belangrijk:</strong> De prijs is een schatting en kan nog aangepast of afgewezen worden na controle.
+              </p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                ℹ️ <strong>Let op:</strong> Op de kant-en-klare modellen na worden onderdelen niet in elkaar gezet geleverd.
+              </p>
+            </div>
+          </div>
 
           {/* Progress Steps */}
           <div className="flex justify-center mb-12">
             <div className="flex items-center gap-4">
-              {[1, 2, 3].map((s) => (
+              {[1, 2].map((s) => (
                 <div key={s} className="flex items-center">
                   <motion.div
                     animate={{
@@ -286,7 +487,7 @@ export default function Bestellen() {
                   >
                     {step > s ? <Check className="w-5 h-5" /> : s}
                   </motion.div>
-                  {s < 3 && (
+                  {s < 2 && (
                     <div
                       className={`w-16 md:w-24 h-1 mx-2 rounded-full transition-colors ${
                         step > s ? "bg-accent" : "bg-muted"
@@ -303,217 +504,256 @@ export default function Bestellen() {
             {/* Left Side - Form Steps */}
             <div className="lg:col-span-2">
               <AnimatePresence mode="wait">
-                {/* Step 1: Upload */}
+                {/* Step 1: Products */}
                 {step === 1 && (
                   <motion.div
                     key="step1"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="bg-card rounded-2xl p-8 shadow-overweel-card"
+                    className="space-y-6"
                   >
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                      <Upload className="w-6 h-6 text-accent" />
-                      Upload je 3D-model
-                    </h2>
+                    {/* Pre-built Models */}
+                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                      <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                        <Star className="w-6 h-6 text-accent" />
+                        Kant-en-klare modellen
+                      </h2>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        Direct leverbaar tegen vaste prijs. Deze worden volledig afgemonteerd geleverd.
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {prebuiltModels.map((model) => (
+                          <button
+                            key={model.id}
+                            onClick={() => addPrebuiltToCart(model)}
+                            className="p-4 rounded-xl border-2 border-border hover:border-accent transition-all text-center group"
+                          >
+                            <div className="text-4xl mb-2">{model.image}</div>
+                            <p className="font-semibold text-sm">{model.name}</p>
+                            <p className="text-xs text-muted-foreground">{model.description}</p>
+                            <p className="text-accent font-bold mt-2">€{model.price.toFixed(2)}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                    {/* Drop Zone */}
-                    <div
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ${
-                        isDragging
-                          ? "border-accent bg-accent/5"
-                          : file
-                          ? "border-accent/50 bg-accent/5"
-                          : "border-border hover:border-accent/50"
-                      }`}
-                    >
-                      <input
-                        type="file"
-                        accept=".stl,.obj,.step,.stp"
-                        onChange={handleFileSelect}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      
-                      {file ? (
-                        <div className="space-y-4">
-                          <div className="w-16 h-16 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
-                            <FileType className="w-8 h-8 text-accent" />
+                    {/* Custom Upload */}
+                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                      <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                        <Upload className="w-6 h-6 text-accent" />
+                        Upload je eigen 3D-model
+                      </h2>
+
+                      {/* Drop Zone */}
+                      <div
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ${
+                          isDragging
+                            ? "border-accent bg-accent/5"
+                            : file
+                            ? "border-accent/50 bg-accent/5"
+                            : "border-border hover:border-accent/50"
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept=".stl,.obj,.step,.stp"
+                          onChange={handleFileSelect}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        
+                        {file ? (
+                          <div className="space-y-4">
+                            <div className="w-16 h-16 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
+                              <FileType className="w-8 h-8 text-accent" />
+                            </div>
+                            <p className="font-semibold text-primary">{file.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Klik of sleep om een ander bestand te kiezen
+                            </p>
                           </div>
-                          <p className="font-semibold text-primary">{file.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Klik of sleep om een ander bestand te kiezen
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
-                            <Upload className="w-8 h-8 text-muted-foreground" />
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+                              <Upload className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                            <p className="font-semibold text-primary">
+                              Sleep je bestand hierheen
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              of klik om te selecteren. STL, OBJ, STEP ondersteund. Max {MAX_FILE_SIZE_MB}MB.
+                            </p>
                           </div>
-                          <p className="font-semibold text-primary">
-                            Sleep je bestand hierheen
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            of klik om te selecteren. STL, OBJ, STEP ondersteund.
-                          </p>
-                        </div>
+                        )}
+                      </div>
+
+                      {/* File Analysis */}
+                      {fileAnalysis && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-6"
+                        >
+                          {/* Print too large warning */}
+                          {printTooLarge && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                              <p className="text-sm text-red-800 flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                <strong>Deze print is te groot!</strong> Maximale afmetingen zijn {MAX_PRINT_SIZE.x}×{MAX_PRINT_SIZE.y}×{MAX_PRINT_SIZE.z}mm.
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className={`rounded-lg p-4 text-center ${printTooLarge ? 'bg-red-50' : 'bg-muted'}`}>
+                              <Ruler className={`w-5 h-5 mx-auto mb-2 ${printTooLarge ? 'text-red-500' : 'text-accent'}`} />
+                              <p className="text-xs text-muted-foreground">Afmetingen</p>
+                              <p className={`text-sm font-semibold ${printTooLarge ? 'text-red-600' : ''}`}>
+                                {fileAnalysis.dimensions.x} × {fileAnalysis.dimensions.y} × {fileAnalysis.dimensions.z} mm
+                              </p>
+                            </div>
+                            <div className="bg-muted rounded-lg p-4 text-center">
+                              <Box className="w-5 h-5 mx-auto mb-2 text-accent" />
+                              <p className="text-xs text-muted-foreground">Volume</p>
+                              <p className="text-sm font-semibold">~{fileAnalysis.estimatedVolume} cm³</p>
+                            </div>
+                            <div className="bg-muted rounded-lg p-4 text-center">
+                              <FileType className="w-5 h-5 mx-auto mb-2 text-accent" />
+                              <p className="text-xs text-muted-foreground">Bestandsgrootte</p>
+                              <p className="text-sm font-semibold">{fileAnalysis.size}</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Material Selection */}
+                      {file && fileAnalysis && !printTooLarge && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-6 space-y-6"
+                        >
+                          <div>
+                            <Label className="text-sm font-medium mb-3 block">Materiaal</Label>
+                            <div className="grid grid-cols-3 gap-3">
+                              {materials.map((material) => (
+                                <button
+                                  key={material.id}
+                                  onClick={() => {
+                                    setSelectedMaterial(material.id);
+                                    setSelectedColor("");
+                                  }}
+                                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                                    selectedMaterial === material.id
+                                      ? "border-accent bg-accent/5"
+                                      : "border-border hover:border-accent/50"
+                                  }`}
+                                >
+                                  <p className="font-semibold">{material.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    €{material.price.toFixed(2)}/gram
+                                  </p>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Color Selection */}
+                          {selectedMaterial && (
+                            <div>
+                              <Label className="text-sm font-medium mb-3 block">Kleur</Label>
+                              <div className="flex flex-wrap gap-3">
+                                {getCurrentMaterialColors().map((color) => (
+                                  <button
+                                    key={color.id}
+                                    onClick={() => setSelectedColor(color.id)}
+                                    className={`group relative w-12 h-12 rounded-full border-4 transition-all ${
+                                      selectedColor === color.id
+                                        ? "border-accent scale-110"
+                                        : "border-transparent hover:scale-105"
+                                    }`}
+                                    style={{ backgroundColor: color.hex }}
+                                    title={color.name}
+                                  >
+                                    {selectedColor === color.id && (
+                                      <Check
+                                        className={`absolute inset-0 m-auto w-6 h-6 ${
+                                          color.hex === "#FFFFFF" || color.hex === "#FFDD00"
+                                            ? "text-primary"
+                                            : "text-primary-foreground"
+                                        }`}
+                                      />
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                              {selectedColor && (
+                                <p className="text-sm text-muted-foreground mt-2">
+                                  Gekozen: {getCurrentMaterialColors().find(c => c.id === selectedColor)?.name}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Quantity */}
+                          {selectedColor && (
+                            <div>
+                              <Label className="text-sm font-medium mb-3 block">Aantal</Label>
+                              <div className="flex items-center gap-4">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                >
+                                  -
+                                </Button>
+                                <span className="text-xl font-bold w-12 text-center">{quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setQuantity(quantity + 1)}
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Add to Cart Button */}
+                          {canAddToCart && (
+                            <Button
+                              variant="hero"
+                              onClick={addToCart}
+                              className="w-full"
+                            >
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Toevoegen aan winkelwagen (€{calculateItemPrice(fileAnalysis.estimatedVolume, selectedMaterial, quantity).toFixed(2)})
+                            </Button>
+                          )}
+                        </motion.div>
                       )}
                     </div>
 
-                    {/* File Analysis */}
-                    {fileAnalysis && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 grid grid-cols-3 gap-4"
-                      >
-                        <div className="bg-muted rounded-lg p-4 text-center">
-                          <Ruler className="w-5 h-5 mx-auto mb-2 text-accent" />
-                          <p className="text-xs text-muted-foreground">Afmetingen</p>
-                          <p className="text-sm font-semibold">
-                            {fileAnalysis.dimensions.x} × {fileAnalysis.dimensions.y} × {fileAnalysis.dimensions.z} mm
-                          </p>
-                        </div>
-                        <div className="bg-muted rounded-lg p-4 text-center">
-                          <Box className="w-5 h-5 mx-auto mb-2 text-accent" />
-                          <p className="text-xs text-muted-foreground">Volume</p>
-                          <p className="text-sm font-semibold">~{fileAnalysis.estimatedVolume} cm³</p>
-                        </div>
-                        <div className="bg-muted rounded-lg p-4 text-center">
-                          <FileType className="w-5 h-5 mx-auto mb-2 text-accent" />
-                          <p className="text-xs text-muted-foreground">Bestandsgrootte</p>
-                          <p className="text-sm font-semibold">{fileAnalysis.size}</p>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    <div className="mt-8 flex justify-end">
+                    {/* Proceed Button */}
+                    <div className="flex justify-end">
                       <Button
                         variant="hero"
                         onClick={() => setStep(2)}
                         disabled={!canProceedToStep2}
                       >
-                        Verder naar materiaal
+                        Verder naar gegevens ({cart.length} items)
                       </Button>
                     </div>
                   </motion.div>
                 )}
 
-                {/* Step 2: Material & Color */}
+                {/* Step 2: Contact Details */}
                 {step === 2 && (
                   <motion.div
                     key="step2"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="bg-card rounded-2xl p-8 shadow-overweel-card"
-                  >
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                      <Package className="w-6 h-6 text-accent" />
-                      Kies materiaal & kleur
-                    </h2>
-
-                    {/* Material Selection */}
-                    <div className="mb-8">
-                      <Label className="text-sm font-medium mb-3 block">Materiaal</Label>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {materials.map((material) => (
-                          <button
-                            key={material.id}
-                            onClick={() => setSelectedMaterial(material.id)}
-                            className={`p-4 rounded-xl border-2 transition-all text-left ${
-                              selectedMaterial === material.id
-                                ? "border-accent bg-accent/5"
-                                : "border-border hover:border-accent/50"
-                            }`}
-                          >
-                            <p className="font-semibold">{material.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              €{material.price}/gram
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Color Selection */}
-                    <div className="mb-8">
-                      <Label className="text-sm font-medium mb-3 block">Kleur</Label>
-                      <div className="flex flex-wrap gap-3">
-                        {colors.map((color) => (
-                          <button
-                            key={color.id}
-                            onClick={() => setSelectedColor(color.id)}
-                            className={`group relative w-12 h-12 rounded-full border-4 transition-all ${
-                              selectedColor === color.id
-                                ? "border-accent scale-110"
-                                : "border-transparent hover:scale-105"
-                            }`}
-                            style={{ backgroundColor: color.hex }}
-                            title={color.name}
-                          >
-                            {selectedColor === color.id && (
-                              <Check
-                                className={`absolute inset-0 m-auto w-6 h-6 ${
-                                  color.hex === "#FFFFFF" || color.hex === "#FFDD00"
-                                    ? "text-primary"
-                                    : "text-primary-foreground"
-                                }`}
-                              />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                      {selectedColor && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Gekozen: {colors.find(c => c.id === selectedColor)?.name}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Quantity */}
-                    <div className="mb-8">
-                      <Label className="text-sm font-medium mb-3 block">Aantal</Label>
-                      <div className="flex items-center gap-4">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        >
-                          -
-                        </Button>
-                        <span className="text-xl font-bold w-12 text-center">{quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setQuantity(quantity + 1)}
-                        >
-                          +
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <Button variant="ghost" onClick={() => setStep(1)}>
-                        Terug
-                      </Button>
-                      <Button
-                        variant="hero"
-                        onClick={() => setStep(3)}
-                        disabled={!canProceedToStep3}
-                      >
-                        Verder naar gegevens
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Step 3: Contact Details */}
-                {step === 3 && (
-                  <motion.div
-                    key="step3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
@@ -622,7 +862,7 @@ export default function Bestellen() {
                     </div>
 
                     <div className="flex justify-between">
-                      <Button variant="ghost" onClick={() => setStep(2)}>
+                      <Button variant="ghost" onClick={() => setStep(1)}>
                         Terug
                       </Button>
                       <Button
@@ -645,7 +885,7 @@ export default function Bestellen() {
               </AnimatePresence>
             </div>
 
-            {/* Right Side - Price Summary */}
+            {/* Right Side - Cart Summary */}
             <div className="lg:col-span-1">
               <div className="sticky top-24">
                 <motion.div
@@ -653,73 +893,55 @@ export default function Bestellen() {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-card rounded-2xl p-6 shadow-overweel-card"
                 >
-                  <h3 className="text-lg font-bold mb-6">Prijsoverzicht</h3>
+                  <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5" />
+                    Winkelwagen ({cart.length})
+                  </h3>
 
-                  {fileAnalysis ? (
+                  {cart.length > 0 ? (
                     <div className="space-y-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Bestand</span>
-                        <span className="font-medium truncate max-w-32">{fileAnalysis.name}</span>
-                      </div>
-                      {selectedMaterial && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Materiaal</span>
-                          <span className="font-medium">
-                            {materials.find(m => m.id === selectedMaterial)?.name}
-                          </span>
+                      {cart.map((item) => (
+                        <div key={item.id} className="flex justify-between items-start border-b border-border pb-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm truncate max-w-40">{item.name}</p>
+                            {item.material && (
+                              <p className="text-xs text-muted-foreground">
+                                {materials.find(m => m.id === item.material)?.name} - {getCurrentMaterialColors().find(c => c.id === item.color)?.name || item.color}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">{item.quantity}x</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">€{item.price.toFixed(2)}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => removeFromCart(item.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                      )}
-                      {selectedColor && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Kleur</span>
-                          <span className="font-medium">
-                            {colors.find(c => c.id === selectedColor)?.name}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Aantal</span>
-                        <span className="font-medium">{quantity}x</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Volume</span>
-                        <span className="font-medium">~{fileAnalysis.estimatedVolume} cm³</span>
-                      </div>
-                      
-                      <div className="border-t border-border pt-4 mt-4">
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-muted-foreground">Materiaalkosten</span>
-                          <span>
-                            €{(
-                              (fileAnalysis.estimatedVolume *
-                                (materials.find(m => m.id === selectedMaterial)?.price || 0)) *
-                              quantity
-                            ).toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-muted-foreground">Opstartkosten</span>
-                          <span>€{(5 * quantity).toFixed(2)}</span>
-                        </div>
-                      </div>
+                      ))}
 
                       <div className="border-t border-border pt-4">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold">Geschatte totaal</span>
                           <span className="text-2xl font-bold text-accent">
-                            €{calculatePrice().toFixed(2)}
+                            €{calculateCartTotal().toFixed(2)}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          * Definitieve prijs na controle van het model
+                          * Definitieve prijs na controle van de bestelling
                         </p>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                       <p className="text-muted-foreground">
-                        Upload een bestand om de prijs te berekenen
+                        Je winkelwagen is leeg
                       </p>
                     </div>
                   )}
@@ -734,10 +956,6 @@ export default function Bestellen() {
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-accent" />
                     <span>Prijsgarantie na bevestiging</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accent" />
-                    <span>Gratis verzending vanaf €50</span>
                   </div>
                 </div>
               </div>
