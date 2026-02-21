@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Mail, MapPin, Clock } from "lucide-react";
+import { Logo } from "./Logo";
 
 export function Footer() {
   return (
@@ -9,13 +10,9 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl font-bold text-primary-foreground tracking-tight">
-                  Overweel<span className="text-accent">3D</span>
-                </span>
-              </div>
-              <span className="text-sm text-primary-foreground/70 tracking-wide">
-                Vorm. Functie. Filament.
+              <Logo size="lg" forceDark />
+              <span className="text-sm text-primary-foreground/70 tracking-wide mt-2 block">
+                Print. Creëer. Innoveer.
               </span>
             </div>
             <p className="text-primary-foreground/70 max-w-md mt-4">

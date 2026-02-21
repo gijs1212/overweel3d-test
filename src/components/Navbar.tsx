@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "./Logo";
 import { Button } from "./ui/button";
+import { ThemeToggle } from "./ThemeToggle";
 import { Upload, Menu, X } from "lucide-react";
 import { useState } from "react";
 
@@ -54,8 +55,9 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* CTA Button */}
-          <div className="hidden md:block">
+          {/* CTA + Theme */}
+          <div className="hidden md:flex items-center gap-2">
+            <ThemeToggle />
             <Link to="/bestellen">
               <Button variant="hero" size="default">
                 <Upload className="w-4 h-4" />
