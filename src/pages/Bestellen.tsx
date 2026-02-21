@@ -18,7 +18,7 @@ const materials = [
   { 
     id: "pla", 
     name: "PLA", 
-    price: 0.08,
+    price: 0.05,
     colors: [
       { id: "white", name: "Wit", hex: "#FFFFFF" },
       { id: "black", name: "Zwart", hex: "#000000" },
@@ -33,7 +33,7 @@ const materials = [
   { 
     id: "petg", 
     name: "PETG", 
-    price: 0.10,
+    price: 0.07,
     colors: [
       { id: "white", name: "Wit", hex: "#FFFFFF" },
       { id: "black", name: "Zwart", hex: "#000000" },
@@ -43,42 +43,43 @@ const materials = [
   { 
     id: "tpu", 
     name: "TPU", 
-    price: 0.10,
+    price: 0.07,
     colors: [
       { id: "black", name: "Zwart", hex: "#000000" },
     ]
   },
 ];
 
+const plaColors = [
+  { id: "white", name: "Wit", hex: "#FFFFFF" },
+  { id: "black", name: "Zwart", hex: "#000000" },
+  { id: "blue", name: "Blauw", hex: "#0066FF" },
+  { id: "green", name: "Groen", hex: "#00CC00" },
+  { id: "leafgreen", name: "Bladgroen", hex: "#228B22" },
+  { id: "red", name: "Rood", hex: "#FF0000" },
+  { id: "yellow", name: "Geel", hex: "#FFDD00" },
+  { id: "grey", name: "Grijs", hex: "#808080" },
+];
+
 // Kant-en-klare modellen met vaste prijs
 const prebuiltModels = [
   {
-    id: "phone-stand",
-    name: "Telefoonhouder",
-    description: "Universele telefoonstandaard",
-    price: 8.50,
-    image: "📱",
+    id: "roos",
+    name: "Roos",
+    price: 4.00,
+    image: "🌹",
+    hasTextInput: true,
+    textLabel: "Tekst op rozenstam",
+    textMaxLength: 25,
+    hasColorChoice: false,
   },
   {
-    id: "keychain",
-    name: "Sleutelhanger (aangepast)",
-    description: "Gepersonaliseerde sleutelhanger met tekst",
+    id: "waxinelicht-houder",
+    name: "Waxinelicht houder",
     price: 5.00,
-    image: "🔑",
-  },
-  {
-    id: "cable-organizer",
-    name: "Kabelhouder (3-pack)",
-    description: "Houd je kabels netjes",
-    price: 6.50,
-    image: "🔌",
-  },
-  {
-    id: "plant-pot",
-    name: "Mini Plantenpot",
-    description: "Decoratieve pot voor kleine planten",
-    price: 12.00,
-    image: "🪴",
+    image: "🕯️",
+    hasTextInput: false,
+    hasColorChoice: true,
   },
 ];
 
@@ -88,6 +89,7 @@ interface CartItem {
   name: string;
   material?: string;
   color?: string;
+  colorName?: string;
   quantity: number;
   price: number;
   file?: File;
@@ -98,6 +100,7 @@ interface CartItem {
     dimensions: { x: number; y: number; z: number };
   };
   prebuiltId?: string;
+  stemText?: string;
 }
 
 export default function Bestellen() {
@@ -125,6 +128,10 @@ export default function Bestellen() {
   const [selectedMaterial, setSelectedMaterial] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
+
+  // Prebuilt model state
+  const [prebuiltStemTexts, setPrebuiltStemTexts] = useState<Record<string, string>>({});
+  const [prebuiltColors, setPrebuiltColors] = useState<Record<string, string>>({});
 
   // Form state
   const [formData, setFormData] = useState({
@@ -262,25 +269,30 @@ export default function Bestellen() {
   };
 
   const addPrebuiltToCart = (model: typeof prebuiltModels[0]) => {
-    const existingItem = cart.find(item => item.prebuiltId === model.id);
-    
-    if (existingItem) {
-      setCart(cart.map(item => 
-        item.prebuiltId === model.id 
-          ? { ...item, quantity: item.quantity + 1, price: model.price * (item.quantity + 1) }
-          : item
-      ));
-    } else {
-      const newItem: CartItem = {
-        id: `prebuilt-${Date.now()}`,
-        type: "prebuilt",
-        name: model.name,
-        quantity: 1,
-        price: model.price,
-        prebuiltId: model.id,
-      };
-      setCart([...cart, newItem]);
+    // Validate color choice if needed
+    if (model.hasColorChoice && !prebuiltColors[model.id]) {
+      toast({
+        title: "Kies een kleur",
+        description: "Selecteer een kleur voordat je dit product toevoegt.",
+        variant: "destructive",
+      });
+      return;
     }
+
+    const selectedColorObj = model.hasColorChoice ? plaColors.find(c => c.id === prebuiltColors[model.id]) : undefined;
+
+    const newItem: CartItem = {
+      id: `prebuilt-${Date.now()}`,
+      type: "prebuilt",
+      name: model.name,
+      quantity: 1,
+      price: model.price,
+      prebuiltId: model.id,
+      stemText: model.hasTextInput ? (prebuiltStemTexts[model.id] || "") : undefined,
+      color: selectedColorObj?.id,
+      colorName: selectedColorObj?.name,
+    };
+    setCart([...cart, newItem]);
 
     toast({
       title: "Toegevoegd aan winkelwagen",
@@ -314,35 +326,69 @@ export default function Bestellen() {
     setIsSubmitting(true);
 
     try {
+      // Prepare file for OneDrive upload
+      let fileBase64: string | undefined;
+      let uploadFileName: string | undefined;
+      const customItem = cart.find(item => item.type === "custom" && item.file);
+      if (customItem?.file) {
+        const arrayBuffer = await customItem.file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        fileBase64 = btoa(binary);
+        uploadFileName = customItem.file.name;
+      }
+
+      const orderItems = cart.map(item => ({
+        name: item.name,
+        type: item.type,
+        material: item.material ? materials.find(m => m.id === item.material)?.name : undefined,
+        color: item.colorName || (item.color ? materials.find(m => m.id === item.material)?.colors.find(c => c.id === item.color)?.name : undefined),
+        quantity: item.quantity,
+        price: item.price.toFixed(2),
+        dimensions: item.fileAnalysis?.dimensions,
+        volume: item.fileAnalysis?.estimatedVolume,
+        stemText: item.stemText,
+      }));
+
+      const customerData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        postalCode: formData.postalCode,
+        notes: formData.notes,
+      };
+
       // Call edge function to send email notification
       const { error } = await supabase.functions.invoke("send-order-notification", {
         body: {
           orderDetails: {
-            items: cart.map(item => ({
-              name: item.name,
-              type: item.type,
-              material: item.material ? materials.find(m => m.id === item.material)?.name : undefined,
-              color: item.color ? materials.find(m => m.id === item.material)?.colors.find(c => c.id === item.color)?.name : undefined,
-              quantity: item.quantity,
-              price: item.price.toFixed(2),
-              dimensions: item.fileAnalysis?.dimensions,
-              volume: item.fileAnalysis?.estimatedVolume,
-            })),
+            items: orderItems,
             totalPrice: calculateCartTotal().toFixed(2),
           },
-          customer: {
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            address: formData.address,
-            city: formData.city,
-            postalCode: formData.postalCode,
-            notes: formData.notes,
-          },
+          customer: customerData,
         },
       });
 
       if (error) throw error;
+
+      // Upload to OneDrive (don't block order on failure)
+      try {
+        await supabase.functions.invoke("upload-to-onedrive", {
+          body: {
+            customer: customerData,
+            items: orderItems,
+            fileBase64,
+            fileName: uploadFileName,
+          },
+        });
+      } catch (onedriveError) {
+        console.error("OneDrive upload failed (order still placed):", onedriveError);
+      }
 
       setOrderComplete(true);
       toast({
@@ -522,18 +568,83 @@ export default function Bestellen() {
                       <p className="text-sm text-muted-foreground mb-6">
                         Direct leverbaar tegen vaste prijs. Deze worden volledig afgemonteerd geleverd.
                       </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {prebuiltModels.map((model) => (
-                          <button
+                          <div
                             key={model.id}
-                            onClick={() => addPrebuiltToCart(model)}
-                            className="p-4 rounded-xl border-2 border-border hover:border-accent transition-all text-center group"
+                            className="p-6 rounded-xl border-2 border-border hover:border-accent/50 transition-all"
                           >
-                            <div className="text-4xl mb-2">{model.image}</div>
-                            <p className="font-semibold text-sm">{model.name}</p>
-                            <p className="text-xs text-muted-foreground">{model.description}</p>
-                            <p className="text-accent font-bold mt-2">€{model.price.toFixed(2)}</p>
-                          </button>
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="text-4xl">{model.image}</div>
+                              <div>
+                                <p className="font-semibold">{model.name}</p>
+                                <p className="text-accent font-bold">€{model.price.toFixed(2)}</p>
+                              </div>
+                            </div>
+
+                            {/* Text input for roos */}
+                            {model.hasTextInput && (
+                              <div className="mb-4">
+                                <Label className="text-sm mb-1 block">{model.textLabel}</Label>
+                                <Input
+                                  maxLength={model.textMaxLength}
+                                  value={prebuiltStemTexts[model.id] || ""}
+                                  onChange={(e) => setPrebuiltStemTexts({ ...prebuiltStemTexts, [model.id]: e.target.value })}
+                                  placeholder="Typ hier je tekst (max 25 tekens)"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {(prebuiltStemTexts[model.id] || "").length}/{model.textMaxLength} tekens
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Color choice for waxinelicht */}
+                            {model.hasColorChoice && (
+                              <div className="mb-4">
+                                <Label className="text-sm mb-2 block">Kies een kleur (verplicht)</Label>
+                                <div className="flex flex-wrap gap-2">
+                                  {plaColors.map((color) => (
+                                    <button
+                                      key={color.id}
+                                      onClick={() => setPrebuiltColors({ ...prebuiltColors, [model.id]: color.id })}
+                                      className={`w-8 h-8 rounded-full border-3 transition-all ${
+                                        prebuiltColors[model.id] === color.id
+                                          ? "border-accent scale-110 ring-2 ring-accent"
+                                          : "border-border hover:scale-105"
+                                      }`}
+                                      style={{ backgroundColor: color.hex }}
+                                      title={color.name}
+                                    >
+                                      {prebuiltColors[model.id] === color.id && (
+                                        <Check
+                                          className={`w-4 h-4 mx-auto ${
+                                            color.hex === "#FFFFFF" || color.hex === "#FFDD00"
+                                              ? "text-primary"
+                                              : "text-white"
+                                          }`}
+                                        />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                                {prebuiltColors[model.id] && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Gekozen: {plaColors.find(c => c.id === prebuiltColors[model.id])?.name}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addPrebuiltToCart(model)}
+                              className="w-full"
+                            >
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Toevoegen
+                            </Button>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -906,8 +1017,14 @@ export default function Bestellen() {
                             <p className="font-medium text-sm truncate max-w-40">{item.name}</p>
                             {item.material && (
                               <p className="text-xs text-muted-foreground">
-                                {materials.find(m => m.id === item.material)?.name} - {getCurrentMaterialColors().find(c => c.id === item.color)?.name || item.color}
+                                {materials.find(m => m.id === item.material)?.name} - {item.colorName || getCurrentMaterialColors().find(c => c.id === item.color)?.name || item.color}
                               </p>
+                            )}
+                            {item.colorName && !item.material && (
+                              <p className="text-xs text-muted-foreground">Kleur: {item.colorName}</p>
+                            )}
+                            {item.stemText && (
+                              <p className="text-xs text-muted-foreground">Tekst: "{item.stemText}"</p>
                             )}
                             <p className="text-xs text-muted-foreground">{item.quantity}x</p>
                           </div>

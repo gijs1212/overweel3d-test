@@ -18,6 +18,7 @@ interface OrderItem {
   price: string;
   dimensions?: { x: number; y: number; z: number };
   volume?: number;
+  stemText?: string;
 }
 
 interface OrderDetails {
@@ -70,6 +71,8 @@ const handler = async (req: Request): Promise<Response> => {
         <div>
           <span class="value" style="font-weight: 600; color: #1B365D;">${item.name}</span>
           ${item.material ? `<br><span style="color: #64748b; font-size: 12px;">${item.material}${item.color ? ` - ${item.color}` : ''}</span>` : ''}
+          ${item.color && !item.material ? `<br><span style="color: #64748b; font-size: 12px;">Kleur: ${item.color}</span>` : ''}
+          ${item.stemText ? `<br><span style="color: #64748b; font-size: 12px;">Tekst op stam: "${item.stemText}"</span>` : ''}
           <br><span style="color: #64748b; font-size: 12px;">${item.quantity}x</span>
           ${item.dimensions ? `<br><span style="color: #64748b; font-size: 12px;">${item.dimensions.x} × ${item.dimensions.y} × ${item.dimensions.z} mm</span>` : ''}
         </div>
