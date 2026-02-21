@@ -2,7 +2,7 @@ import logoDark from "@/assets/logo-dark.jpg";
 import logoLight from "@/assets/logo-light.png";
 
 interface LogoProps {
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   showTagline?: boolean;
   forceDark?: boolean;
 }
@@ -12,6 +12,7 @@ export function Logo({ size = "md", showTagline = false, forceDark = false }: Lo
     sm: "h-8",
     md: "h-10",
     lg: "h-14",
+    xl: "h-20",
   };
 
   return (

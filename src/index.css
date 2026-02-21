@@ -16,8 +16,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 20%;
 
-    /* Deep Blue Primary */
-    --primary: 217 56% 24%;
+    /* Dark Charcoal Primary - matched from logo */
+    --primary: 0 0% 20%;
     --primary-foreground: 210 40% 98%;
 
     /* Ice Blue Secondary */
@@ -42,7 +42,7 @@
     --radius: 0.75rem;
 
     /* Custom Overweel3D tokens */
-    --overweel-deep: 217 56% 24%;
+    --overweel-deep: 0 0% 20%;
     --overweel-light: 210 45% 65%;
     --overweel-ice: 210 50% 96%;
     --overweel-turquoise: 195 85% 45%;
@@ -51,7 +51,7 @@
     --overweel-dark: 220 15% 18%;
 
     /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(217 56% 24%) 0%, hsl(210 45% 35%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(0 0% 20%) 0%, hsl(0 0% 30%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(195 85% 45%) 0%, hsl(195 100% 50%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 50% 98%) 100%);
     --gradient-glow: radial-gradient(circle at 50% 0%, hsl(195 85% 45% / 0.15) 0%, transparent 50%);
@@ -61,7 +61,7 @@
     --shadow-md: 0 4px 16px -4px hsl(220 15% 18% / 0.12);
     --shadow-lg: 0 8px 32px -8px hsl(220 15% 18% / 0.16);
     --shadow-glow: 0 0 24px hsl(195 85% 45% / 0.25);
-    --shadow-card: 0 4px 20px -4px hsl(217 56% 24% / 0.08);
+    --shadow-card: 0 4px 20px -4px hsl(0 0% 20% / 0.08);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
