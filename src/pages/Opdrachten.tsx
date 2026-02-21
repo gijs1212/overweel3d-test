@@ -19,7 +19,7 @@ interface Product {
 const products: Product[] = [
   {
     id: "roos",
-    images: [roosOpen, roosKnop],
+    images: [roosKnop, roosOpen],
     coverIndex: 0,
   },
   {
