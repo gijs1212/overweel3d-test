@@ -132,6 +132,7 @@ export default function Bestellen() {
   // Prebuilt model state
   const [prebuiltStemTexts, setPrebuiltStemTexts] = useState<Record<string, string>>({});
   const [prebuiltColors, setPrebuiltColors] = useState<Record<string, string>>({});
+  const [prebuiltQuantities, setPrebuiltQuantities] = useState<Record<string, number>>({});
 
   // Form state
   const [formData, setFormData] = useState({
@@ -281,12 +282,14 @@ export default function Bestellen() {
 
     const selectedColorObj = model.hasColorChoice ? plaColors.find(c => c.id === prebuiltColors[model.id]) : undefined;
 
+    const qty = prebuiltQuantities[model.id] || 1;
+
     const newItem: CartItem = {
       id: `prebuilt-${Date.now()}`,
       type: "prebuilt",
       name: model.name,
-      quantity: 1,
-      price: model.price,
+      quantity: qty,
+      price: model.price * qty,
       prebuiltId: model.id,
       stemText: model.hasTextInput ? (prebuiltStemTexts[model.id] || "") : undefined,
       color: selectedColorObj?.id,
@@ -635,6 +638,18 @@ export default function Bestellen() {
                               </div>
                             )}
 
+                            {/* Quantity input */}
+                            <div className="mb-4">
+                              <Label className="text-sm mb-1 block">Aantal</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={prebuiltQuantities[model.id] || 1}
+                                onChange={(e) => setPrebuiltQuantities({ ...prebuiltQuantities, [model.id]: Math.max(1, parseInt(e.target.value) || 1) })}
+                                className="w-24"
+                              />
+                            </div>
+
                             <Button
                               variant="outline"
                               size="sm"
@@ -642,7 +657,7 @@ export default function Bestellen() {
                               className="w-full"
                             >
                               <ShoppingCart className="w-4 h-4 mr-2" />
-                              Toevoegen
+                              Toevoegen (€{((prebuiltQuantities[model.id] || 1) * model.price).toFixed(2)})
                             </Button>
                           </div>
                         ))}

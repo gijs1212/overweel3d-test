@@ -10,7 +10,7 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="mb-4">
-              <Logo size="xl" forceDark />
+              <Logo size="xl" />
               <span className="text-sm text-primary-foreground/70 tracking-wide mt-2 block">
                 Print. Creëer. Innoveer.
               </span>
