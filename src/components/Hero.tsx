@@ -90,11 +90,7 @@ export function Hero() {
           >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-accent" />
-              <span>Gemiddeld 3-5 werkdagen levertijd</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-accent" />
-              <span>Gratis verzending vanaf €50</span>
+              <span>Geen betaling vooraf nodig</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-accent" />

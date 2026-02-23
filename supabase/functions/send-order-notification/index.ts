@@ -82,7 +82,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send notification email to Overweel3D
     const emailResponse = await resend.emails.send({
-      from: "Overweel3D <onboarding@resend.dev>",
+      from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
       to: ["gijsoverweel@gmail.com"],
       subject: `🖨️ Nieuwe 3D-print bestelling van ${customer.name}`,
       html: `
@@ -170,7 +170,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send confirmation email to customer
     const customerEmailResponse = await resend.emails.send({
-      from: "Overweel3D <onboarding@resend.dev>",
+      from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
       to: [customer.email],
       subject: `✅ Bevestiging van je bestelling bij Overweel3D`,
       html: `
