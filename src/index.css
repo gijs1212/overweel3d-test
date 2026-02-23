@@ -6,8 +6,8 @@
 
 @layer base {
   :root {
-    /* Overweel3D Blue Palette */
-    --background: 210 33% 98%;
+    /* Overweel3D Light Theme - #fefefe white */
+    --background: 0 0% 99.6%;
     --foreground: 220 25% 20%;
 
     --card: 0 0% 100%;
