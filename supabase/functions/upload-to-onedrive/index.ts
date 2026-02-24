@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,37 +36,99 @@ interface UploadRequest {
   fileName?: string;
 }
 
+const TENANT_ID = Deno.env.get("ONEDRIVE_TENANT_ID") || "ee379395-a204-487f-ac45-88e971655363";
+const CLIENT_ID = Deno.env.get("ONEDRIVE_CLIENT_ID")!;
+const CLIENT_SECRET = Deno.env.get("ONEDRIVE_CLIENT_SECRET")!;
+const TOKEN_URL = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+
 async function getAccessToken(): Promise<string> {
-  const clientId = Deno.env.get("ONEDRIVE_CLIENT_ID");
-  const clientSecret = Deno.env.get("ONEDRIVE_CLIENT_SECRET");
-  const refreshToken = Deno.env.get("ONEDRIVE_REFRESH_TOKEN");
-  const tenantId = Deno.env.get("ONEDRIVE_TENANT_ID") || "common";
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("OneDrive credentials not configured. Please set ONEDRIVE_CLIENT_ID, ONEDRIVE_CLIENT_SECRET, and ONEDRIVE_REFRESH_TOKEN.");
+  // Try to get stored tokens from DB first
+  const { data: tokenRow } = await supabaseAdmin
+    .from("onedrive_tokens")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (tokenRow) {
+    // Check if access token is still valid
+    if (tokenRow.expires_at && new Date(tokenRow.expires_at) > new Date()) {
+      console.log("Using cached access token from DB");
+      return tokenRow.access_token;
+    }
+
+    // Refresh the token
+    if (tokenRow.refresh_token) {
+      console.log("Refreshing access token using stored refresh token...");
+      const response = await fetch(TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: CLIENT_ID,
+          client_secret: CLIENT_SECRET,
+          refresh_token: tokenRow.refresh_token,
+          grant_type: "refresh_token",
+          scope: "https://graph.microsoft.com/.default",
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const expiresAt = data.expires_in
+          ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+          : null;
+
+        // Update stored tokens
+        await supabaseAdmin
+          .from("onedrive_tokens")
+          .update({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token || tokenRow.refresh_token,
+            expires_at: expiresAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tokenRow.id);
+
+        console.log("Token refreshed and stored");
+        return data.access_token;
+      } else {
+        const errorText = await response.text();
+        console.error("Token refresh failed:", errorText);
+      }
+    }
   }
 
-  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  // Fallback: try env var refresh token (legacy)
+  const envRefreshToken = Deno.env.get("ONEDRIVE_REFRESH_TOKEN");
+  if (envRefreshToken) {
+    console.log("Using env var ONEDRIVE_REFRESH_TOKEN as fallback...");
+    const response = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        refresh_token: envRefreshToken,
+        grant_type: "refresh_token",
+        scope: "https://graph.microsoft.com/.default",
+      }),
+    });
 
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-      scope: "https://graph.microsoft.com/.default",
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to get access token: ${error}`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.access_token;
+    }
+    const errorText = await response.text();
+    throw new Error(`Failed to get access token from env refresh token: ${errorText}`);
   }
 
-  const data = await response.json();
-  return data.access_token;
+  throw new Error(
+    "No valid OneDrive tokens found. Please authenticate via /auth/callback first."
+  );
 }
 
 async function createFolder(accessToken: string, parentPath: string, folderName: string): Promise<void> {
