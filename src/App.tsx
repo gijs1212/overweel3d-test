@@ -9,6 +9,7 @@ import Voorwaarden from "./pages/Voorwaarden";
 import FAQ from "./pages/FAQ";
 import Contact from "./pages/Contact";
 import Opdrachten from "./pages/Opdrachten";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/faq" element={<FAQ />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/opdrachten" element={<Opdrachten />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
