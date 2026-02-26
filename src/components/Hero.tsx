@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { Upload, ArrowRight, Sparkles } from "lucide-react";
+import { Upload, ArrowRight, Sparkles, Cloud } from "lucide-react";
+import { startOneDriveAuth } from "@/lib/pkce";
 
 export function Hero() {
   return (
@@ -79,6 +80,23 @@ export function Hero() {
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
+          </motion.div>
+
+          {/* Temp: OneDrive Auth Button */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="mt-6"
+          >
+            <Button
+              variant="ice"
+              size="default"
+              onClick={() => startOneDriveAuth(["openid", "profile", "email", "User.Read"])}
+            >
+              <Cloud className="w-4 h-4" />
+              Connect OneDrive (test)
+            </Button>
           </motion.div>
 
           {/* Trust Indicators */}
