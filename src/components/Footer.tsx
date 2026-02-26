@@ -59,7 +59,7 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-primary-foreground/70">
                 <Mail className="w-4 h-4 text-accent" />
-                <span>overweel3d@hotmail.com</span>
+                <span>gijsoverweel@gmail.com</span>
               </li>
               <li className="flex items-center gap-3 text-primary-foreground/70">
                 <MapPin className="w-4 h-4 text-accent" />
@@ -76,7 +76,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="border-t border-primary-foreground/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-primary-foreground/50 text-sm">
-            © 2024 Overweel3D. Alle rechten voorbehouden.
+            © 2026 Overweel3D. Alle rechten voorbehouden.
           </p>
           <p className="text-primary-foreground/50 text-sm">
             PS: Het geheime codewoord is <span className="text-accent font-mono">PLAFTASTIC</span> 🤫

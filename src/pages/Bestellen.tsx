@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -7,18 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, Check, Package, Loader2, FileType, Ruler, Box, AlertCircle, ShoppingCart, Trash2, Star } from "lucide-react";
+import { Link2, Check, Package, Loader2, AlertCircle, ShoppingCart, Trash2, Star, Plus, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-const MAX_PRINT_SIZE = { x: 220, y: 220, z: 200 };
-const MAX_FILE_SIZE_MB = 10;
 
 const materials = [
   { 
     id: "pla", 
     name: "PLA", 
-    price: 0.05,
     colors: [
       { id: "white", name: "Wit", hex: "#FFFFFF" },
       { id: "black", name: "Zwart", hex: "#000000" },
@@ -33,7 +29,6 @@ const materials = [
   { 
     id: "petg", 
     name: "PETG", 
-    price: 0.07,
     colors: [
       { id: "white", name: "Wit", hex: "#FFFFFF" },
       { id: "black", name: "Zwart", hex: "#000000" },
@@ -43,7 +38,6 @@ const materials = [
   { 
     id: "tpu", 
     name: "TPU", 
-    price: 0.07,
     colors: [
       { id: "black", name: "Zwart", hex: "#000000" },
     ]
@@ -61,7 +55,6 @@ const plaColors = [
   { id: "grey", name: "Grijs", hex: "#808080" },
 ];
 
-// Kant-en-klare modellen met vaste prijs
 const prebuiltModels = [
   {
     id: "roos",
@@ -83,24 +76,28 @@ const prebuiltModels = [
   },
 ];
 
-interface CartItem {
-  id: string;
-  type: "custom" | "prebuilt";
+interface LinkFile {
   name: string;
-  material?: string;
-  color?: string;
-  colorName?: string;
+  quantity: number;
+  material: string;
+  color: string;
+}
+
+interface OrderLink {
+  id: string;
+  url: string;
+  files: LinkFile[];
+}
+
+interface PrebuiltCartItem {
+  id: string;
+  name: string;
   quantity: number;
   price: number;
-  file?: File;
-  fileAnalysis?: {
-    name: string;
-    size: string;
-    estimatedVolume: number;
-    dimensions: { x: number; y: number; z: number };
-  };
-  prebuiltId?: string;
+  prebuiltId: string;
   stemText?: string;
+  color?: string;
+  colorName?: string;
 }
 
 export default function Bestellen() {
@@ -109,27 +106,13 @@ export default function Bestellen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
 
-  // Cart state
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Links state
+  const [orderLinks, setOrderLinks] = useState<OrderLink[]>([
+    { id: `link-${Date.now()}`, url: "", files: [{ name: "", quantity: 1, material: "", color: "" }] }
+  ]);
 
-  // File state
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [fileAnalysis, setFileAnalysis] = useState<{
-    name: string;
-    size: string;
-    estimatedVolume: number;
-    dimensions: { x: number; y: number; z: number };
-  } | null>(null);
-  const [fileTooLarge, setFileTooLarge] = useState(false);
-  const [printTooLarge, setPrintTooLarge] = useState(false);
-
-  // Selection state
-  const [selectedMaterial, setSelectedMaterial] = useState("");
-  const [selectedColor, setSelectedColor] = useState("");
-  const [quantity, setQuantity] = useState(1);
-
-  // Prebuilt model state
+  // Prebuilt cart
+  const [prebuiltCart, setPrebuiltCart] = useState<PrebuiltCartItem[]>([]);
   const [prebuiltStemTexts, setPrebuiltStemTexts] = useState<Record<string, string>>({});
   const [prebuiltColors, setPrebuiltColors] = useState<Record<string, string>>({});
   const [prebuiltQuantities, setPrebuiltQuantities] = useState<Record<string, number>>({});
@@ -147,146 +130,57 @@ export default function Bestellen() {
     notALightsaber: false,
   });
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFile = e.dataTransfer.files[0];
-    processFile(droppedFile);
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      processFile(selectedFile);
-    }
+  // Link management
+  const addLink = () => {
+    setOrderLinks([...orderLinks, { id: `link-${Date.now()}`, url: "", files: [{ name: "", quantity: 1, material: "", color: "" }] }]);
   };
 
-  const processFile = (file: File) => {
-    const validExtensions = [".stl", ".obj", ".step", ".stp"];
-    const extension = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
-    
-    if (!validExtensions.includes(extension)) {
-      toast({
-        title: "Ongeldig bestandstype",
-        description: "Upload een STL, OBJ of STEP bestand.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check file size (10MB limit)
-    const fileSizeMB = file.size / 1024 / 1024;
-    if (fileSizeMB > MAX_FILE_SIZE_MB) {
-      setFileTooLarge(true);
-      toast({
-        title: "Bestand te groot",
-        description: `Maximum bestandsgrootte is ${MAX_FILE_SIZE_MB}MB. Dit bestand is ${fileSizeMB.toFixed(1)}MB.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    setFileTooLarge(false);
-
-    setFile(file);
-    
-    // Simulate file analysis (in real app, this would parse the 3D file)
-    const randomVolume = Math.floor(Math.random() * 150) + 20;
-    const dimensions = {
-      x: Math.floor(Math.random() * 180) + 20,
-      y: Math.floor(Math.random() * 180) + 20,
-      z: Math.floor(Math.random() * 150) + 10,
-    };
-
-    // Check if print is too large
-    const isTooLarge = dimensions.x > MAX_PRINT_SIZE.x || 
-                       dimensions.y > MAX_PRINT_SIZE.y || 
-                       dimensions.z > MAX_PRINT_SIZE.z;
-    setPrintTooLarge(isTooLarge);
-
-    setFileAnalysis({
-      name: file.name,
-      size: (file.size / 1024 / 1024).toFixed(2) + " MB",
-      estimatedVolume: randomVolume,
-      dimensions,
-    });
+  const removeLink = (linkId: string) => {
+    if (orderLinks.length <= 1) return;
+    setOrderLinks(orderLinks.filter(l => l.id !== linkId));
   };
 
-  const getCurrentMaterialColors = () => {
-    const material = materials.find(m => m.id === selectedMaterial);
-    return material?.colors || [];
+  const updateLinkUrl = (linkId: string, url: string) => {
+    setOrderLinks(orderLinks.map(l => l.id === linkId ? { ...l, url } : l));
   };
 
-  const calculateItemPrice = (volume: number, materialId: string, qty: number) => {
-    const material = materials.find(m => m.id === materialId);
-    if (!material) return 0;
-    const basePrice = volume * material.price;
-    const setupFee = 5;
-    return (basePrice + setupFee) * qty;
+  const addFileToLink = (linkId: string) => {
+    setOrderLinks(orderLinks.map(l => l.id === linkId ? { ...l, files: [...l.files, { name: "", quantity: 1, material: "", color: "" }] } : l));
   };
 
-  const calculateCartTotal = () => {
-    return cart.reduce((total, item) => total + item.price, 0);
+  const removeFileFromLink = (linkId: string, fileIndex: number) => {
+    setOrderLinks(orderLinks.map(l => {
+      if (l.id !== linkId || l.files.length <= 1) return l;
+      return { ...l, files: l.files.filter((_, i) => i !== fileIndex) };
+    }));
   };
 
-  const addToCart = () => {
-    if (!file || !fileAnalysis || !selectedMaterial || !selectedColor || printTooLarge) return;
+  const updateFile = (linkId: string, fileIndex: number, field: keyof LinkFile, value: string | number) => {
+    setOrderLinks(orderLinks.map(l => {
+      if (l.id !== linkId) return l;
+      const newFiles = [...l.files];
+      newFiles[fileIndex] = { ...newFiles[fileIndex], [field]: value };
+      // Reset color when material changes
+      if (field === "material") {
+        newFiles[fileIndex].color = "";
+      }
+      return { ...l, files: newFiles };
+    }));
+  };
 
-    const newItem: CartItem = {
-      id: `custom-${Date.now()}`,
-      type: "custom",
-      name: file.name,
-      material: selectedMaterial,
-      color: selectedColor,
-      quantity,
-      price: calculateItemPrice(fileAnalysis.estimatedVolume, selectedMaterial, quantity),
-      file,
-      fileAnalysis,
-    };
-
-    setCart([...cart, newItem]);
-    
-    // Reset form
-    setFile(null);
-    setFileAnalysis(null);
-    setSelectedMaterial("");
-    setSelectedColor("");
-    setQuantity(1);
-    setPrintTooLarge(false);
-
-    toast({
-      title: "Toegevoegd aan winkelwagen",
-      description: `${file.name} is toegevoegd.`,
-    });
+  const getColorsForMaterial = (materialId: string) => {
+    return materials.find(m => m.id === materialId)?.colors || [];
   };
 
   const addPrebuiltToCart = (model: typeof prebuiltModels[0]) => {
-    // Validate color choice if needed
     if (model.hasColorChoice && !prebuiltColors[model.id]) {
-      toast({
-        title: "Kies een kleur",
-        description: "Selecteer een kleur voordat je dit product toevoegt.",
-        variant: "destructive",
-      });
+      toast({ title: "Kies een kleur", description: "Selecteer een kleur voordat je dit product toevoegt.", variant: "destructive" });
       return;
     }
-
     const selectedColorObj = model.hasColorChoice ? plaColors.find(c => c.id === prebuiltColors[model.id]) : undefined;
-
     const qty = prebuiltQuantities[model.id] || 1;
-
-    const newItem: CartItem = {
+    const newItem: PrebuiltCartItem = {
       id: `prebuilt-${Date.now()}`,
-      type: "prebuilt",
       name: model.name,
       quantity: qty,
       price: model.price * qty,
@@ -295,65 +189,47 @@ export default function Bestellen() {
       color: selectedColorObj?.id,
       colorName: selectedColorObj?.name,
     };
-    setCart([...cart, newItem]);
-
-    toast({
-      title: "Toegevoegd aan winkelwagen",
-      description: `${model.name} is toegevoegd.`,
-    });
+    setPrebuiltCart([...prebuiltCart, newItem]);
+    toast({ title: "Toegevoegd", description: `${model.name} is toegevoegd.` });
   };
 
-  const removeFromCart = (itemId: string) => {
-    setCart(cart.filter(item => item.id !== itemId));
+  const removePrebuilt = (itemId: string) => {
+    setPrebuiltCart(prebuiltCart.filter(item => item.id !== itemId));
   };
+
+  const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
+
+  // Validation
+  const hasValidLinks = orderLinks.some(l => l.url.trim() !== "" && l.files.some(f => f.name.trim() !== "" && f.material && f.color));
+  const hasPrebuiltItems = prebuiltCart.length > 0;
+  const canProceedToStep2 = hasValidLinks || hasPrebuiltItems;
+  const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && formData.notALightsaber && canProceedToStep2;
 
   const handleSubmit = async () => {
-    if (!formData.agreeTerms) {
-      toast({
-        title: "Voorwaarden",
-        description: "Accepteer de algemene voorwaarden om door te gaan.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (cart.length === 0) {
-      toast({
-        title: "Winkelwagen leeg",
-        description: "Voeg eerst items toe aan je winkelwagen.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (!canSubmit) return;
     setIsSubmitting(true);
 
     try {
-      // Prepare file for OneDrive upload
-      let fileBase64: string | undefined;
-      let uploadFileName: string | undefined;
-      const customItem = cart.find(item => item.type === "custom" && item.file);
-      if (customItem?.file) {
-        const arrayBuffer = await customItem.file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        fileBase64 = btoa(binary);
-        uploadFileName = customItem.file.name;
-      }
+      // Build link items for email
+      const linkItems = orderLinks
+        .filter(l => l.url.trim() !== "")
+        .map(l => ({
+          url: l.url,
+          files: l.files.filter(f => f.name.trim() !== "").map(f => ({
+            name: f.name,
+            quantity: f.quantity,
+            material: materials.find(m => m.id === f.material)?.name || f.material,
+            color: getColorsForMaterial(f.material).find(c => c.id === f.color)?.name || f.color,
+          })),
+        }));
 
-      const orderItems = cart.map(item => ({
+      const prebuiltItems = prebuiltCart.map(item => ({
         name: item.name,
-        type: item.type,
-        material: item.material ? materials.find(m => m.id === item.material)?.name : undefined,
-        color: item.colorName || (item.color ? materials.find(m => m.id === item.material)?.colors.find(c => c.id === item.color)?.name : undefined),
+        type: "prebuilt" as const,
         quantity: item.quantity,
         price: item.price.toFixed(2),
-        dimensions: item.fileAnalysis?.dimensions,
-        volume: item.fileAnalysis?.estimatedVolume,
         stemText: item.stemText,
+        color: item.colorName,
       }));
 
       const customerData = {
@@ -366,12 +242,12 @@ export default function Bestellen() {
         notes: formData.notes,
       };
 
-      // Call edge function to send email notification
       const { error } = await supabase.functions.invoke("send-order-notification", {
         body: {
           orderDetails: {
-            items: orderItems,
-            totalPrice: calculateCartTotal().toFixed(2),
+            links: linkItems,
+            prebuiltItems,
+            prebuiltTotal: prebuiltTotal.toFixed(2),
           },
           customer: customerData,
         },
@@ -379,40 +255,15 @@ export default function Bestellen() {
 
       if (error) throw error;
 
-      // Upload to OneDrive (don't block order on failure)
-      try {
-        await supabase.functions.invoke("upload-to-onedrive", {
-          body: {
-            customer: customerData,
-            items: orderItems,
-            fileBase64,
-            fileName: uploadFileName,
-          },
-        });
-      } catch (onedriveError) {
-        console.error("OneDrive upload failed (order still placed):", onedriveError);
-      }
-
       setOrderComplete(true);
-      toast({
-        title: "Bestelling geplaatst!",
-        description: "Je ontvangt binnenkort een bevestigingsmail.",
-      });
+      toast({ title: "Bestelling geplaatst!", description: "Je ontvangt binnenkort een bevestigingsmail." });
     } catch (error) {
       console.error("Order error:", error);
-      toast({
-        title: "Er ging iets mis",
-        description: "Probeer het opnieuw of neem contact met ons op.",
-        variant: "destructive",
-      });
+      toast({ title: "Er ging iets mis", description: "Probeer het opnieuw of neem contact met ons op.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const canAddToCart = file && fileAnalysis && selectedMaterial && selectedColor && !printTooLarge;
-  const canProceedToStep2 = cart.length > 0;
-  const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && formData.notALightsaber && cart.length > 0;
 
   if (orderComplete) {
     return (
@@ -420,64 +271,49 @@ export default function Bestellen() {
         <Navbar />
         <main className="pt-20 pb-16">
           <div className="container mx-auto px-4 py-16">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="max-w-lg mx-auto text-center"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="w-24 h-24 mx-auto mb-8 rounded-full bg-accent flex items-center justify-center"
-              >
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-lg mx-auto text-center">
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }} className="w-24 h-24 mx-auto mb-8 rounded-full bg-accent flex items-center justify-center">
                 <Check className="w-12 h-12 text-accent-foreground" />
               </motion.div>
-              
-              <h1 className="text-3xl font-bold text-primary mb-4">
-                Bestelling geplaatst! 🎉
-              </h1>
+              <h1 className="text-3xl font-bold text-primary mb-4">Bestelling geplaatst! 🎉</h1>
               <p className="text-muted-foreground mb-8">
                 Je bestelling vliegt nu digitaal naar ons toe. We gaan direct aan de slag 
                 en je ontvangt een bevestigingsmail met alle details op {formData.email}.
               </p>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="bg-card rounded-2xl p-6 shadow-overweel-card text-left"
-              >
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-card rounded-2xl p-6 shadow-overweel-card text-left">
                 <h3 className="font-semibold mb-4">Samenvatting</h3>
                 <div className="space-y-3">
-                  {cart.map(item => (
+                  {orderLinks.filter(l => l.url.trim()).map((link, i) => (
+                    <div key={link.id} className="border-b border-border pb-3">
+                      <p className="text-sm font-medium text-accent break-all">🔗 {link.url}</p>
+                      {link.files.filter(f => f.name.trim()).map((f, fi) => (
+                        <p key={fi} className="text-xs text-muted-foreground ml-4">
+                          {f.name} — {f.quantity}x — {materials.find(m => m.id === f.material)?.name} — {getColorsForMaterial(f.material).find(c => c.id === f.color)?.name}
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                  {prebuiltCart.map(item => (
                     <div key={item.id} className="flex justify-between text-sm border-b border-border pb-2">
                       <div>
                         <p className="font-medium">{item.name}</p>
-                        {item.material && (
-                          <p className="text-muted-foreground text-xs">
-                            {materials.find(m => m.id === item.material)?.name} - {item.quantity}x
-                          </p>
-                        )}
+                        <p className="text-muted-foreground text-xs">{item.quantity}x</p>
                       </div>
                       <span className="font-medium">€{item.price.toFixed(2)}</span>
                     </div>
                   ))}
-                  <p className="text-lg font-bold text-accent pt-2">
-                    Geschatte totaal: €{calculateCartTotal().toFixed(2)}
-                  </p>
+                  {prebuiltCart.length > 0 && (
+                    <p className="text-lg font-bold text-accent pt-2">Kant-en-klaar totaal: €{prebuiltTotal.toFixed(2)}</p>
+                  )}
                 </div>
               </motion.div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-left">
                 <p className="text-sm text-amber-800">
-                  ⚠️ <strong>Let op:</strong> De prijs is niet definitief en kan nog afgewezen of aangepast worden na controle van de bestelling.
+                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt bepaald na controle. We nemen contact op met een offerte.
                 </p>
               </div>
-
-              <p className="text-sm text-muted-foreground mt-8">
-                PS: Het geheime codewoord is <span className="font-mono text-accent">PLAFTASTIC</span> 🤫
-              </p>
             </motion.div>
           </div>
         </main>
@@ -492,16 +328,10 @@ export default function Bestellen() {
       <main className="pt-20 pb-16">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">
-              Plaats je bestelling
-            </h1>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
+            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Plaats je bestelling</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload je 3D-model of kies een kant-en-klaar product, en wij doen de rest.
+              Deel een link naar je 3D-bestanden, geef per bestand de details op, en wij printen het voor je.
             </p>
           </motion.div>
 
@@ -509,7 +339,12 @@ export default function Bestellen() {
           <div className="max-w-4xl mx-auto mb-8 space-y-3">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
-                ⚠️ <strong>Belangrijk:</strong> De prijs is een schatting en kan nog aangepast of afgewezen worden na controle.
+                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na controle bepaald. Je ontvangt eerst een offerte.
+              </p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                ℹ️ <strong>Links:</strong> Alleen links met gratis te downloaden bestanden worden geaccepteerd. Zijn de bestanden betaald? Stuur ze dan via <a href="https://wetransfer.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold">WeTransfer</a> en plak de WeTransfer-link hieronder.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -525,24 +360,13 @@ export default function Bestellen() {
               {[1, 2].map((s) => (
                 <div key={s} className="flex items-center">
                   <motion.div
-                    animate={{
-                      backgroundColor: step >= s ? "hsl(var(--accent))" : "hsl(var(--muted))",
-                      scale: step === s ? 1.1 : 1,
-                    }}
+                    animate={{ backgroundColor: step >= s ? "hsl(var(--accent))" : "hsl(var(--muted))", scale: step === s ? 1.1 : 1 }}
                     className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
-                    style={{
-                      color: step >= s ? "hsl(var(--accent-foreground))" : "hsl(var(--muted-foreground))",
-                    }}
+                    style={{ color: step >= s ? "hsl(var(--accent-foreground))" : "hsl(var(--muted-foreground))" }}
                   >
                     {step > s ? <Check className="w-5 h-5" /> : s}
                   </motion.div>
-                  {s < 2 && (
-                    <div
-                      className={`w-16 md:w-24 h-1 mx-2 rounded-full transition-colors ${
-                        step > s ? "bg-accent" : "bg-muted"
-                      }`}
-                    />
-                  )}
+                  {s < 2 && <div className={`w-16 md:w-24 h-1 mx-2 rounded-full transition-colors ${step > s ? "bg-accent" : "bg-muted"}`} />}
                 </div>
               ))}
             </div>
@@ -550,18 +374,10 @@ export default function Bestellen() {
 
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Side - Form Steps */}
             <div className="lg:col-span-2">
               <AnimatePresence mode="wait">
-                {/* Step 1: Products */}
                 {step === 1 && (
-                  <motion.div
-                    key="step1"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="space-y-6"
-                  >
+                  <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
                     {/* Pre-built Models */}
                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
                       <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
@@ -573,10 +389,7 @@ export default function Bestellen() {
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {prebuiltModels.map((model) => (
-                          <div
-                            key={model.id}
-                            className="p-6 rounded-xl border-2 border-border hover:border-accent/50 transition-all"
-                          >
+                          <div key={model.id} className="p-6 rounded-xl border-2 border-border hover:border-accent/50 transition-all">
                             <div className="flex items-center gap-3 mb-4">
                               <div className="text-4xl">{model.image}</div>
                               <div>
@@ -585,7 +398,6 @@ export default function Bestellen() {
                               </div>
                             </div>
 
-                            {/* Text input for roos */}
                             {model.hasTextInput && (
                               <div className="mb-4">
                                 <Label className="text-sm mb-1 block">{model.textLabel}</Label>
@@ -595,13 +407,10 @@ export default function Bestellen() {
                                   onChange={(e) => setPrebuiltStemTexts({ ...prebuiltStemTexts, [model.id]: e.target.value })}
                                   placeholder="Typ hier je tekst (max 25 tekens)"
                                 />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {(prebuiltStemTexts[model.id] || "").length}/{model.textMaxLength} tekens
-                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">{(prebuiltStemTexts[model.id] || "").length}/{model.textMaxLength} tekens</p>
                               </div>
                             )}
 
-                            {/* Color choice for waxinelicht */}
                             {model.hasColorChoice && (
                               <div className="mb-4">
                                 <Label className="text-sm mb-2 block">Kies een kleur (verplicht)</Label>
@@ -610,35 +419,20 @@ export default function Bestellen() {
                                     <button
                                       key={color.id}
                                       onClick={() => setPrebuiltColors({ ...prebuiltColors, [model.id]: color.id })}
-                                      className={`w-8 h-8 rounded-full border-3 transition-all ${
-                                        prebuiltColors[model.id] === color.id
-                                          ? "border-accent scale-110 ring-2 ring-accent"
-                                          : "border-border hover:scale-105"
-                                      }`}
+                                      className={`w-8 h-8 rounded-full border-3 transition-all ${prebuiltColors[model.id] === color.id ? "border-accent scale-110 ring-2 ring-accent" : "border-border hover:scale-105"}`}
                                       style={{ backgroundColor: color.hex }}
                                       title={color.name}
                                     >
                                       {prebuiltColors[model.id] === color.id && (
-                                        <Check
-                                          className={`w-4 h-4 mx-auto ${
-                                            color.hex === "#FFFFFF" || color.hex === "#FFDD00"
-                                              ? "text-primary"
-                                              : "text-white"
-                                          }`}
-                                        />
+                                        <Check className={`w-4 h-4 mx-auto ${color.hex === "#FFFFFF" || color.hex === "#FFDD00" ? "text-primary" : "text-white"}`} />
                                       )}
                                     </button>
                                   ))}
                                 </div>
-                                {prebuiltColors[model.id] && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Gekozen: {plaColors.find(c => c.id === prebuiltColors[model.id])?.name}
-                                  </p>
-                                )}
+                                {prebuiltColors[model.id] && <p className="text-xs text-muted-foreground mt-1">Gekozen: {plaColors.find(c => c.id === prebuiltColors[model.id])?.name}</p>}
                               </div>
                             )}
 
-                            {/* Quantity input */}
                             <div className="mb-4">
                               <Label className="text-sm mb-1 block">Aantal</Label>
                               <Input
@@ -650,12 +444,7 @@ export default function Bestellen() {
                               />
                             </div>
 
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addPrebuiltToCart(model)}
-                              className="w-full"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => addPrebuiltToCart(model)} className="w-full">
                               <ShoppingCart className="w-4 h-4 mr-2" />
                               Toevoegen (€{((prebuiltQuantities[model.id] || 1) * model.price).toFixed(2)})
                             </Button>
@@ -664,346 +453,180 @@ export default function Bestellen() {
                       </div>
                     </div>
 
-                    {/* Custom Upload */}
+                    {/* Links Section */}
                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                      <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                        <Upload className="w-6 h-6 text-accent" />
-                        Upload je eigen 3D-model
+                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                        <Link2 className="w-6 h-6 text-accent" />
+                        Bestanden via link
                       </h2>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat je wilt. 
+                        Als je alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
+                      </p>
 
-                      {/* Drop Zone */}
-                      <div
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ${
-                          isDragging
-                            ? "border-accent bg-accent/5"
-                            : file
-                            ? "border-accent/50 bg-accent/5"
-                            : "border-border hover:border-accent/50"
-                        }`}
-                      >
-                        <input
-                          type="file"
-                          accept=".stl,.obj,.step,.stp"
-                          onChange={handleFileSelect}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        
-                        {file ? (
-                          <div className="space-y-4">
-                            <div className="w-16 h-16 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
-                              <FileType className="w-8 h-8 text-accent" />
-                            </div>
-                            <p className="font-semibold text-primary">{file.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Klik of sleep om een ander bestand te kiezen
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
-                              <Upload className="w-8 h-8 text-muted-foreground" />
-                            </div>
-                            <p className="font-semibold text-primary">
-                              Sleep je bestand hierheen
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              of klik om te selecteren. STL, OBJ, STEP ondersteund. Max {MAX_FILE_SIZE_MB}MB.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* File Analysis */}
-                      {fileAnalysis && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="mt-6"
-                        >
-                          {/* Print too large warning */}
-                          {printTooLarge && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                              <p className="text-sm text-red-800 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4" />
-                                <strong>Deze print is te groot!</strong> Maximale afmetingen zijn {MAX_PRINT_SIZE.x}×{MAX_PRINT_SIZE.y}×{MAX_PRINT_SIZE.z}mm.
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className={`rounded-lg p-4 text-center ${printTooLarge ? 'bg-red-50' : 'bg-muted'}`}>
-                              <Ruler className={`w-5 h-5 mx-auto mb-2 ${printTooLarge ? 'text-red-500' : 'text-accent'}`} />
-                              <p className="text-xs text-muted-foreground">Afmetingen</p>
-                              <p className={`text-sm font-semibold ${printTooLarge ? 'text-red-600' : ''}`}>
-                                {fileAnalysis.dimensions.x} × {fileAnalysis.dimensions.y} × {fileAnalysis.dimensions.z} mm
-                              </p>
-                            </div>
-                            <div className="bg-muted rounded-lg p-4 text-center">
-                              <Box className="w-5 h-5 mx-auto mb-2 text-accent" />
-                              <p className="text-xs text-muted-foreground">Volume</p>
-                              <p className="text-sm font-semibold">~{fileAnalysis.estimatedVolume} cm³</p>
-                            </div>
-                            <div className="bg-muted rounded-lg p-4 text-center">
-                              <FileType className="w-5 h-5 mx-auto mb-2 text-accent" />
-                              <p className="text-xs text-muted-foreground">Bestandsgrootte</p>
-                              <p className="text-sm font-semibold">{fileAnalysis.size}</p>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Material Selection */}
-                      {file && fileAnalysis && !printTooLarge && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="mt-6 space-y-6"
-                        >
-                          <div>
-                            <Label className="text-sm font-medium mb-3 block">Materiaal</Label>
-                            <div className="grid grid-cols-3 gap-3">
-                              {materials.map((material) => (
-                                <button
-                                  key={material.id}
-                                  onClick={() => {
-                                    setSelectedMaterial(material.id);
-                                    setSelectedColor("");
-                                  }}
-                                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                                    selectedMaterial === material.id
-                                      ? "border-accent bg-accent/5"
-                                      : "border-border hover:border-accent/50"
-                                  }`}
-                                >
-                                  <p className="font-semibold">{material.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    €{material.price.toFixed(2)}/gram
-                                  </p>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Color Selection */}
-                          {selectedMaterial && (
-                            <div>
-                              <Label className="text-sm font-medium mb-3 block">Kleur</Label>
-                              <div className="flex flex-wrap gap-3">
-                                {getCurrentMaterialColors().map((color) => (
-                                  <button
-                                    key={color.id}
-                                    onClick={() => setSelectedColor(color.id)}
-                                    className={`group relative w-12 h-12 rounded-full border-4 transition-all ${
-                                      selectedColor === color.id
-                                        ? "border-accent scale-110"
-                                        : "border-transparent hover:scale-105"
-                                    }`}
-                                    style={{ backgroundColor: color.hex }}
-                                    title={color.name}
-                                  >
-                                    {selectedColor === color.id && (
-                                      <Check
-                                        className={`absolute inset-0 m-auto w-6 h-6 ${
-                                          color.hex === "#FFFFFF" || color.hex === "#FFDD00"
-                                            ? "text-primary"
-                                            : "text-primary-foreground"
-                                        }`}
-                                      />
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                              {selectedColor && (
-                                <p className="text-sm text-muted-foreground mt-2">
-                                  Gekozen: {getCurrentMaterialColors().find(c => c.id === selectedColor)?.name}
-                                </p>
+                      <div className="space-y-8">
+                        {orderLinks.map((link, linkIndex) => (
+                          <div key={link.id} className="border-2 border-border rounded-xl p-6 relative">
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="font-semibold text-sm text-muted-foreground">Link {linkIndex + 1}</h3>
+                              {orderLinks.length > 1 && (
+                                <Button variant="ghost" size="sm" onClick={() => removeLink(link.id)} className="text-destructive hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               )}
                             </div>
-                          )}
 
-                          {/* Quantity */}
-                          {selectedColor && (
-                            <div>
-                              <Label className="text-sm font-medium mb-3 block">Aantal</Label>
-                              <div className="flex items-center gap-4">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                >
-                                  -
-                                </Button>
-                                <span className="text-xl font-bold w-12 text-center">{quantity}</span>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => setQuantity(quantity + 1)}
-                                >
-                                  +
-                                </Button>
-                              </div>
+                            <div className="mb-4">
+                              <Label className="text-sm mb-1 block">Download-link *</Label>
+                              <Input
+                                value={link.url}
+                                onChange={(e) => updateLinkUrl(link.id, e.target.value)}
+                                placeholder="https://www.thingiverse.com/thing/... of WeTransfer-link"
+                              />
                             </div>
-                          )}
 
-                          {/* Add to Cart Button */}
-                          {canAddToCart && (
-                            <Button
-                              variant="hero"
-                              onClick={addToCart}
-                              className="w-full"
-                            >
-                              <ShoppingCart className="w-4 h-4 mr-2" />
-                              Toevoegen aan winkelwagen (€{calculateItemPrice(fileAnalysis.estimatedVolume, selectedMaterial, quantity).toFixed(2)})
-                            </Button>
-                          )}
-                        </motion.div>
-                      )}
+                            <div className="space-y-4">
+                              <Label className="text-sm font-medium block">Bestanden uit deze link:</Label>
+                              {link.files.map((file, fileIndex) => (
+                                <div key={fileIndex} className="bg-muted/50 rounded-lg p-4 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-muted-foreground">Bestand {fileIndex + 1}</span>
+                                    {link.files.length > 1 && (
+                                      <Button variant="ghost" size="sm" onClick={() => removeFileFromLink(link.id, fileIndex)} className="h-6 w-6 p-0 text-destructive">
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <Label className="text-xs">Bestandsnaam *</Label>
+                                      <Input
+                                        value={file.name}
+                                        onChange={(e) => updateFile(link.id, fileIndex, "name", e.target.value)}
+                                        placeholder="bijv. houder.stl of Alle bestanden"
+                                        className="text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Aantal *</Label>
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        value={file.quantity}
+                                        onChange={(e) => updateFile(link.id, fileIndex, "quantity", Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Materiaal *</Label>
+                                      <div className="flex flex-wrap gap-2 mt-1">
+                                        {materials.map((m) => (
+                                          <button
+                                            key={m.id}
+                                            onClick={() => updateFile(link.id, fileIndex, "material", m.id)}
+                                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${file.material === m.id ? "border-accent bg-accent/10 text-accent" : "border-border hover:border-accent/50"}`}
+                                          >
+                                            {m.name}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {file.material && (
+                                      <div>
+                                        <Label className="text-xs">Kleur *</Label>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                          {getColorsForMaterial(file.material).map((color) => (
+                                            <button
+                                              key={color.id}
+                                              onClick={() => updateFile(link.id, fileIndex, "color", color.id)}
+                                              className={`w-7 h-7 rounded-full border-2 transition-all ${file.color === color.id ? "border-accent scale-110 ring-2 ring-accent" : "border-border hover:scale-105"}`}
+                                              style={{ backgroundColor: color.hex }}
+                                              title={color.name}
+                                            >
+                                              {file.color === color.id && <Check className={`w-3 h-3 mx-auto ${color.hex === "#FFFFFF" || color.hex === "#FFDD00" ? "text-primary" : "text-white"}`} />}
+                                            </button>
+                                          ))}
+                                        </div>
+                                        {file.color && <p className="text-xs text-muted-foreground mt-1">{getColorsForMaterial(file.material).find(c => c.id === file.color)?.name}</p>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                              <Button variant="outline" size="sm" onClick={() => addFileToLink(link.id)}>
+                                <Plus className="w-3 h-3 mr-1" /> Bestand toevoegen
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Button variant="outline" onClick={addLink} className="mt-4 w-full">
+                        <Plus className="w-4 h-4 mr-2" /> Nog een link toevoegen
+                      </Button>
                     </div>
 
-                    {/* Proceed Button */}
+                    {/* Proceed */}
                     <div className="flex justify-end">
-                      <Button
-                        variant="hero"
-                        onClick={() => setStep(2)}
-                        disabled={!canProceedToStep2}
-                      >
-                        Verder naar gegevens ({cart.length} items)
+                      <Button variant="hero" onClick={() => setStep(2)} disabled={!canProceedToStep2}>
+                        Verder naar gegevens
                       </Button>
                     </div>
                   </motion.div>
                 )}
 
-                {/* Step 2: Contact Details */}
                 {step === 2 && (
-                  <motion.div
-                    key="step2"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="bg-card rounded-2xl p-8 shadow-overweel-card"
-                  >
+                  <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="bg-card rounded-2xl p-8 shadow-overweel-card">
                     <h2 className="text-xl font-bold mb-6">Jouw gegevens</h2>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div>
                         <Label htmlFor="name">Naam *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          placeholder="Je volledige naam"
-                        />
+                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Je volledige naam" />
                       </div>
                       <div>
                         <Label htmlFor="email">E-mail *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          placeholder="je@email.nl"
-                        />
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="je@email.nl" />
                       </div>
                       <div>
                         <Label htmlFor="phone">Telefoon</Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="06-12345678"
-                        />
+                        <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="06-12345678" />
                       </div>
                       <div>
                         <Label htmlFor="postalCode">Postcode *</Label>
-                        <Input
-                          id="postalCode"
-                          value={formData.postalCode}
-                          onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-                          placeholder="1234 AB"
-                        />
+                        <Input id="postalCode" value={formData.postalCode} onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })} placeholder="1234 AB" />
                       </div>
                       <div className="md:col-span-2">
                         <Label htmlFor="address">Adres *</Label>
-                        <Input
-                          id="address"
-                          value={formData.address}
-                          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                          placeholder="Straat en huisnummer"
-                        />
+                        <Input id="address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Straat en huisnummer" />
                       </div>
                       <div className="md:col-span-2">
                         <Label htmlFor="city">Plaats *</Label>
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                          placeholder="Woonplaats"
-                        />
+                        <Input id="city" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} placeholder="Woonplaats" />
                       </div>
                       <div className="md:col-span-2">
-                        <Label htmlFor="notes">Opmerkingen</Label>
-                        <Textarea
-                          id="notes"
-                          value={formData.notes}
-                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                          placeholder="Speciale wensen of instructies..."
-                          rows={3}
-                        />
+                        <Label htmlFor="notes">Opmerkingen / speciale instructies</Label>
+                        <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Bijv. specifieke bestanden uit een link, infill-percentage, etc." rows={3} />
                       </div>
                     </div>
 
-                    {/* Checkboxes */}
                     <div className="space-y-4 mb-8">
                       <div className="flex items-start gap-3">
-                        <Checkbox
-                          id="notLightsaber"
-                          checked={formData.notALightsaber}
-                          onCheckedChange={(checked) =>
-                            setFormData({ ...formData, notALightsaber: checked as boolean })
-                          }
-                        />
-                        <Label htmlFor="notLightsaber" className="text-sm leading-relaxed cursor-pointer">
-                          Ik verklaar dat dit geen lightsaber of emotionele wraak is 🤺
-                        </Label>
+                        <Checkbox id="notLightsaber" checked={formData.notALightsaber} onCheckedChange={(checked) => setFormData({ ...formData, notALightsaber: checked as boolean })} />
+                        <Label htmlFor="notLightsaber" className="text-sm leading-relaxed cursor-pointer">Ik verklaar dat dit geen lightsaber of emotionele wraak is 🤺</Label>
                       </div>
                       <div className="flex items-start gap-3">
-                        <Checkbox
-                          id="terms"
-                          checked={formData.agreeTerms}
-                          onCheckedChange={(checked) =>
-                            setFormData({ ...formData, agreeTerms: checked as boolean })
-                          }
-                        />
+                        <Checkbox id="terms" checked={formData.agreeTerms} onCheckedChange={(checked) => setFormData({ ...formData, agreeTerms: checked as boolean })} />
                         <Label htmlFor="terms" className="text-sm leading-relaxed cursor-pointer">
                           Ik ga akkoord met de{" "}
-                          <a href="/voorwaarden" className="text-accent underline" target="_blank">
-                            Heilige Scroll der Plastische Precisie
-                          </a>{" "}
-                          (algemene voorwaarden)
+                          <a href="/voorwaarden" className="text-accent underline" target="_blank">Heilige Scroll der Plastische Precisie</a>{" "}(algemene voorwaarden)
                         </Label>
                       </div>
                     </div>
 
                     <div className="flex justify-between">
-                      <Button variant="ghost" onClick={() => setStep(1)}>
-                        Terug
-                      </Button>
-                      <Button
-                        variant="hero"
-                        onClick={handleSubmit}
-                        disabled={!canSubmit || isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Bestelling plaatsen...
-                          </>
-                        ) : (
-                          "Bestelling plaatsen"
-                        )}
+                      <Button variant="ghost" onClick={() => setStep(1)}>Terug</Button>
+                      <Button variant="hero" onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
+                        {isSubmitting ? (<><Loader2 className="w-4 h-4 animate-spin" /> Bestelling plaatsen...</>) : "Bestelling plaatsen"}
                       </Button>
                     </div>
                   </motion.div>
@@ -1011,75 +634,72 @@ export default function Bestellen() {
               </AnimatePresence>
             </div>
 
-            {/* Right Side - Cart Summary */}
+            {/* Right Side - Summary */}
             <div className="lg:col-span-1">
               <div className="sticky top-24">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-card rounded-2xl p-6 shadow-overweel-card"
-                >
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5" />
-                    Winkelwagen ({cart.length})
+                    Overzicht
                   </h3>
 
-                  {cart.length > 0 ? (
+                  {(hasValidLinks || hasPrebuiltItems) ? (
                     <div className="space-y-4">
-                      {cart.map((item) => (
-                        <div key={item.id} className="flex justify-between items-start border-b border-border pb-4">
+                      {/* Links summary */}
+                      {orderLinks.filter(l => l.url.trim()).map((link, i) => (
+                        <div key={link.id} className="border-b border-border pb-3">
+                          <p className="text-xs font-medium text-accent break-all truncate">🔗 {link.url}</p>
+                          {link.files.filter(f => f.name.trim()).map((f, fi) => (
+                            <p key={fi} className="text-xs text-muted-foreground ml-2">
+                              {f.name} — {f.quantity}x
+                              {f.material && ` — ${materials.find(m => m.id === f.material)?.name}`}
+                              {f.color && ` — ${getColorsForMaterial(f.material).find(c => c.id === f.color)?.name}`}
+                            </p>
+                          ))}
+                        </div>
+                      ))}
+
+                      {/* Prebuilt summary */}
+                      {prebuiltCart.map((item) => (
+                        <div key={item.id} className="flex justify-between items-start border-b border-border pb-3">
                           <div className="flex-1">
-                            <p className="font-medium text-sm truncate max-w-40">{item.name}</p>
-                            {item.material && (
-                              <p className="text-xs text-muted-foreground">
-                                {materials.find(m => m.id === item.material)?.name} - {item.colorName || getCurrentMaterialColors().find(c => c.id === item.color)?.name || item.color}
-                              </p>
-                            )}
-                            {item.colorName && !item.material && (
-                              <p className="text-xs text-muted-foreground">Kleur: {item.colorName}</p>
-                            )}
-                            {item.stemText && (
-                              <p className="text-xs text-muted-foreground">Tekst: "{item.stemText}"</p>
-                            )}
+                            <p className="font-medium text-sm">{item.name}</p>
+                            {item.colorName && <p className="text-xs text-muted-foreground">Kleur: {item.colorName}</p>}
+                            {item.stemText && <p className="text-xs text-muted-foreground">Tekst: "{item.stemText}"</p>}
                             <p className="text-xs text-muted-foreground">{item.quantity}x</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">€{item.price.toFixed(2)}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => removeFromCart(item.id)}
-                            >
+                            <span className="font-medium text-sm">€{item.price.toFixed(2)}</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removePrebuilt(item.id)}>
                               <Trash2 className="w-3 h-3" />
                             </Button>
                           </div>
                         </div>
                       ))}
 
-                      <div className="border-t border-border pt-4">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold">Geschatte totaal</span>
-                          <span className="text-2xl font-bold text-accent">
-                            €{calculateCartTotal().toFixed(2)}
-                          </span>
+                      {prebuiltCart.length > 0 && (
+                        <div className="border-t border-border pt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-sm">Kant-en-klaar totaal</span>
+                            <span className="text-xl font-bold text-accent">€{prebuiltTotal.toFixed(2)}</span>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          * Definitieve prijs na controle van de bestelling
+                      )}
+
+                      {hasValidLinks && (
+                        <p className="text-xs text-muted-foreground">
+                          * Prijs voor custom prints wordt na controle gecommuniceerd.
                         </p>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">
-                        Je winkelwagen is leeg
-                      </p>
+                      <p className="text-muted-foreground">Voeg links of producten toe</p>
                     </div>
                   )}
                 </motion.div>
 
-                {/* Trust indicators */}
                 <div className="mt-6 space-y-3 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-accent" />

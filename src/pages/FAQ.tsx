@@ -62,6 +62,10 @@ const faqData = [
         q: "Moet ik vooraf betalen?",
         a: "Nee, pas na goedkeuring van de offerte. Je krijgt betaalinstructies zodra we je model hebben geanalyseerd en de definitieve prijs hebben vastgesteld.",
       },
+      {
+        q: "Hoe kan ik betalen?",
+        a: "Betaling gaat via Tikkie. Bij grotere bestellingen is betaling via factuur mogelijk, maar dit is niet altijd beschikbaar. We bespreken de mogelijkheden bij je bestelling.",
+      },
     ],
   },
   {
