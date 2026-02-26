@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { Upload, ArrowRight, Sparkles, Cloud } from "lucide-react";
-import { startOneDriveAuth } from "@/lib/pkce";
+import { Link2, ArrowRight, Sparkles } from "lucide-react";
 
 export function Hero() {
   return (
@@ -36,7 +35,7 @@ export function Hero() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-8"
           >
             <Sparkles className="w-4 h-4 text-accent" />
-            <span>Professionele 3D-prints op maat</span>
+            <span>Professionele 3D-prints via je eigen link</span>
           </motion.div>
 
           {/* Headline */}
@@ -57,8 +56,8 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl mx-auto"
           >
-            Upload je 3D-model, kies je materiaal en kleur, en ontvang binnen 
-            een paar dagen jouw unieke print. Simpel, transparant, en met liefde gemaakt.
+            Deel een link naar je 3D-bestanden, kies je materiaal en kleur, en ontvang 
+            binnen een paar dagen jouw unieke print. Simpel, transparant, en met liefde gemaakt.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -70,8 +69,8 @@ export function Hero() {
           >
             <Link to="/bestellen">
               <Button variant="hero" size="xl">
-                <Upload className="w-5 h-5" />
-                Upload je 3D-model
+                <Link2 className="w-5 h-5" />
+                Bestel via link
               </Button>
             </Link>
             <Link to="/faq">
@@ -80,23 +79,6 @@ export function Hero() {
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
-          </motion.div>
-
-          {/* Temp: OneDrive Auth Button */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="mt-6"
-          >
-            <Button
-              variant="ice"
-              size="default"
-              onClick={() => startOneDriveAuth(["openid", "profile", "email", "User.Read"])}
-            >
-              <Cloud className="w-4 h-4" />
-              Connect OneDrive (test)
-            </Button>
           </motion.div>
 
           {/* Trust Indicators */}

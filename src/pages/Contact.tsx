@@ -72,7 +72,7 @@ export default function Contact() {
       console.error("Contact form error:", error);
       toast({
         title: "Er ging iets mis",
-        description: "Probeer het opnieuw of mail direct naar overweel3d@hotmail.com",
+        description: "Probeer het opnieuw of mail direct naar gijsoverweel@gmail.com",
         variant: "destructive",
       });
     } finally {
@@ -155,7 +155,7 @@ export default function Contact() {
                     <Mail className="w-6 h-6 text-accent" />
                   </div>
                   <h3 className="font-semibold text-primary mb-2">E-mail</h3>
-                  <p className="text-muted-foreground">overweel3d@hotmail.com</p>
+                  <p className="text-muted-foreground">gijsoverweel@gmail.com</p>
                 </motion.div>
 
                 <motion.div
