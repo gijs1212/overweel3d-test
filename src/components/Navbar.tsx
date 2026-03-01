@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Logo } from "./Logo";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Upload, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const navLinks = [
@@ -55,15 +55,9 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* CTA + Theme */}
+          {/* Theme */}
           <div className="hidden md:flex items-center gap-2">
             <ThemeToggle />
-            <Link to="/bestellen">
-              <Button variant="hero" size="default">
-                <Upload className="w-4 h-4" />
-                Upload Model
-              </Button>
-            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -102,12 +96,6 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <Link to="/bestellen" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="hero" className="w-full">
-                  <Upload className="w-4 h-4" />
-                  Upload Model
-                </Button>
-              </Link>
             </div>
           </motion.div>
         )}
