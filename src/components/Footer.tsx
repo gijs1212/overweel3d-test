@@ -37,7 +37,7 @@ export function Footer() {
               </li>
               <li>
                 <Link to="/voorwaarden" className="text-primary-foreground/70 hover:text-accent transition-colors">
-                  Voorwaarden
+                  Algemene voorwaarden
                 </Link>
               </li>
               <li>

@@ -1,139 +1,174 @@
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { Scroll, Shield, Scale, AlertTriangle, FileText, Pizza, Handshake, Link } from "lucide-react";
+import { FileText, Scale, Handshake, CreditCard, XCircle, Truck, Archive, AlertTriangle, Shield, Ban, Lightbulb, Lock, Gavel } from "lucide-react";
 
 const voorwaardenData = [
   {
     id: "art1",
-    title: "Artikel 1 – Definities",
-    icon: FileText,
-    content: `In deze Heilige Scroll der Plastische Precisie wordt verstaan onder:
+    title: "Artikel 1 – Toepasselijkheid",
+    icon: Scale,
+    content: `Deze algemene voorwaarden zijn van toepassing op alle offertes, overeenkomsten en leveringen van Overweel3D.
 
-1.1 **Overweel3D**: De entiteit die jouw digitale dromen omzet in tastbare plastische werkelijkheid.
+Afwijkingen zijn slechts geldig indien schriftelijk overeengekomen.
 
-1.2 **Klant**: De dappere ziel die een bestelling plaatst, ook wel bekend als "de held van het print-epos".
-
-1.3 **3D-print**: Het fysieke object dat ontstaat wanneer wij gesmolten filament laag voor laag met chirurgische precisie stapelen tot jouw ontwerp.
-
-1.4 **Bestand**: Het digitale model (STL, OBJ, STEP) dat jij aanlevert en dat wij converteren naar printbare instructies.
-
-1.5 **Filament**: De magische draad die door onze printers wordt gevoerd en transformeert in jouw creatie.`,
+Indien de klant handelt in de uitoefening van beroep of bedrijf (B2B), gelden aanvullende beperkingen zoals hieronder vermeld.`,
   },
   {
     id: "art2",
-    title: "Artikel 2 – Toepasselijkheid",
-    icon: Scale,
-    content: `2.1 Deze voorwaarden zijn van toepassing op alle bestellingen, offertes en overeenkomsten tussen Overweel3D en de klant.
+    title: "Artikel 2 – Diensten",
+    icon: Lightbulb,
+    content: `Overweel3D verzorgt 3D-printproductie op basis van door klant aangeleverde bestanden.
 
-2.2 Door een bestelling te plaatsen, accepteert de klant deze voorwaarden in hun geheel. Er is geen ontsnappen mogelijk – behalve via de annuleringsknop (zie Artikel 5).
+Maximale printafmeting: 250 x 250 x 250 mm.
 
-2.3 Afwijkingen van deze voorwaarden zijn alleen geldig indien schriftelijk overeengekomen. WhatsApp-berichten om 3 uur 's nachts tellen niet.
+Materialen:
+• PLA – vanaf €0,03 per gram
+• PETG – vanaf €0,04 per gram
+• TPU – vanaf €0,04 per gram
 
-2.4 Wij behouden het recht om deze voorwaarden te wijzigen. Wijzigingen worden aangekondigd via onze website en/of via duivenpost (afhankelijk van beschikbaarheid).`,
+Ontwerpwerk uitsluitend op speciale aanvraag.
+
+Geen nabewerking tenzij schriftelijk overeengekomen.`,
   },
   {
     id: "art3",
-    title: "Artikel 3 – Bestellingen & Prijzen",
+    title: "Artikel 3 – Totstandkoming overeenkomst",
     icon: Handshake,
-    content: `3.1 Prijzen worden berekend op basis van materiaalverbruik, printtijd en complexiteit. Geen verborgen kosten – wij zijn transparanter dan PLA.
+    content: `Een overeenkomst komt tot stand na schriftelijke bevestiging en ontvangst van volledige betaling.
 
-3.2 De geschatte prijs bij bestelling is indicatief. De definitieve prijs wordt vastgesteld na analyse van het model en gecommuniceerd voor productie.
-
-3.3 Verzendkosten worden apart berekend, tenzij je bestelling de €50 passeert – dan vliegt het gratis naar je toe.
-
-3.4 Betalingen worden verwerkt via de door ons aangeboden betaalmethoden. Betalen in Pokémon-kaarten wordt helaas niet geaccepteerd.
-
-3.5 Bij niet-tijdige betaling behouden wij ons het recht voor om je print als gijzelaar te houden tot de schuld is voldaan.`,
+Overweel3D behoudt zich het recht voor opdrachten te weigeren.`,
   },
   {
     id: "art4",
-    title: "Artikel 4 – Bestanden & Intellectueel Eigendom",
-    icon: Shield,
-    content: `4.1 De klant garandeert dat hij/zij gerechtigd is om het aangeleverde bestand te laten printen. Wij zijn niet verantwoordelijk voor auteursrechtelijke claims.
+    title: "Artikel 4 – Prijzen en betaling",
+    icon: CreditCard,
+    content: `Prijzen worden berekend op basis van materiaalverbruik, printtijd en complexiteit.
 
-4.2 Wij bewaren bestanden maximaal 30 dagen na levering voor eventuele herbestellingen. Daarna verdwijnen ze in het digitale nirwana.
+Verzendkosten zijn niet inbegrepen.
 
-4.3 Bestanden worden niet gedeeld met derden, tenzij wettelijk verplicht of als je iets écht cools hebt gemaakt en we je om toestemming vragen.
+Verzending via PostNL, volledig voor rekening van de klant.
 
-4.4 Wij behouden het recht om anonieme prints te gebruiken voor promotionele doeleinden (foto's op social media). Herkenbare objecten worden alleen met toestemming gedeeld.`,
+Betalingstermijn: 14 dagen.
+
+Productie start uitsluitend na ontvangst van volledige betaling.
+
+Bij eerdere betaling kan productie eerder starten.`,
   },
   {
     id: "art5",
-    title: "Artikel 5 – Annulering & Retourneren",
-    icon: AlertTriangle,
-    content: `5.1 Annuleren is mogelijk tot het moment dat de print daadwerkelijk start. Daarna is het filament al gesmolten en is er geen weg terug.
+    title: "Artikel 5 – Annulering",
+    icon: XCircle,
+    content: `Annulering is kosteloos mogelijk zolang productie niet is gestart.
 
-5.2 Bij annulering vóór productie worden geen kosten in rekening gebracht, behalve eventuele voorbereidingskosten indien van toepassing.
-
-5.3 Vanwege het maatwerk karakter van 3D-prints is retourneren niet mogelijk, tenzij er sprake is van een productiefout aan onze kant.
-
-5.4 Productiefout betekent: significant afwijkend van het originele ontwerp door toedoen van ons (niet: "ik had het me anders voorgesteld").
-
-5.5 Claims dienen binnen 7 dagen na ontvangst te worden ingediend, voorzien van foto's. Wij zijn geen gedachtenlezers – communicatie is key.`,
+Na start van productie is annulering niet mogelijk en vindt geen restitutie plaats.`,
   },
   {
     id: "art6",
-    title: "Artikel 6 – Levertijd & Verzending",
-    icon: Link,
-    content: `6.1 Levertijden zijn indicatief en geen fatale termijnen. Gemiddeld 3-5 werkdagen, maar complexe prints kunnen langer duren.
+    title: "Artikel 6 – Levering en risico",
+    icon: Truck,
+    content: `Levering geschiedt door afhalen of verzending.
 
-6.2 Wij zijn niet aansprakelijk voor vertragingen door overmacht, stroomuitval, filament-jams, of invasies van buitenaardse wezens.
+Verzendkosten zijn voor rekening van de klant.
 
-6.3 Verzending geschiedt via PostNL of een vergelijkbare dienstverlener. Tracking wordt verstrekt zodra het pakket onderweg is.
+Bij zakelijke klanten (B2B) gaat het risico over bij verzending.
 
-6.4 Bij beschadiging tijdens transport dient de klant dit direct bij de bezorger te melden en binnen 24 uur aan ons door te geven.`,
+Bij consumenten (B2C) gaat het risico over bij daadwerkelijke ontvangst van het product.`,
   },
   {
     id: "art7",
-    title: "Artikel 7 – Aansprakelijkheid",
-    icon: AlertTriangle,
-    content: `7.1 Overweel3D is niet aansprakelijk voor schade ontstaan door:
-- Onjuist gebruik van het geprinte object
-- Modificaties aangebracht na levering
-- Normale slijtage (ja, ook plastic slijt)
-- Onrealistisch hoge verwachtingen
+    title: "Artikel 7 – Opslag",
+    icon: Archive,
+    content: `Na voltooiing wordt klant geïnformeerd.
 
-7.2 Onze aansprakelijkheid is in alle gevallen beperkt tot het orderbedrag.
+Indien niet opgehaald binnen 2 weken, geldt €5 opslag per week.
 
-7.3 Wij zijn niet verantwoordelijk voor functionele geschiktheid van het ontwerp – dat is jouw verantwoordelijkheid als ontwerper.
-
-7.4 3D-prints zijn niet geschikt voor medische toepassingen, vliegtuigonderdelen, of als vervanging voor echte lightsabers in een duel.`,
+Opslagkosten blijven verschuldigd totdat product is afgehaald of verzonden.`,
   },
   {
     id: "art8",
-    title: "Artikel 8 – Privacy & Gegevens",
-    icon: Shield,
-    content: `8.1 Wij verzamelen alleen gegevens die nodig zijn voor de uitvoering van je bestelling. Geen stiekeme tracking, geen verkoop aan derden.
+    title: "Artikel 8 – Klachten",
+    icon: AlertTriangle,
+    content: `Klachten dienen binnen 3 dagen na levering schriftelijk gemeld te worden.
 
-8.2 Je gegevens worden beveiligd opgeslagen en na 2 jaar inactiviteit automatisch verwijderd.
+Kleine afwijkingen binnen gebruikelijke toleranties (±0,2–0,5 mm) vormen geen grond voor afkeuring.
 
-8.3 Je hebt recht op inzage, correctie en verwijdering van je gegevens. Een mailtje volstaat.
-
-8.4 Wij houden niet van spam en sturen alleen relevante updates over je bestelling. Geen nieuwsbrieven zonder expliciete toestemming.`,
+Bij consumenten geldt de wettelijke conformiteitseis (artikel 7:17 BW).`,
   },
   {
     id: "art9",
-    title: "Artikel 9 – Slotbepalingen",
-    icon: Pizza,
-    content: `9.1 Op deze voorwaarden is Nederlands recht van toepassing.
+    title: "Artikel 9 – Garantie en conformiteit",
+    icon: Shield,
+    content: `9.1 Geen commerciële garantie
+Overweel3D verstrekt geen aanvullende commerciële garantie.
 
-9.2 Geschillen worden bij voorkeur in onderling overleg opgelost. Mocht dat niet lukken, dan is de rechtbank in Nederland bevoegd.
+9.2 Consumenten (B2C)
+Voor consumenten geldt dat het product moet voldoen aan de redelijke verwachtingen die op basis van de overeenkomst bestaan (wettelijke conformiteit).
 
-9.3 Mocht enige bepaling nietig blijken, dan blijven de overige bepalingen van kracht.
+Gezien de aard van 3D-printing geldt nadrukkelijk:
+• Lijnstructuur en zichtbare laagopbouw zijn normaal.
+• Kleine maat- of structuurafwijkingen zijn inherent aan FDM-printtechniek.
+• Producten zijn niet getest voor specifieke toepassingen tenzij schriftelijk overeengekomen.
 
-9.4 Door verder te klikken verklaar je jezelf held van je eigen print-epos.
+Indien een product niet conform is, zal Overweel3D naar eigen keuze herstellen, vervangen of een redelijke compensatie bieden.
 
-9.5 Het geheime codewoord is PLAFTASTIC. Gefeliciteerd, je hebt de hele scroll gelezen! 🎉
+9.3 Zakelijke klanten (B2B)
+Voor zakelijke klanten wordt iedere garantie uitgesloten, tenzij sprake is van opzet of bewuste roekeloosheid.`,
+  },
+  {
+    id: "art10",
+    title: "Artikel 10 – Aansprakelijkheid",
+    icon: AlertTriangle,
+    content: `10.1 Algemeen
+Gebruik van 3D-geprinte producten is volledig op eigen risico.
 
-Laatste update: ${new Date().toLocaleDateString("nl-NL")}`,
+10.2 Uitsluitingen
+Overweel3D is niet aansprakelijk voor:
+• Fouten in aangeleverde bestanden
+• Functionele geschiktheid voor specifieke toepassingen
+• Slijtage, breuk of vervorming na levering
+• Indirecte schade of gevolgschade
+• Schade ontstaan door onjuist gebruik
+
+10.3 Beperking
+Indien aansprakelijkheid wettelijk vaststaat, is deze beperkt tot maximaal het factuurbedrag van de betreffende opdracht.
+
+Voor B2B geldt een volledige uitsluiting van indirecte schade.`,
+  },
+  {
+    id: "art11",
+    title: "Artikel 11 – Intellectueel eigendom",
+    icon: FileText,
+    content: `Aangeleverde bestanden blijven eigendom van klant.
+
+Overweel3D mag geproduceerde prints tonen in portfolio of social media, tenzij vooraf schriftelijk bezwaar is gemaakt.
+
+Door Overweel3D gemaakte ontwerpen blijven eigendom van Overweel3D tenzij anders overeengekomen.`,
+  },
+  {
+    id: "art12",
+    title: "Artikel 12 – Beperkingen gebruik",
+    icon: Ban,
+    content: `Producten zijn niet geschikt voor:
+• Voedselcontact
+• Medisch gebruik
+• Veiligheidskritische toepassingen
+• Dragende constructies
+
+Gebruik is volledig op eigen risico.`,
+  },
+  {
+    id: "art13",
+    title: "Artikel 13 – Toepasselijk recht",
+    icon: Gavel,
+    content: `Op alle overeenkomsten is Nederlands recht van toepassing.`,
   },
 ];
 
@@ -151,15 +186,16 @@ export default function Voorwaarden() {
               className="max-w-3xl mx-auto text-center"
             >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-foreground/10 backdrop-blur-sm border border-primary-foreground/20 text-primary-foreground text-sm mb-6">
-                <Scroll className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
                 <span>Officieel document</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-primary-foreground mb-4">
-                De Heilige Scroll der Plastische Precisie
+                Algemene Voorwaarden
               </h1>
               <p className="text-lg text-primary-foreground/70">
-                Oftewel: onze algemene voorwaarden. Maar dan leuker om te lezen.
+                Overweel3D – Eenmanszaak (ZZP), gevestigd in Nederland. Levering uitsluitend binnen Nederland.
               </p>
+              <p className="text-sm text-primary-foreground/50 mt-2">Versie 2026</p>
             </motion.div>
           </div>
         </section>
@@ -214,11 +250,8 @@ export default function Voorwaarden() {
                   transition={{ delay: 0.5 }}
                   className="mt-12 text-center"
                 >
-                  <p className="text-muted-foreground mb-6">
-                    Door verder te klikken verklaar je jezelf held van je eigen print-epos.
-                  </p>
                   <Button variant="hero" size="lg" asChild>
-                    <a href="/bestellen">Ik ga akkoord! Print mijn toekomst.</a>
+                    <a href="/bestellen">Bestelling plaatsen</a>
                   </Button>
                 </motion.div>
               </motion.div>

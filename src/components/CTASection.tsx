@@ -44,9 +44,9 @@ export function CTASection() {
           >
             <Scroll className="w-4 h-4" />
             <span>
-              Onze voorwaarden zijn episch – lees de{" "}
+              Lees onze{" "}
               <Link to="/voorwaarden" className="text-accent underline hover:text-accent/80">
-                Heilige Scroll der Plastische Precisie
+                algemene voorwaarden
               </Link>
             </span>
           </motion.div>
