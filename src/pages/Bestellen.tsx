@@ -311,7 +311,12 @@ export default function Bestellen() {
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-left">
                 <p className="text-sm text-amber-800">
-                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt bepaald na controle. We nemen contact op met een offerte.
+                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt bepaald na controle. We nemen contact op met een prijs.
+                </p>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3 text-left">
+                <p className="text-sm text-blue-800">
+                  📧 Als u geen bevestigingsmail ontvangt, kijk dan ook in uw spam/ongewenste berichten.
                 </p>
               </div>
             </motion.div>
@@ -337,9 +342,9 @@ export default function Bestellen() {
 
           {/* Disclaimers */}
           <div className="max-w-4xl mx-auto mb-8 space-y-3">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
-                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na controle bepaald. Je ontvangt eerst een offerte.
+                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na controle bepaald. We nemen contact op met een prijs.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
