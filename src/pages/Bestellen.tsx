@@ -311,7 +311,7 @@ export default function Bestellen() {
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-left">
                 <p className="text-sm text-amber-800">
-                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt bepaald na controle. We nemen contact op met een prijs.
+                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt na de controle bepaald en aan je doorgegeven.
                 </p>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3 text-left">
@@ -336,7 +336,7 @@ export default function Bestellen() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
             <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Plaats je bestelling</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Deel een link naar je 3D-bestanden, geef per bestand de details op, en wij printen het voor je.
+              Deel de link naar je gewenste 3D-bestanden, geef per bestand de details op en wij printen het voor je.
             </p>
           </motion.div>
 
@@ -344,7 +344,7 @@ export default function Bestellen() {
           <div className="max-w-4xl mx-auto mb-8 space-y-3">
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
-                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na controle bepaald. We nemen contact op met een prijs.
+                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan je doorgegeven.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -706,10 +706,6 @@ export default function Bestellen() {
                 </motion.div>
 
                 <div className="mt-6 space-y-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accent" />
-                    <span>Geen betaling vooraf nodig</span>
-                  </div>
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-accent" />
                     <span>Prijsgarantie na bevestiging</span>

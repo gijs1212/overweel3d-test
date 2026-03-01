@@ -56,8 +56,8 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl mx-auto"
           >
-            Deel een link naar je 3D-bestanden, kies je materiaal en kleur, en ontvang 
-            binnen een paar dagen jouw unieke print. Simpel, transparant, en met liefde gemaakt.
+            Deel de link naar je gewenste 3D-bestanden, kies je materiaal en kleur en ontvang 
+            jouw unieke print zo snel mogelijk. Simpel, transparant en met liefde gemaakt.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -88,10 +88,6 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.5 }}
             className="mt-16 flex flex-wrap items-center justify-center gap-8 text-primary-foreground/50 text-sm"
           >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-accent" />
-              <span>Geen betaling vooraf nodig</span>
-            </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-accent" />
               <span>100% tevredenheidsgarantie</span>
