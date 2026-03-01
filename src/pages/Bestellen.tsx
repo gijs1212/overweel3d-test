@@ -127,7 +127,7 @@ export default function Bestellen() {
     postalCode: "",
     notes: "",
     agreeTerms: false,
-    notALightsaber: false,
+    
   });
 
   // Link management
@@ -203,7 +203,7 @@ export default function Bestellen() {
   const hasValidLinks = orderLinks.some(l => l.url.trim() !== "" && l.files.some(f => f.name.trim() !== "" && f.material && f.color));
   const hasPrebuiltItems = prebuiltCart.length > 0;
   const canProceedToStep2 = hasValidLinks || hasPrebuiltItems;
-  const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && formData.notALightsaber && canProceedToStep2;
+  const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && canProceedToStep2;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -616,14 +616,10 @@ export default function Bestellen() {
 
                     <div className="space-y-4 mb-8">
                       <div className="flex items-start gap-3">
-                        <Checkbox id="notLightsaber" checked={formData.notALightsaber} onCheckedChange={(checked) => setFormData({ ...formData, notALightsaber: checked as boolean })} />
-                        <Label htmlFor="notLightsaber" className="text-sm leading-relaxed cursor-pointer">Ik verklaar dat dit geen lightsaber of emotionele wraak is 🤺</Label>
-                      </div>
-                      <div className="flex items-start gap-3">
                         <Checkbox id="terms" checked={formData.agreeTerms} onCheckedChange={(checked) => setFormData({ ...formData, agreeTerms: checked as boolean })} />
                         <Label htmlFor="terms" className="text-sm leading-relaxed cursor-pointer">
                           Ik ga akkoord met de{" "}
-                          <a href="/voorwaarden" className="text-accent underline" target="_blank">Heilige Scroll der Plastische Precisie</a>{" "}(algemene voorwaarden)
+                          <a href="/voorwaarden" className="text-accent underline" target="_blank">algemene voorwaarden</a>
                         </Label>
                       </div>
                     </div>

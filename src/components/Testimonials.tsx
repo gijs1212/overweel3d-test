@@ -12,7 +12,7 @@ const testimonials = [
   {
     name: "Lisa Jansen",
     role: "Product designer",
-    content: "De voorwaarden lezen als een fantasy-roman. 10/10 zou opnieuw plastic laten smelten.",
+    content: "Snelle service en top kwaliteit. 10/10 zou opnieuw plastic laten smelten.",
     rating: 5,
     avatar: "L",
   },

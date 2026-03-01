@@ -9,7 +9,7 @@ import { useState } from "react";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/bestellen", label: "Bestellen" },
-  { href: "/voorwaarden", label: "Voorwaarden" },
+  { href: "/voorwaarden", label: "Algemene voorwaarden" },
   { href: "/opdrachten", label: "Opdrachten" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
