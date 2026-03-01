@@ -4,8 +4,8 @@ import { Upload, Palette, CreditCard, Package } from "lucide-react";
 const steps = [
   {
     icon: Upload,
-    title: "Upload je bestand",
-    description: "Sleep je STL, OBJ of STEP bestand naar ons upload-veld. Wij analyseren direct de afmetingen.",
+    title: "Deel je link",
+    description: "Plak een link naar je 3D-bestanden (bijv. Thingiverse, Printables of WeTransfer). Wij downloaden en controleren alles voor je.",
     color: "bg-blue-500",
   },
   {
@@ -17,13 +17,13 @@ const steps = [
   {
     icon: CreditCard,
     title: "Ontvang prijs & bestel",
-    description: "Direct een transparante prijs op basis van volume en materiaal. Geen verrassingen.",
+    description: "Direct een eerlijke prijs op basis van volume en materiaal. Geen verrassingen.",
     color: "bg-green-500",
   },
   {
     icon: Package,
     title: "Wij printen & versturen",
-    description: "Onze printers gaan aan de slag en binnen een paar dagen heb jij je creatie in handen!",
+    description: "Onze printers gaan aan de slag en je hebt zo snel mogelijk jouw creatie in handen!",
     color: "bg-accent",
   },
 ];
@@ -45,7 +45,7 @@ export function Steps() {
             Zo simpel werkt het
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            In vier stappen van idee naar fysiek product. Geen gedoe, geen wachtrijen, gewoon printen.
+            In vier stappen van idee naar fysiek product. Geen gedoe, gewoon printen.
           </p>
         </motion.div>
 
