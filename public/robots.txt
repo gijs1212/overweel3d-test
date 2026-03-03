@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://overweel3d.gijsoverweel.nl/sitemap.xml
