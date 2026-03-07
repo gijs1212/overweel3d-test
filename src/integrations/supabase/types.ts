@@ -14,30 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      onedrive_tokens: {
-        Row: {
-          access_token: string
-          expires_at: string | null
-          id: string
-          refresh_token: string
-          updated_at: string
-        }
-        Insert: {
-          access_token: string
-          expires_at?: string | null
-          id?: string
-          refresh_token: string
-          updated_at?: string
-        }
-        Update: {
-          access_token?: string
-          expires_at?: string | null
-          id?: string
-          refresh_token?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
