@@ -14,16 +14,277 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      order_events: {
+        Row: {
+          created_at: string | null
+          event_description: string | null
+          event_type: string
+          id: string
+          order_id: string
+          performed_by: string | null
+          visible_to_customer: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_description?: string | null
+          event_type: string
+          id?: string
+          order_id: string
+          performed_by?: string | null
+          visible_to_customer?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          event_description?: string | null
+          event_type?: string
+          id?: string
+          order_id?: string
+          performed_by?: string | null
+          visible_to_customer?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_files: {
+        Row: {
+          created_at: string | null
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          order_id: string
+          original_filename: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          order_id: string
+          original_filename: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          order_id?: string
+          original_filename?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_files_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          approved_at: string | null
+          billing_address: string | null
+          city: string | null
+          color: string | null
+          company_name: string | null
+          country: string | null
+          created_at: string | null
+          customer_email: string
+          customer_name: string
+          customer_order_token: string
+          customer_visible_notes: string | null
+          final_price: number | null
+          id: string
+          instant_quote_price: number | null
+          internal_notes: string | null
+          material: string | null
+          notes: string | null
+          order_number: string
+          phone: string | null
+          postal_code: string | null
+          print_preferences: string | null
+          quantity: number | null
+          rejected_at: string | null
+          shipping_address: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          submitted_at: string | null
+          tikkie_link: string | null
+          updated_at: string | null
+          user_id: string | null
+          vat_number: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          billing_address?: string | null
+          city?: string | null
+          color?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          customer_email: string
+          customer_name: string
+          customer_order_token?: string
+          customer_visible_notes?: string | null
+          final_price?: number | null
+          id?: string
+          instant_quote_price?: number | null
+          internal_notes?: string | null
+          material?: string | null
+          notes?: string | null
+          order_number: string
+          phone?: string | null
+          postal_code?: string | null
+          print_preferences?: string | null
+          quantity?: number | null
+          rejected_at?: string | null
+          shipping_address?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          submitted_at?: string | null
+          tikkie_link?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          vat_number?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          billing_address?: string | null
+          city?: string | null
+          color?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_order_token?: string
+          customer_visible_notes?: string | null
+          final_price?: number | null
+          id?: string
+          instant_quote_price?: number | null
+          internal_notes?: string | null
+          material?: string | null
+          notes?: string | null
+          order_number?: string
+          phone?: string | null
+          postal_code?: string | null
+          print_preferences?: string | null
+          quantity?: number | null
+          rejected_at?: string | null
+          shipping_address?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          submitted_at?: string | null
+          tikkie_link?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          vat_number?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          billing_address: string | null
+          city: string | null
+          company_name: string | null
+          country: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          phone: string | null
+          postal_code: string | null
+          shipping_address: string | null
+          updated_at: string | null
+          user_id: string
+          vat_number: string | null
+        }
+        Insert: {
+          billing_address?: string | null
+          city?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          postal_code?: string | null
+          shipping_address?: string | null
+          updated_at?: string | null
+          user_id: string
+          vat_number?: string | null
+        }
+        Update: {
+          billing_address?: string | null
+          city?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          postal_code?: string | null
+          shipping_address?: string | null
+          updated_at?: string | null
+          user_id?: string
+          vat_number?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_order_number: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "customer"
+      order_status:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "waiting_for_approval"
+        | "approved_by_customer"
+        | "rejected_by_customer"
+        | "waiting_for_payment"
+        | "in_production"
+        | "completed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +411,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "customer"],
+      order_status: [
+        "draft",
+        "submitted",
+        "under_review",
+        "waiting_for_approval",
+        "approved_by_customer",
+        "rejected_by_customer",
+        "waiting_for_payment",
+        "in_production",
+        "completed",
+        "cancelled",
+      ],
+    },
   },
 } as const
