@@ -1,15 +1,16 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "./Logo";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/bestellen", label: "Bestellen" },
-  { href: "/voorwaarden", label: "Algemene voorwaarden" },
+  { href: "/voorwaarden", label: "Voorwaarden" },
   { href: "/opdrachten", label: "Opdrachten" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
@@ -17,7 +18,14 @@ const navLinks = [
 
 export function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isAdmin, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <motion.nav
@@ -33,15 +41,13 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
                 className={`relative text-sm font-medium transition-colors hover:text-primary ${
-                  location.pathname === link.href
-                    ? "text-primary"
-                    : "text-muted-foreground"
+                  location.pathname === link.href ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 {link.label}
@@ -55,21 +61,37 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* Theme */}
+          {/* Auth + Theme */}
           <div className="hidden md:flex items-center gap-2">
             <ThemeToggle />
+            {user ? (
+              <div className="flex items-center gap-2">
+                <Link to="/dashboard">
+                  <Button variant="ghost" size="sm">
+                    <User className="w-4 h-4" /> Dashboard
+                  </Button>
+                </Link>
+                {isAdmin && (
+                  <Link to="/admin">
+                    <Button variant="ghost" size="sm">🔒 Admin</Button>
+                  </Link>
+                )}
+                <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Link to="/login">
+                <Button variant="ghost" size="sm">
+                  <LogIn className="w-4 h-4" /> Inloggen
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+          <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
@@ -88,14 +110,33 @@ export function Navbar() {
                   to={link.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`text-sm font-medium py-2 ${
-                    location.pathname === link.href
-                      ? "text-primary"
-                      : "text-muted-foreground"
+                    location.pathname === link.href ? "text-primary" : "text-muted-foreground"
                   }`}
                 >
                   {link.label}
                 </Link>
               ))}
+              <div className="border-t border-border pt-4 flex flex-col gap-2">
+                {user ? (
+                  <>
+                    <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium py-2">
+                      Dashboard
+                    </Link>
+                    {isAdmin && (
+                      <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium py-2">
+                        🔒 Admin
+                      </Link>
+                    )}
+                    <button onClick={() => { handleSignOut(); setMobileMenuOpen(false); }} className="text-sm font-medium py-2 text-left text-destructive">
+                      Uitloggen
+                    </button>
+                  </>
+                ) : (
+                  <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium py-2">
+                    Inloggen
+                  </Link>
+                )}
+              </div>
             </div>
           </motion.div>
         )}

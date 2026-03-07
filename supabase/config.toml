@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.upload-to-onedrive]
 verify_jwt = false
+
+[functions.get-order-by-token]
+verify_jwt = false
+
+[functions.update-order-status]
+verify_jwt = false
+
+[functions.send-order-email]
+verify_jwt = false
