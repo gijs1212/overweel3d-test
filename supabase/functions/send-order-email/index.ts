@@ -108,7 +108,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
       </div>
 
       <div class="warning">
-        ⚠️ <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door ons vastgesteld en aan je gecommuniceerd.
+        ⚠️ <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door ons vastgesteld en aan u gecommuniceerd.
       </div>
 
       <div class="section">
