@@ -165,7 +165,7 @@ const handler = async (req: Request): Promise<Response> => {
         <div class="content">
           <p>Beste ${customer.name},</p>
           <p>Bedankt voor uw bestelling bij Overweel3D! We hebben uw aanvraag ontvangen en gaan er direct mee aan de slag.</p>
-          ${hasLinks ? `<div class="section"><h2>🔗 Jouw links & bestanden</h2>${linksHtml}</div>` : ""}
+          ${hasLinks ? `<div class="section"><h2>🔗 Uw links & bestanden</h2>${linksHtml}</div>` : ""}
           ${hasPrebuilt ? `<div class="section"><h2>⭐ Kant-en-klare modellen</h2>${prebuiltHtml}</div><div style="font-size: 24px; color: #00b4d8; font-weight: bold; text-align: center; padding: 20px;">Kant-en-klaar totaal: €${orderDetails.prebuiltTotal}</div>` : ""}
           ${hasLinks ? `<div class="warning">⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt na controle gecommuniceerd. We nemen contact met je op.</div>` : ""}
           <div class="info">ℹ️ Op de kant-en-klare modellen na worden onderdelen niet in elkaar gezet geleverd.</div>
