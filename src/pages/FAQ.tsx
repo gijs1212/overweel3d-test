@@ -64,7 +64,7 @@ const faqData = [
       },
       {
         q: "Hoe kan ik betalen?",
-        a: "Betaling gaat via Tikkie. Bij grotere bestellingen is betaling via factuur mogelijk, maar dit is niet altijd beschikbaar. We bespreken de mogelijkheden bij je bestelling.",
+        a: "Betaling gaat via Tikkie. Bij grotere bestellingen is betaling via factuur mogelijk, maar dit is niet altijd beschikbaar. We bespreken de mogelijkheden bij uw bestelling.",
       },
     ],
   },
