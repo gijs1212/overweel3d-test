@@ -110,7 +110,7 @@ const faqData = [
     questions: [
       {
         q: "Wat is de maximale printgrootte?",
-        a: "Onze printers kunnen tot 250 x 250 x 250 mm. Groter nodig? We kunnen modellen in delen printen die je achteraf kunt assembleren.",
+        a: "Onze printers kunnen tot 250 x 250 x 250 mm. Groter nodig? We kunnen modellen in delen printen die u achteraf kunt assembleren.",
       },
       {
         q: "Kunnen jullie supports en rafts verwijderen?",
