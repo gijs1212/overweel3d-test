@@ -100,7 +100,7 @@ const faqData = [
       },
       {
         q: "Kan ik een prototype eerst goedkeuren?",
-        a: "Voor grote of dure projecten kunnen we foto's sturen van de eerste laag of tussentijdse updates. Geef dit aan bij je bestelling.",
+        a: "Voor grote of dure projecten kunnen we foto's sturen van de eerste laag of tussentijdse updates. Geef dit aan bij uw bestelling.",
       },
     ],
   },
