@@ -118,7 +118,7 @@ const faqData = [
       },
       {
         q: "Wat is infill en welke percentage moet ik kiezen?",
-        a: "Infill is de 'vulling' binnenin je print. 20% is standaard en voldoende voor decoratie. Functionele onderdelen? 50-100% maakt ze steviger.",
+        a: "Infill is de 'vulling' binnenin uw print. 20% is standaard en voldoende voor decoratie. Functionele onderdelen? 50-100% maakt ze steviger.",
       },
     ],
   },
