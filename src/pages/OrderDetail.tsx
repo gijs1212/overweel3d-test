@@ -119,7 +119,11 @@ export default function OrderDetail() {
   const downloadFile = async (storagePath: string, filename: string) => {
     const { data, error } = await supabase.storage.from("orders").download(storagePath);
     if (error) {
-      toast({ title: "Download mislukt", variant: "destructive" });
+      toast({
+        title: "Bestand niet beschikbaar",
+        description: "Dit bestand is verplaatst. Neem contact op met gijsoverweel@gmail.com als u een kopie van dit bestand wilt.",
+        variant: "destructive",
+      });
       return;
     }
     const url = URL.createObjectURL(data);
