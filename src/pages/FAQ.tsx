@@ -42,7 +42,7 @@ const faqData = [
       },
       {
         q: "Is PLA voedselveilig?",
-        a: "Technisch gezien is PLA food-safe, maar 3D-prints zijn dat niet automatisch. Door de laagjes kunnen bacteriën zich nestelen. Voor éénmalig gebruik mogelijk, voor dagelijks gebruik raden we het af.",
+        a: "Technisch gezien is PLA food-safe, maar 3D-prints zijn dat niet automatisch. Door de laagjes kunnen bacteriën zich nestelen. Voor éénmalig gebruik is het mogelijk, maar voor dagelijks gebruik raden we het af.",
       },
     ],
   },
