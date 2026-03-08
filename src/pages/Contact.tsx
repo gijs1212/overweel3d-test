@@ -246,7 +246,7 @@ export default function Contact() {
                       id="message"
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      placeholder="Vertel ons wat je op je hart hebt..."
+                      placeholder="Vertel ons wat u op het hart hebt..."
                       rows={6}
                     />
                   </div>
