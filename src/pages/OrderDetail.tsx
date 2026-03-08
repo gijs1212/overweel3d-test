@@ -268,6 +268,9 @@ export default function OrderDetail() {
                         filename={file.original_filename}
                       />
                     </div>
+                  ))}
+                </div>
+              </div>
 
               {/* Address */}
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
