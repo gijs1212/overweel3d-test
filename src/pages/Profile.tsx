@@ -23,7 +23,7 @@ export default function Profile() {
     postal_code: "",
     city: "",
     country: "Nederland",
-    vat_number: "",
+    
   });
 
   useEffect(() => {
