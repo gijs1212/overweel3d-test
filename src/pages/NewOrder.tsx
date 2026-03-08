@@ -553,18 +553,27 @@ export default function NewOrder() {
                    <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
                   ) : (
                     <div className="space-y-3">
-                      {uploadedFiles.map((uf, i) => (
-                        <div key={i} className="flex justify-between text-sm border-b border-border pb-2">
-                          <div>
-                            <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
+                      {uploadedFiles.map((uf, i) => {
+                        const perPiece = calculatePerPiecePrice(uf);
+                        const perPieceWithMin = Math.max(perPiece, 5);
+                        return (
+                          <div key={i} className="text-sm border-b border-border pb-2">
+                            <div className="flex justify-between">
+                              <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
+                              {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                               {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
                               {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
                             </p>
+                            {uf.material && uf.estimatedGrams && (
+                              <p className="text-xs font-medium text-accent">
+                                €{perPieceWithMin.toFixed(2)}/stuk{perPiece < 5 && " (min.)"} × {uf.quantity} = €{(perPieceWithMin * uf.quantity).toFixed(2)}
+                              </p>
+                            )}
                           </div>
-                          {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       <div className="border-t border-border pt-3">
                         <div className="flex justify-between items-center">
