@@ -208,6 +208,7 @@ export default function AdminOrderEdit() {
     }
   };
 
+  if (loading) {
     return (
       <div className="min-h-screen">
         <Navbar />
