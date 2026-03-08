@@ -49,7 +49,7 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-primary">
                 Welkom{profile?.full_name ? `, ${profile.full_name}` : ""}!
               </h1>
-              <p className="text-muted-foreground">Bekijk en beheer je bestellingen.</p>
+              <p className="text-muted-foreground">Bekijk en beheer uw bestellingen.</p>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
               <Link to="/profiel">
