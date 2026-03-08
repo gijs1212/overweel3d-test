@@ -35,7 +35,7 @@ export function Hero() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-8"
           >
             <Sparkles className="w-4 h-4 text-accent" />
-            <span>Professionele 3D-prints via je eigen link</span>
+            <span>Professionele 3D-prints via uw eigen link</span>
           </motion.div>
 
           {/* Headline */}
