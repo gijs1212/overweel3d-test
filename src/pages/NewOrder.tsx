@@ -68,13 +68,32 @@ export default function NewOrder() {
     }
   });
 
+  const ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf", ".step", ".stp"];
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const newFiles: UploadedFile[] = files
+    
+    const validExt = files.filter((f) => {
+      const ext = f.name.toLowerCase().substring(f.name.lastIndexOf("."));
+      return ALLOWED_EXTENSIONS.includes(ext);
+    });
+    const invalidExt = files.filter((f) => {
+      const ext = f.name.toLowerCase().substring(f.name.lastIndexOf("."));
+      return !ALLOWED_EXTENSIONS.includes(ext);
+    });
+    if (invalidExt.length > 0) {
+      toast({
+        title: "Ongeldig bestandstype",
+        description: `Alleen STL, OBJ, 3MF en STEP bestanden zijn toegestaan. ${invalidExt.map((f) => f.name).join(", ")} is overgeslagen.`,
+        variant: "destructive",
+      });
+    }
+
+    const newFiles: UploadedFile[] = validExt
       .filter((f) => f.size <= MAX_FILE_SIZE)
       .map((file) => ({ file, material: "", color: "", quantity: 1 }));
 
-    const tooLarge = files.filter((f) => f.size > MAX_FILE_SIZE);
+    const tooLarge = validExt.filter((f) => f.size > MAX_FILE_SIZE);
     if (tooLarge.length > 0) {
       toast({
         title: "Bestand(en) te groot (max 10MB)",
