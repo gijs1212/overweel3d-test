@@ -465,8 +465,8 @@ export default function Bestellen() {
                         Bestanden via link
                       </h2>
                       <p className="text-sm text-muted-foreground mb-6">
-                        Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat je wilt. 
-                        Als je alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
+                        Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat u wilt. 
+                        Als u alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
                       </p>
 
                       <div className="space-y-8">

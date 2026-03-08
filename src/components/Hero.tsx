@@ -56,8 +56,8 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl mx-auto"
           >
-            Deel de link naar je gewenste 3D-bestanden, kies je materiaal en kleur en ontvang 
-            jouw unieke print zo snel mogelijk. Simpel, transparant en met liefde gemaakt.
+            Deel de link naar uw gewenste 3D-bestanden, kies uw materiaal en kleur en ontvang 
+            uw unieke print zo snel mogelijk. Simpel, transparant en met liefde gemaakt.
           </motion.p>
 
           {/* CTA Buttons */}

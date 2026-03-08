@@ -272,9 +272,9 @@ export default function OrderDetail() {
             {/* Accept / Reject */}
             {showAcceptReject && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 bg-card rounded-2xl p-8 shadow-overweel-card text-center">
-                <h3 className="text-xl font-bold text-primary mb-2">Je definitieve offerte is klaar</h3>
+                <h3 className="text-xl font-bold text-primary mb-2">Uw definitieve offerte is klaar</h3>
                 <p className="text-muted-foreground mb-4">
-                  De admin heeft je definitieve prijs vastgesteld. Bekijk het aanbod en kies om te accepteren of af te wijzen.
+                  Wij hebben uw definitieve prijs vastgesteld. Bekijk het aanbod en kies om te accepteren of af te wijzen.
                 </p>
                 <p className="text-3xl font-bold text-accent mb-6">€{Number(order.final_price).toFixed(2)}</p>
 

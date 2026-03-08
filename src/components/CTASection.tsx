@@ -22,7 +22,7 @@ export function CTASection() {
           </h2>
           <p className="text-lg text-white/70 mb-10">
             Van een simpel gadget tot een complex prototype – 
-            wij maken het voor je. Deel je link naar je gewenste 3D-bestanden en ontvang op zeer korte termijn een prijsindicatie.
+            wij maken het voor u. Deel uw link naar uw gewenste 3D-bestanden en ontvang op zeer korte termijn een prijsindicatie.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">

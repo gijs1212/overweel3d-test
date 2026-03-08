@@ -16,8 +16,8 @@ export function Footer() {
               </span>
             </div>
             <p className="text-primary-foreground/70 max-w-md mt-4">
-              Breng je ideeën tot leven met onze professionele 3D-printservice. 
-              Van prototype tot eindproduct, wij printen het voor je.
+              Breng uw ideeën tot leven met onze professionele 3D-printservice. 
+              Van prototype tot eindproduct, wij printen het voor u.
             </p>
           </div>
 

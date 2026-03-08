@@ -367,7 +367,7 @@ export default function NewOrder() {
                         <div className="bg-accent/10 border border-accent/30 rounded-lg p-4 text-sm">
                           <p className="text-primary">
                             💡 <a href="/login" className="text-accent underline font-medium">Log in</a> of{" "}
-                            <a href="/register" className="text-accent underline font-medium">maak een account</a> om je gegevens automatisch in te vullen bij toekomstige bestellingen.
+                            <a href="/register" className="text-accent underline font-medium">maak een account</a> om uw gegevens automatisch in te vullen bij toekomstige bestellingen.
                           </p>
                         </div>
                       )}

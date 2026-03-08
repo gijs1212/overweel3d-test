@@ -51,7 +51,7 @@ export default function Login() {
             <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
               <h1 className="text-2xl font-bold text-primary mb-2">Inloggen</h1>
               <p className="text-muted-foreground mb-6">
-                Log in om je bestellingen te bekijken en te beheren.
+                Log in om uw bestellingen te bekijken en te beheren.
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">

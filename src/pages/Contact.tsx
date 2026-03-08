@@ -104,7 +104,7 @@ export default function Contact() {
                 Bericht verzonden! 📬
               </h1>
               <p className="text-muted-foreground mb-8">
-                Bedankt voor je bericht! We lezen alles persoonlijk en reageren 
+               Bedankt voor uw bericht! We lezen alles persoonlijk en reageren 
                 meestal binnen 24 uur. Tot snel!
               </p>
               <Button variant="hero" onClick={() => setIsSubmitted(false)}>
