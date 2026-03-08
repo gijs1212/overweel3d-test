@@ -36,7 +36,7 @@ serve(async (req: Request) => {
       await resend.emails.send({
         from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
-        subject: `✅ Bevestiging bestelling ${order.order_number}`,
+       subject: `✅ Bevestiging bestelling ${order.order_number}`,
         html: buildConfirmationEmail(order, orderLink),
       });
 
