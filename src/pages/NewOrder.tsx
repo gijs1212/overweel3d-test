@@ -262,7 +262,8 @@ export default function NewOrder() {
                         <label htmlFor="file-upload" className="cursor-pointer">
                           <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                           <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
-                          <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 50MB per bestand)</p>
+                          <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 10MB per bestand)</p>
+                          <p className="text-xs text-muted-foreground mt-1">Groter dan 10MB? Stuur het bestand via e-mail naar <a href="mailto:gijsoverweel@gmail.com" className="text-accent underline">gijsoverweel@gmail.com</a></p>
                         </label>
                       </div>
 
