@@ -116,7 +116,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
         <p>${order.customer_name}<br>${order.shipping_address || order.billing_address}<br>${order.postal_code} ${order.city}<br>${order.country}</p>
       </div>
 
-      ${order.notes ? `<div class="section"><h2>📝 Jouw opmerkingen</h2><p>${order.notes}</p></div>` : ""}
+      ${order.notes ? `<div class="section"><h2>📝 Uw opmerkingen</h2><p>${order.notes}</p></div>` : ""}
 
       <div style="text-align: center; margin: 24px 0;">
         <a href="${orderLink}" class="btn">📋 Bekijk je bestelling</a>
