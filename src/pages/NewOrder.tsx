@@ -224,6 +224,7 @@ export default function NewOrder() {
       if (orderError) throw orderError;
 
       // 3. Upload files to storage and create records
+      const failedFiles: string[] = [];
       for (const uf of uploadedFiles) {
         const storagePath = `${orderNumber}/files/${uf.file.name}`;
         const { error: uploadError } = await supabase.storage
@@ -231,16 +232,30 @@ export default function NewOrder() {
           .upload(storagePath, uf.file, { upsert: true });
 
         if (uploadError) {
-          console.error("Upload error:", uploadError);
+          console.error("Upload error for", uf.file.name, ":", uploadError);
+          failedFiles.push(uf.file.name);
           continue;
         }
 
-        await supabase.from("order_files").insert({
+        const { error: fileRecordError } = await supabase.from("order_files").insert({
           order_id: order.id,
           storage_path: storagePath,
           original_filename: uf.file.name,
           file_size: uf.file.size,
           mime_type: uf.file.type || "application/octet-stream",
+        });
+
+        if (fileRecordError) {
+          console.error("File record error for", uf.file.name, ":", fileRecordError);
+          failedFiles.push(uf.file.name);
+        }
+      }
+
+      if (failedFiles.length > 0) {
+        toast({
+          title: "Sommige bestanden konden niet worden geüpload",
+          description: `${failedFiles.join(", ")} — stuur deze bestanden via e-mail naar gijsoverweel@gmail.com`,
+          variant: "destructive",
         });
       }
 
