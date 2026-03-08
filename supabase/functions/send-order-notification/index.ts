@@ -176,7 +176,7 @@ const handler = async (req: Request): Promise<Response> => {
           ${customer.notes ? `<div class="section"><h2>📝 Uw opmerkingen</h2><p>${customer.notes}</p></div>` : ""}
           <div class="section">
             <h2>❓ Vragen?</h2>
-            <p>Heb je vragen over je bestelling? Neem gerust contact met ons op via <a href="mailto:gijsoverweel@gmail.com" style="color: #00b4d8;">gijsoverweel@gmail.com</a>.</p>
+            <p>Heeft u vragen over uw bestelling? Neem gerust contact met ons op via <a href="mailto:gijsoverweel@gmail.com" style="color: #00b4d8;">gijsoverweel@gmail.com</a>.</p>
           </div>
         </div>
         <div class="footer">
