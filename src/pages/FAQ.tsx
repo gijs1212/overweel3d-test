@@ -145,7 +145,7 @@ export default function FAQ() {
                 Hoe kunnen we helpen?
               </h1>
               <p className="text-lg text-muted-foreground">
-                Van bestandsformaten tot levertijden – hier vind je antwoord op de meest gestelde vragen.
+                Van bestandsformaten tot levertijden – hier vindt u antwoord op de meest gestelde vragen.
               </p>
             </motion.div>
           </div>
