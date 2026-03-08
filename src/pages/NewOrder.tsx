@@ -415,10 +415,6 @@ export default function NewOrder() {
                           <Label>Land</Label>
                           <Input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
                         </div>
-                        <div>
-                          <Label>BTW-nummer</Label>
-                          <Input value={formData.vat_number} onChange={(e) => setFormData({ ...formData, vat_number: e.target.value })} />
-                        </div>
                       </div>
 
                       <div className="flex items-start gap-2 pt-4">
