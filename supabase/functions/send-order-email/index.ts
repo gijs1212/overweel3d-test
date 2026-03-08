@@ -167,7 +167,7 @@ function buildUpdateEmail(order: any, orderLink: string): string {
       ${order.final_price ? `<p>De definitieve prijs is vastgesteld op: <strong style="font-size: 24px; color: #00b4d8;">€${Number(order.final_price).toFixed(2)}</strong></p>` : ""}
       <p>Bekijk je bestelling voor alle details en om de offerte te accepteren of af te wijzen.</p>
       <div style="text-align: center; margin: 24px 0;">
-        <a href="${orderLink}" class="btn">Bekijk je bestelling</a>
+        <a href="${orderLink}" class="btn">Bekijk uw bestelling</a>
       </div>
     </div>
     <div class="footer">
