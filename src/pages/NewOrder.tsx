@@ -481,7 +481,7 @@ export default function NewOrder() {
 
                   <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                     <p className="text-xs text-amber-800 dark:text-amber-200">
-                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs.
+                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimum bestelling is €5,-.
                     </p>
                   </div>
                 </div>

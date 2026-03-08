@@ -256,9 +256,14 @@ export default function AdminOrderEdit() {
                         </span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                      <Download className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteFile(file.id, file.storage_path)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {files.length === 0 && <p className="text-sm text-muted-foreground">Geen bestanden geüpload.</p>}
