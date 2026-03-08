@@ -174,7 +174,7 @@ export default function Bestellen() {
 
   const addPrebuiltToCart = (model: typeof prebuiltModels[0]) => {
     if (model.hasColorChoice && !prebuiltColors[model.id]) {
-      toast({ title: "Kies een kleur", description: "Selecteer een kleur voordat je dit product toevoegt.", variant: "destructive" });
+      toast({ title: "Kies een kleur", description: "Selecteer een kleur voordat u dit product toevoegt.", variant: "destructive" });
       return;
     }
     const selectedColorObj = model.hasColorChoice ? plaColors.find(c => c.id === prebuiltColors[model.id]) : undefined;
