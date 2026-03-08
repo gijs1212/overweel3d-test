@@ -20,7 +20,7 @@ const faqData = [
       },
       {
         q: "Hoe weet ik of mijn model printbaar is?",
-        a: "Na upload analyseren we automatisch je model. We checken op manifold errors, te dunne wanden en overhangs. Als er problemen zijn, nemen we contact op vóór we starten.",
+        a: "Na upload analyseren we automatisch uw model. We checken op manifold errors, te dunne wanden en overhangs. Als er problemen zijn, nemen we contact op vóór we starten.",
       },
       {
         q: "Kan ik m'n ex laten printen?",
