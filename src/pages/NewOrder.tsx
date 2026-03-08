@@ -353,6 +353,7 @@ export default function NewOrder() {
                                     <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
                                   )}
                                 </div>
+                              )}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <Label className="text-xs">Materiaal</Label>
