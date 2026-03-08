@@ -110,7 +110,7 @@ function buildAcceptEmailCustomer(order: any, orderLink: string): string {
         <p><strong>Definitieve prijs:</strong> €${Number(order.final_price).toFixed(2)}</p>
         ${order.tikkie_link ? `<p><a href="${order.tikkie_link}" class="btn">💰 Betalen via Tikkie</a></p>` : ""}
       </div>
-      <p><a href="${orderLink}" class="btn">Bekijk je bestelling</a></p>
+      <p><a href="${orderLink}" class="btn">Bekijk uw bestelling</a></p>
     </div>
   </body></html>`;
 }
