@@ -586,7 +586,7 @@ export default function Bestellen() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div>
                         <Label htmlFor="name">Naam *</Label>
-                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Je volledige naam" />
+                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Uw volledige naam" />
                       </div>
                       <div>
                         <Label htmlFor="email">E-mail *</Label>
