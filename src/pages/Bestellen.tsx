@@ -590,7 +590,7 @@ export default function Bestellen() {
                       </div>
                       <div>
                         <Label htmlFor="email">E-mail *</Label>
-                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="je@email.nl" />
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="u@email.nl" />
                       </div>
                       <div>
                         <Label htmlFor="phone">Telefoon</Label>
