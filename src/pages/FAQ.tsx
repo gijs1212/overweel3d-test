@@ -60,7 +60,7 @@ const faqData = [
       },
       {
         q: "Moet ik vooraf betalen?",
-        a: "Nee, pas na goedkeuring van de offerte. Je krijgt betaalinstructies zodra we je model hebben geanalyseerd en de definitieve prijs hebben vastgesteld.",
+        a: "Nee, pas na goedkeuring van de offerte. U krijgt betaalinstructies zodra we uw model hebben geanalyseerd en de definitieve prijs hebben vastgesteld.",
       },
       {
         q: "Hoe kan ik betalen?",
