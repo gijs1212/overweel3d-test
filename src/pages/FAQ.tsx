@@ -16,7 +16,7 @@ const faqData = [
     questions: [
       {
         q: "Welke bestandsformaten accepteren jullie?",
-        a: "Wij accepteren STL, OBJ en STEP bestanden. STL is het meest gangbaar en werkt vrijwel altijd perfect. Twijfel je? Upload gerust en we checken het voor je.",
+        a: "Wij accepteren STL, OBJ en STEP bestanden. STL is het meest gangbaar en werkt vrijwel altijd perfect. Twijfelt u? Upload gerust en we checken het voor u.",
       },
       {
         q: "Hoe weet ik of mijn model printbaar is?",
