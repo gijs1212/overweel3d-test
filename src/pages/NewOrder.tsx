@@ -364,8 +364,6 @@ export default function NewOrder() {
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               </div>
-                              {/* 3D Preview */}
-                              <FilePreview3D file={uf.file} filename={uf.file.name} className="mb-2" />
 
                               {/* Volume & weight info */}
                               {!uf.parsing && uf.estimatedGrams && (

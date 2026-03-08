@@ -263,10 +263,6 @@ export default function OrderDetail() {
                           <Download className="w-4 h-4" />
                         </Button>
                       </div>
-                      <FilePreview3D
-                        url={getFileUrl(file.storage_path)}
-                        filename={file.original_filename}
-                      />
                     </div>
                   ))}
                 </div>
