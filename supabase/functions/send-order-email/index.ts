@@ -160,7 +160,7 @@ function buildUpdateEmail(order: any, orderLink: string): string {
     .btn { display: inline-block; background: #00b4d8; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }
     .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
   </style></head><body>
-    <div class="header"><h1>📋 Update voor je bestelling</h1></div>
+    <div class="header"><h1>📋 Update voor uw bestelling</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
       <p>Er is nieuwe informatie beschikbaar voor je bestelling <strong>${order.order_number}</strong>.</p>
