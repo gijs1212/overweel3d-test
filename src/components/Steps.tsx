@@ -5,13 +5,13 @@ const steps = [
   {
     icon: Upload,
     title: "Deel je link",
-    description: "Plak een link naar je 3D-bestanden (bijv. Thingiverse, Printables of WeTransfer). Wij downloaden en controleren alles voor je.",
+    description: "Plak een link naar uw 3D-bestanden (bijv. Thingiverse, Printables of WeTransfer). Wij downloaden en controleren alles voor u.",
     color: "bg-blue-500",
   },
   {
     icon: Palette,
     title: "Kies materiaal & kleur",
-    description: "Van PLA tot PETG, en van klassiek zwart tot felgeel. Jij bepaalt hoe je print eruitziet.",
+    description: "Van PLA tot PETG, en van klassiek zwart tot felgeel. U bepaalt hoe uw print eruitziet.",
     color: "bg-purple-500",
   },
   {
@@ -23,7 +23,7 @@ const steps = [
   {
     icon: Package,
     title: "Wij printen & versturen",
-    description: "Onze printers gaan aan de slag en je hebt zo snel mogelijk jouw creatie in handen!",
+    description: "Onze printers gaan aan de slag en u hebt zo snel mogelijk uw creatie in handen!",
     color: "bg-accent",
   },
 ];

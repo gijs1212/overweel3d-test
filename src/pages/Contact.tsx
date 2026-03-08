@@ -43,7 +43,7 @@ export default function Contact() {
     if (!formData.name || !formData.email || !formData.subject || !formData.message) {
       toast({
         title: "Vul alle velden in",
-        description: "We hebben al je gegevens nodig om je te kunnen helpen.",
+        description: "We hebben al uw gegevens nodig om u te kunnen helpen.",
         variant: "destructive",
       });
       return;
@@ -66,7 +66,7 @@ export default function Contact() {
       setIsSubmitted(true);
       toast({
         title: "Bericht verzonden!",
-        description: "We nemen zo snel mogelijk contact met je op.",
+        description: "We nemen zo snel mogelijk contact met u op.",
       });
     } catch (error) {
       console.error("Contact form error:", error);
@@ -104,7 +104,7 @@ export default function Contact() {
                 Bericht verzonden! 📬
               </h1>
               <p className="text-muted-foreground mb-8">
-                Bedankt voor je bericht! We lezen alles persoonlijk en reageren 
+               Bedankt voor uw bericht! We lezen alles persoonlijk en reageren 
                 meestal binnen 24 uur. Tot snel!
               </p>
               <Button variant="hero" onClick={() => setIsSubmitted(false)}>
@@ -134,7 +134,7 @@ export default function Contact() {
                 Neem contact op
               </h1>
               <p className="text-lg text-muted-foreground">
-                Vraag, opmerking of gewoon zin in een praatje over 3D-printen? We horen graag van je!
+                Vraag, opmerking of gewoon zin in een praatje over 3D-printen? We horen graag van u!
               </p>
             </motion.div>
           </div>
@@ -206,7 +206,7 @@ export default function Contact() {
                         id="name"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Je naam"
+                        placeholder="Uw naam"
                       />
                     </div>
                     <div>
@@ -216,7 +216,7 @@ export default function Contact() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="je@email.nl"
+                        placeholder="u@email.nl"
                       />
                     </div>
                   </div>
@@ -246,7 +246,7 @@ export default function Contact() {
                       id="message"
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      placeholder="Vertel ons wat je op je hart hebt..."
+                      placeholder="Vertel ons wat u op het hart hebt..."
                       rows={6}
                     />
                   </div>

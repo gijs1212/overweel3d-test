@@ -36,7 +36,7 @@ serve(async (req: Request) => {
       await resend.emails.send({
         from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
-        subject: `✅ Bevestiging bestelling ${order.order_number}`,
+       subject: `✅ Bevestiging bestelling ${order.order_number}`,
         html: buildConfirmationEmail(order, orderLink),
       });
 
@@ -58,7 +58,7 @@ serve(async (req: Request) => {
       await resend.emails.send({
         from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
-        subject: `📋 Update voor bestelling ${order.order_number}`,
+       subject: `📋 Update voor bestelling ${order.order_number}`,
         html: buildUpdateEmail(order, orderLink),
       });
 
@@ -96,7 +96,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
     <div class="header"><h1>Bedankt voor je bestelling! 🎉</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
-      <p>Bedankt voor je bestelling bij Overweel3D! We hebben je aanvraag ontvangen en gaan er direct mee aan de slag.</p>
+      <p>Bedankt voor uw bestelling bij Overweel3D! We hebben uw aanvraag ontvangen en gaan er direct mee aan de slag.</p>
 
       <div class="section">
         <h2>📦 Bestelgegevens</h2>
@@ -108,7 +108,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
       </div>
 
       <div class="warning">
-        ⚠️ <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door ons vastgesteld en aan je gecommuniceerd.
+        ⚠️ <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door ons vastgesteld en aan u gecommuniceerd.
       </div>
 
       <div class="section">
@@ -116,13 +116,13 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
         <p>${order.customer_name}<br>${order.shipping_address || order.billing_address}<br>${order.postal_code} ${order.city}<br>${order.country}</p>
       </div>
 
-      ${order.notes ? `<div class="section"><h2>📝 Jouw opmerkingen</h2><p>${order.notes}</p></div>` : ""}
+      ${order.notes ? `<div class="section"><h2>📝 Uw opmerkingen</h2><p>${order.notes}</p></div>` : ""}
 
       <div style="text-align: center; margin: 24px 0;">
-        <a href="${orderLink}" class="btn">📋 Bekijk je bestelling</a>
+        <a href="${orderLink}" class="btn">📋 Bekijk uw bestelling</a>
       </div>
 
-      <p>Bewaar bovenstaande link om je bestelling te volgen. Je kunt hier ook de definitieve offerte bekijken en accepteren of afwijzen.</p>
+      <p>Bewaar bovenstaande link om uw bestelling te volgen. U kunt hier ook de definitieve offerte bekijken en accepteren of afwijzen.</p>
 
       <div class="section">
         <h2>❓ Vragen?</h2>
@@ -167,7 +167,7 @@ function buildUpdateEmail(order: any, orderLink: string): string {
       ${order.final_price ? `<p>De definitieve prijs is vastgesteld op: <strong style="font-size: 24px; color: #00b4d8;">€${Number(order.final_price).toFixed(2)}</strong></p>` : ""}
       <p>Bekijk je bestelling voor alle details en om de offerte te accepteren of af te wijzen.</p>
       <div style="text-align: center; margin: 24px 0;">
-        <a href="${orderLink}" class="btn">Bekijk je bestelling</a>
+        <a href="${orderLink}" class="btn">Bekijk uw bestelling</a>
       </div>
     </div>
     <div class="footer">

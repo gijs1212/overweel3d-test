@@ -16,11 +16,11 @@ const faqData = [
     questions: [
       {
         q: "Welke bestandsformaten accepteren jullie?",
-        a: "Wij accepteren STL, OBJ en STEP bestanden. STL is het meest gangbaar en werkt vrijwel altijd perfect. Twijfel je? Upload gerust en we checken het voor je.",
+        a: "Wij accepteren STL, OBJ en STEP bestanden. STL is het meest gangbaar en werkt vrijwel altijd perfect. Twijfelt u? Upload gerust en we checken het voor u.",
       },
       {
         q: "Hoe weet ik of mijn model printbaar is?",
-        a: "Na upload analyseren we automatisch je model. We checken op manifold errors, te dunne wanden en overhangs. Als er problemen zijn, nemen we contact op vóór we starten.",
+        a: "Na upload analyseren we automatisch uw model. We checken op manifold errors, te dunne wanden en overhangs. Als er problemen zijn, nemen we contact op vóór we starten.",
       },
       {
         q: "Kan ik m'n ex laten printen?",
@@ -42,7 +42,7 @@ const faqData = [
       },
       {
         q: "Is PLA voedselveilig?",
-        a: "Technisch gezien is PLA food-safe, maar 3D-prints zijn dat niet automatisch. Door de laagjes kunnen bacteriën zich nestelen. Voor éénmalig gebruik mogelijk, voor dagelijks gebruik raden we het af.",
+        a: "Technisch gezien is PLA food-safe, maar 3D-prints zijn dat niet automatisch. Door de laagjes kunnen bacteriën zich nestelen. Voor éénmalig gebruik is het mogelijk, maar voor dagelijks gebruik raden we het af.",
       },
     ],
   },
@@ -52,19 +52,19 @@ const faqData = [
     questions: [
       {
         q: "Hoe wordt de prijs berekend?",
-        a: "De prijs hangt af van materiaalverbruik (volume), het type materiaal, en eventuele complexiteit. Je krijgt altijd eerst een offerte voordat we starten.",
+        a: "De prijs hangt af van materiaalverbruik (volume), het type materiaal, en eventuele complexiteit. U krijgt altijd eerst een offerte voordat we starten.",
       },
       {
         q: "Zijn er verborgen kosten?",
-        a: "Nee! We zijn transparanter dan helder PLA. Je ziet de geschatte prijs direct, en de definitieve prijs wordt gecommuniceerd vóór productie.",
+        a: "Nee! We zijn transparanter dan helder PLA. U ziet de geschatte prijs direct, en de definitieve prijs wordt gecommuniceerd vóór productie.",
       },
       {
         q: "Moet ik vooraf betalen?",
-        a: "Nee, pas na goedkeuring van de offerte. Je krijgt betaalinstructies zodra we je model hebben geanalyseerd en de definitieve prijs hebben vastgesteld.",
+        a: "Nee, pas na goedkeuring van de offerte. U krijgt betaalinstructies zodra we uw model hebben geanalyseerd en de definitieve prijs hebben vastgesteld.",
       },
       {
         q: "Hoe kan ik betalen?",
-        a: "Betaling gaat via Tikkie. Bij grotere bestellingen is betaling via factuur mogelijk, maar dit is niet altijd beschikbaar. We bespreken de mogelijkheden bij je bestelling.",
+        a: "Betaling gaat via Tikkie. Bij grotere bestellingen is betaling via factuur mogelijk, maar dit is niet altijd beschikbaar. We bespreken de mogelijkheden bij uw bestelling.",
       },
     ],
   },
@@ -74,11 +74,11 @@ const faqData = [
     questions: [
       {
         q: "Hoe lang duurt het voordat ik mijn print heb?",
-        a: "Gemiddeld 3-5 werkdagen, afhankelijk van grootte en drukte. Spoedorders? Neem contact op, we kijken wat mogelijk is.",
+        a: "Gemiddeld 3-5 werkdagen, afhankelijk van grootte en drukte. Spoedorders? Neem contact op, we kijken wat er mogelijk is.",
       },
       {
         q: "Kan ik mijn bestelling tracken?",
-        a: "Ja! Zodra je pakket onderweg is, krijg je een track & trace code. Je kunt live meekijken hoe je print naar je toe reist.",
+        a: "Ja! Zodra uw pakket onderweg is, krijgt u een track & trace code. U kunt live meekijken hoe uw print naar u toe reist.",
       },
       {
         q: "Leveren jullie ook in België?",
@@ -92,7 +92,7 @@ const faqData = [
     questions: [
       {
         q: "Wat als mijn print beschadigd aankomt?",
-        a: "Maak foto's en neem binnen 24 uur contact op. Bij transportschade regelen we een nieuwe print of volledige refund.",
+        a: "Maak foto's en neem binnen 24 uur contact op. Bij transportschade regelen we een nieuwe print of volledige restitutie.",
       },
       {
         q: "Wat is jullie kwaliteitsstandaard?",
@@ -100,7 +100,7 @@ const faqData = [
       },
       {
         q: "Kan ik een prototype eerst goedkeuren?",
-        a: "Voor grote of dure projecten kunnen we foto's sturen van de eerste laag of tussentijdse updates. Geef dit aan bij je bestelling.",
+        a: "Voor grote of dure projecten kunnen we foto's sturen van de eerste laag of tussentijdse updates. Geef dit aan bij uw bestelling.",
       },
     ],
   },
@@ -110,15 +110,15 @@ const faqData = [
     questions: [
       {
         q: "Wat is de maximale printgrootte?",
-        a: "Onze printers kunnen tot 250 x 250 x 250 mm. Groter nodig? We kunnen modellen in delen printen die je achteraf kunt assembleren.",
+        a: "Onze printers kunnen tot 250 x 250 x 250 mm. Groter nodig? We kunnen modellen in delen printen die u achteraf kunt assembleren.",
       },
       {
         q: "Kunnen jullie supports en rafts verwijderen?",
-        a: "Ja, we verwijderen supports standaard. Kleine restanten zijn soms zichtbaar – dat hoort bij FDM printing. We doen ons best voor een mooie finish.",
+        a: "Ja, we verwijderen supports standaard. Kleine restanten zijn soms zichtbaar – dat hoort bij FDM-printing. We doen ons best voor een mooie finish.",
       },
       {
         q: "Wat is infill en welke percentage moet ik kiezen?",
-        a: "Infill is de 'vulling' binnenin je print. 20% is standaard en voldoende voor decoratie. Functionele onderdelen? 50-100% maakt ze steviger.",
+        a: "Infill is de 'vulling' binnenin uw print. 20% is standaard en voldoende voor decoratie. Functionele onderdelen? 50-100% maakt ze steviger.",
       },
     ],
   },
@@ -145,7 +145,7 @@ export default function FAQ() {
                 Hoe kunnen we helpen?
               </h1>
               <p className="text-lg text-muted-foreground">
-                Van bestandsformaten tot levertijden – hier vind je antwoord op de meest gestelde vragen.
+                Van bestandsformaten tot levertijden – hier vindt u antwoord op de meest gestelde vragen.
               </p>
             </motion.div>
           </div>
@@ -197,7 +197,7 @@ export default function FAQ() {
               className="max-w-2xl mx-auto mt-16 text-center"
             >
               <h3 className="text-2xl font-bold text-primary mb-4">
-                Staat je vraag er niet tussen?
+                Staat uw vraag er niet tussen?
               </h3>
               <p className="text-muted-foreground mb-6">
                 Geen probleem! Neem contact met ons op en we helpen je graag verder.

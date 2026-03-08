@@ -49,7 +49,7 @@ serve(async (req: Request) => {
       await resend.emails.send({
         from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
-        subject: `✅ Bestelling ${order.order_number} geaccepteerd`,
+       subject: `✅ Bestelling ${order.order_number} geaccepteerd`,
         html: buildAcceptEmailCustomer(order, orderLink),
       });
 
@@ -104,13 +104,13 @@ function buildAcceptEmailCustomer(order: any, orderLink: string): string {
     <div class="header"><h1>Bestelling geaccepteerd! ✅</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
-      <p>Je hebt bestelling <strong>${order.order_number}</strong> geaccepteerd. De productie start na je betaling.</p>
+      <p>U hebt bestelling <strong>${order.order_number}</strong> geaccepteerd. De productie start na uw betaling.</p>
       <div class="section">
         <p><strong>Bestelnummer:</strong> ${order.order_number}</p>
         <p><strong>Definitieve prijs:</strong> €${Number(order.final_price).toFixed(2)}</p>
         ${order.tikkie_link ? `<p><a href="${order.tikkie_link}" class="btn">💰 Betalen via Tikkie</a></p>` : ""}
       </div>
-      <p><a href="${orderLink}" class="btn">Bekijk je bestelling</a></p>
+      <p><a href="${orderLink}" class="btn">Bekijk uw bestelling</a></p>
     </div>
   </body></html>`;
 }

@@ -35,7 +35,7 @@ export function Hero() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-8"
           >
             <Sparkles className="w-4 h-4 text-accent" />
-            <span>Professionele 3D-prints via je eigen link</span>
+            <span>Professionele 3D-prints via uw eigen link</span>
           </motion.div>
 
           {/* Headline */}
@@ -56,8 +56,8 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl mx-auto"
           >
-            Deel de link naar je gewenste 3D-bestanden, kies je materiaal en kleur en ontvang 
-            jouw unieke print zo snel mogelijk. Simpel, transparant en met liefde gemaakt.
+            Deel de link naar uw gewenste 3D-bestanden, kies uw materiaal en kleur en ontvang 
+            uw unieke print zo snel mogelijk. Simpel, transparant en met liefde gemaakt.
           </motion.p>
 
           {/* CTA Buttons */}

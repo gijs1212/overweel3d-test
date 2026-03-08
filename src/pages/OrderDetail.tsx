@@ -177,7 +177,7 @@ export default function OrderDetail() {
               <PartyPopper className="w-12 h-12 text-green-600 mx-auto mb-3" />
               <h2 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Bestelling succesvol geplaatst! 🎉</h2>
               <p className="text-green-700 dark:text-green-300 text-sm">
-                Je ontvangt een bevestigingsmail op <strong>{order.customer_email}</strong>. Bewaar deze link om je bestelling te volgen.
+                U ontvangt een bevestigingsmail op <strong>{order.customer_email}</strong>. Bewaar deze link om uw bestelling te volgen.
               </p>
             </motion.div>
           )}
@@ -272,9 +272,9 @@ export default function OrderDetail() {
             {/* Accept / Reject */}
             {showAcceptReject && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 bg-card rounded-2xl p-8 shadow-overweel-card text-center">
-                <h3 className="text-xl font-bold text-primary mb-2">Je definitieve offerte is klaar</h3>
+                <h3 className="text-xl font-bold text-primary mb-2">Uw definitieve offerte is klaar</h3>
                 <p className="text-muted-foreground mb-4">
-                  De admin heeft je definitieve prijs vastgesteld. Bekijk het aanbod en kies om te accepteren of af te wijzen.
+                  Wij hebben uw definitieve prijs vastgesteld. Bekijk het aanbod en kies om te accepteren of af te wijzen.
                 </p>
                 <p className="text-3xl font-bold text-accent mb-6">€{Number(order.final_price).toFixed(2)}</p>
 
@@ -297,7 +297,7 @@ export default function OrderDetail() {
                 <Check className="w-12 h-12 text-green-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Geaccepteerd! 🎉</h3>
                 <p className="text-green-700 dark:text-green-300 mb-4">
-                  De productie start na je betaling.
+                  De productie start na uw betaling.
                 </p>
                 {order.tikkie_link && (
                   <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
@@ -315,7 +315,7 @@ export default function OrderDetail() {
                 <X className="w-12 h-12 text-red-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-red-800 dark:text-red-200 mb-2">Offerte afgewezen</h3>
                 <p className="text-red-700 dark:text-red-300">
-                  Heb je vragen, wil je een nieuw aanbod, meer informatie, of vind je de prijs te hoog? 
+                  Heeft u vragen, wilt u een nieuw aanbod, meer informatie, of vindt u de prijs te hoog? 
                   Stuur dan een bericht naar{" "}
                   <a href="mailto:gijsoverweel@gmail.com" className="underline font-semibold">gijsoverweel@gmail.com</a>.
                   Dan kunnen we samen tot een oplossing komen.

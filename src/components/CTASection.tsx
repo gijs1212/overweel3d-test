@@ -18,11 +18,11 @@ export function CTASection() {
           className="max-w-3xl mx-auto text-center"
         >
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
-            Klaar om je idee werkelijkheid te maken?
+            Klaar om uw idee werkelijkheid te maken?
           </h2>
           <p className="text-lg text-white/70 mb-10">
             Van een simpel gadget tot een complex prototype – 
-            wij maken het voor je. Deel je link naar je gewenste 3D-bestanden en ontvang op zeer korte termijn een prijsindicatie.
+            wij maken het voor u. Deel uw link naar uw gewenste 3D-bestanden en ontvang op zeer korte termijn een prijsindicatie.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">

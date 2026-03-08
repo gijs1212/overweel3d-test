@@ -159,24 +159,24 @@ const handler = async (req: Request): Promise<Response> => {
     await resend.emails.send({
       from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
       to: [customer.email],
-      subject: `✅ Bevestiging van je bestelling bij Overweel3D`,
+      subject: `✅ Bevestiging van uw bestelling bij Overweel3D`,
       html: `<!DOCTYPE html><html><head><style>${sharedStyle}</style></head><body>
         <div class="header"><h1>Bedankt voor je bestelling! 🎉</h1></div>
         <div class="content">
           <p>Beste ${customer.name},</p>
-          <p>Bedankt voor je bestelling bij Overweel3D! We hebben je aanvraag ontvangen en gaan er direct mee aan de slag.</p>
-          ${hasLinks ? `<div class="section"><h2>🔗 Jouw links & bestanden</h2>${linksHtml}</div>` : ""}
+          <p>Bedankt voor uw bestelling bij Overweel3D! We hebben uw aanvraag ontvangen en gaan er direct mee aan de slag.</p>
+          ${hasLinks ? `<div class="section"><h2>🔗 Uw links & bestanden</h2>${linksHtml}</div>` : ""}
           ${hasPrebuilt ? `<div class="section"><h2>⭐ Kant-en-klare modellen</h2>${prebuiltHtml}</div><div style="font-size: 24px; color: #00b4d8; font-weight: bold; text-align: center; padding: 20px;">Kant-en-klaar totaal: €${orderDetails.prebuiltTotal}</div>` : ""}
-          ${hasLinks ? `<div class="warning">⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt na controle gecommuniceerd. We nemen contact met je op.</div>` : ""}
+          ${hasLinks ? `<div class="warning">⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt na controle gecommuniceerd. We nemen contact met u op.</div>` : ""}
           <div class="info">ℹ️ Op de kant-en-klare modellen na worden onderdelen niet in elkaar gezet geleverd.</div>
           <div class="section">
             <h2>📍 Bezorgadres</h2>
             <p style="margin: 0;">${customer.name}<br>${customer.address}<br>${customer.postalCode} ${customer.city}</p>
           </div>
-          ${customer.notes ? `<div class="section"><h2>📝 Jouw opmerkingen</h2><p>${customer.notes}</p></div>` : ""}
+          ${customer.notes ? `<div class="section"><h2>📝 Uw opmerkingen</h2><p>${customer.notes}</p></div>` : ""}
           <div class="section">
             <h2>❓ Vragen?</h2>
-            <p>Heb je vragen over je bestelling? Neem gerust contact met ons op via <a href="mailto:gijsoverweel@gmail.com" style="color: #00b4d8;">gijsoverweel@gmail.com</a>.</p>
+            <p>Heeft u vragen over uw bestelling? Neem gerust contact met ons op via <a href="mailto:gijsoverweel@gmail.com" style="color: #00b4d8;">gijsoverweel@gmail.com</a>.</p>
           </div>
         </div>
         <div class="footer">

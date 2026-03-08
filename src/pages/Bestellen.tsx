@@ -174,7 +174,7 @@ export default function Bestellen() {
 
   const addPrebuiltToCart = (model: typeof prebuiltModels[0]) => {
     if (model.hasColorChoice && !prebuiltColors[model.id]) {
-      toast({ title: "Kies een kleur", description: "Selecteer een kleur voordat je dit product toevoegt.", variant: "destructive" });
+      toast({ title: "Kies een kleur", description: "Selecteer een kleur voordat u dit product toevoegt.", variant: "destructive" });
       return;
     }
     const selectedColorObj = model.hasColorChoice ? plaColors.find(c => c.id === prebuiltColors[model.id]) : undefined;
@@ -256,7 +256,7 @@ export default function Bestellen() {
       if (error) throw error;
 
       setOrderComplete(true);
-      toast({ title: "Bestelling geplaatst!", description: "Je ontvangt binnenkort een bevestigingsmail." });
+      toast({ title: "Bestelling geplaatst!", description: "U ontvangt binnenkort een bevestigingsmail." });
     } catch (error) {
       console.error("Order error:", error);
       toast({ title: "Er ging iets mis", description: "Probeer het opnieuw of neem contact met ons op.", variant: "destructive" });
@@ -311,7 +311,7 @@ export default function Bestellen() {
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-left">
                 <p className="text-sm text-amber-800">
-                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt na de controle bepaald en aan je doorgegeven.
+                  ⚠️ <strong>Let op:</strong> De prijs voor custom prints wordt na de controle bepaald en aan u doorgegeven.
                 </p>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3 text-left">
@@ -334,9 +334,9 @@ export default function Bestellen() {
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Plaats je bestelling</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Plaats uw bestelling</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Deel de link naar je gewenste 3D-bestanden, geef per bestand de details op en wij printen het voor je.
+              Deel de link naar uw gewenste 3D-bestanden, geef per bestand de details op en wij printen het voor u.
             </p>
           </motion.div>
 
@@ -344,7 +344,7 @@ export default function Bestellen() {
           <div className="max-w-4xl mx-auto mb-8 space-y-3">
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
-                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan je doorgegeven.
+                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan u doorgegeven.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -465,8 +465,8 @@ export default function Bestellen() {
                         Bestanden via link
                       </h2>
                       <p className="text-sm text-muted-foreground mb-6">
-                        Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat je wilt. 
-                        Als je alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
+                        Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat u wilt. 
+                        Als u alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
                       </p>
 
                       <div className="space-y-8">
@@ -582,15 +582,15 @@ export default function Bestellen() {
 
                 {step === 2 && (
                   <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                    <h2 className="text-xl font-bold mb-6">Jouw gegevens</h2>
+                    <h2 className="text-xl font-bold mb-6">Uw gegevens</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div>
                         <Label htmlFor="name">Naam *</Label>
-                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Je volledige naam" />
+                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Uw volledige naam" />
                       </div>
                       <div>
                         <Label htmlFor="email">E-mail *</Label>
-                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="je@email.nl" />
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="u@email.nl" />
                       </div>
                       <div>
                         <Label htmlFor="phone">Telefoon</Label>

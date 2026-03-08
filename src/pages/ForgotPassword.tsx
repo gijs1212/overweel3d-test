@@ -23,7 +23,7 @@ export default function ForgotPassword() {
     try {
       await resetPassword(email);
       setSent(true);
-      toast({ title: "E-mail verzonden", description: "Check je inbox voor de reset link." });
+      toast({ title: "E-mail verzonden", description: "Check uw inbox voor de reset link." });
     } catch (error: any) {
       toast({ title: "Fout", description: error.message, variant: "destructive" });
     } finally {
@@ -43,7 +43,7 @@ export default function ForgotPassword() {
                 <div className="text-center py-8">
                   <Mail className="w-16 h-16 text-accent mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    We hebben een e-mail gestuurd naar <strong>{email}</strong> met een link om je wachtwoord te resetten.
+                    We hebben een e-mail gestuurd naar <strong>{email}</strong> met een link om uw wachtwoord te resetten.
                   </p>
                   <Link to="/login" className="text-accent hover:underline mt-4 inline-block">
                     Terug naar inloggen
@@ -51,11 +51,11 @@ export default function ForgotPassword() {
                 </div>
               ) : (
                 <>
-                  <p className="text-muted-foreground mb-6">Vul je e-mailadres in en we sturen je een reset link.</p>
+                  <p className="text-muted-foreground mb-6">Vul uw e-mailadres in en we sturen u een reset link.</p>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                       <Label htmlFor="email">E-mailadres</Label>
-                      <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="je@email.nl" required />
+                      <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="u@email.nl" required />
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}

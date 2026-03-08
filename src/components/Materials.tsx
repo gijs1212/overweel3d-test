@@ -51,7 +51,7 @@ export function Materials() {
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Van standaard PLA tot flexibele TPU – wij hebben het materiaal dat 
-            bij jouw project past.
+            bij uw project past.
           </p>
         </motion.div>
 

@@ -201,7 +201,7 @@ export default function NewOrder() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Bestelling plaatsen</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload je 3D-bestanden, configureer je print en ontvang direct een indicatieprijs.
+              Upload uw 3D-bestanden, configureer uw print en ontvang direct een indicatieprijs.
             </p>
           </motion.div>
 
@@ -360,14 +360,14 @@ export default function NewOrder() {
                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card space-y-6">
                       <h2 className="text-xl font-bold flex items-center gap-3">
                         <Info className="w-6 h-6 text-accent" />
-                        Jouw gegevens
+                        Uw gegevens
                       </h2>
 
                       {!user && (
                         <div className="bg-accent/10 border border-accent/30 rounded-lg p-4 text-sm">
                           <p className="text-primary">
                             💡 <a href="/login" className="text-accent underline font-medium">Log in</a> of{" "}
-                            <a href="/register" className="text-accent underline font-medium">maak een account</a> om je gegevens automatisch in te vullen bij toekomstige bestellingen.
+                            <a href="/register" className="text-accent underline font-medium">maak een account</a> om uw gegevens automatisch in te vullen bij toekomstige bestellingen.
                           </p>
                         </div>
                       )}
@@ -452,7 +452,7 @@ export default function NewOrder() {
                   <h3 className="font-bold text-primary mb-4">Overzicht</h3>
 
                   {uploadedFiles.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
+                   <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
                   ) : (
                     <div className="space-y-3">
                       {uploadedFiles.map((uf, i) => (

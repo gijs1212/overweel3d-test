@@ -49,7 +49,7 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-primary">
                 Welkom{profile?.full_name ? `, ${profile.full_name}` : ""}!
               </h1>
-              <p className="text-muted-foreground">Bekijk en beheer je bestellingen.</p>
+              <p className="text-muted-foreground">Bekijk en beheer uw bestellingen.</p>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
               <Link to="/profiel">
@@ -74,7 +74,7 @@ export default function Dashboard() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
               <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-xl font-bold text-primary mb-2">Nog geen bestellingen</h2>
-              <p className="text-muted-foreground mb-6">Plaats je eerste bestelling om te beginnen.</p>
+              <p className="text-muted-foreground mb-6">Plaats uw eerste bestelling om te beginnen.</p>
               <Link to="/bestellen">
                 <Button><Plus className="w-4 h-4" /> Bestelling plaatsen</Button>
               </Link>
