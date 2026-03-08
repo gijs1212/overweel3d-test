@@ -112,7 +112,7 @@ export default function NewOrder() {
         total += estimatedGrams * mat.pricePerGram * uf.quantity;
       }
     }
-    return Math.max(total, uploadedFiles.length > 0 ? 5 : 0);
+    return Math.max(total, uploadedFiles.length > 0 ? 5 : 0); // Minimum €5
   };
 
   const estimatedPrice = calculateEstimate();
