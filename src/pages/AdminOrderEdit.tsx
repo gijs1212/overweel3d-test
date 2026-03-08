@@ -168,6 +168,18 @@ export default function AdminOrderEdit() {
     URL.revokeObjectURL(url);
   };
 
+  const deleteFile = async (fileId: string, storagePath: string) => {
+    if (!confirm("Weet u zeker dat u dit bestand wilt verwijderen? De klant ziet dan een melding dat het bestand is verplaatst.")) return;
+    try {
+      await supabase.storage.from("orders").remove([storagePath]);
+      await supabase.from("order_files").delete().eq("id", fileId);
+      setFiles(files.filter((f) => f.id !== fileId));
+      toast({ title: "Bestand verwijderd" });
+    } catch (error: any) {
+      toast({ title: "Fout bij verwijderen", description: error.message, variant: "destructive" });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
