@@ -66,7 +66,7 @@ export default function Contact() {
       setIsSubmitted(true);
       toast({
         title: "Bericht verzonden!",
-        description: "We nemen zo snel mogelijk contact met je op.",
+        description: "We nemen zo snel mogelijk contact met u op.",
       });
     } catch (error) {
       console.error("Contact form error:", error);
