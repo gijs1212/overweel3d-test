@@ -74,8 +74,13 @@ export default function NewOrder() {
       .filter((f) => f.size <= MAX_FILE_SIZE)
       .map((file) => ({ file, material: "", color: "", quantity: 1 }));
 
-    if (newFiles.length < files.length) {
-      toast({ title: "Sommige bestanden zijn te groot (max 50MB)", variant: "destructive" });
+    const tooLarge = files.filter((f) => f.size > MAX_FILE_SIZE);
+    if (tooLarge.length > 0) {
+      toast({
+        title: "Bestand(en) te groot (max 10MB)",
+        description: `${tooLarge.map((f) => f.name).join(", ")} — stuur grotere bestanden via e-mail naar gijsoverweel@gmail.com`,
+        variant: "destructive",
+      });
     }
     setUploadedFiles([...uploadedFiles, ...newFiles]);
     e.target.value = "";
