@@ -45,8 +45,8 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight"
           >
-            Breng je idee tot leven.{" "}
-            <span className="text-gradient">Wij printen het voor je.</span>
+            Breng uw idee tot leven.{" "}
+            <span className="text-gradient">Wij printen het voor u.</span>
           </motion.h1>
 
           {/* Subtitle */}
