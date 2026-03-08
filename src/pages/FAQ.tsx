@@ -92,7 +92,7 @@ const faqData = [
     questions: [
       {
         q: "Wat als mijn print beschadigd aankomt?",
-        a: "Maak foto's en neem binnen 24 uur contact op. Bij transportschade regelen we een nieuwe print of volledige refund.",
+        a: "Maak foto's en neem binnen 24 uur contact op. Bij transportschade regelen we een nieuwe print of volledige restitutie.",
       },
       {
         q: "Wat is jullie kwaliteitsstandaard?",
