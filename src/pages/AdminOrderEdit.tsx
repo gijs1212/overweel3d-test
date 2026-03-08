@@ -64,6 +64,7 @@ export default function AdminOrderEdit() {
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
   // Editable fields
