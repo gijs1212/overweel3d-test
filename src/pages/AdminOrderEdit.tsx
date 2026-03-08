@@ -64,6 +64,7 @@ export default function AdminOrderEdit() {
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
   // Editable fields
@@ -177,6 +178,33 @@ export default function AdminOrderEdit() {
       toast({ title: "Bestand verwijderd" });
     } catch (error: any) {
       toast({ title: "Fout bij verwijderen", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!order) return;
+    if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} volledig wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+    setDeleting(true);
+    try {
+      // 1. Delete storage files
+      if (files.length > 0) {
+        const paths = files.map((f) => f.storage_path);
+        await supabase.storage.from("orders").remove(paths);
+      }
+      // 2. Delete order_files records
+      await supabase.from("order_files").delete().eq("order_id", order.id);
+      // 3. Delete order_events records
+      await supabase.from("order_events").delete().eq("order_id", order.id);
+      // 4. Delete the order itself
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) throw error;
+
+      toast({ title: "Bestelling verwijderd" });
+      navigate("/admin");
+    } catch (error: any) {
+      toast({ title: "Fout bij verwijderen", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -324,6 +352,12 @@ export default function AdminOrderEdit() {
                   {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Klant op de hoogte brengen
                 </Button>
+                <div className="sm:ml-auto">
+                  <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
+                    {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Bestelling verwijderen
+                  </Button>
+                </div>
               </div>
             </div>
 
