@@ -18,7 +18,7 @@ export function CTASection() {
           className="max-w-3xl mx-auto text-center"
         >
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
-            Klaar om je idee werkelijkheid te maken?
+            Klaar om uw idee werkelijkheid te maken?
           </h2>
           <p className="text-lg text-white/70 mb-10">
             Van een simpel gadget tot een complex prototype – 
