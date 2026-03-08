@@ -41,7 +41,7 @@ export default function Contact() {
         body: {
           name: formData.name,
           email: formData.email,
-          subject: subjectOptions.find(s => s.value === formData.subject)?.label || formData.subject,
+          subject: formData.subject,
           message: formData.message,
         },
       });
