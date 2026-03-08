@@ -11,7 +11,7 @@ const steps = [
   {
     icon: Palette,
     title: "Kies materiaal & kleur",
-    description: "Van PLA tot PETG, en van klassiek zwart tot felgeel. Jij bepaalt hoe je print eruitziet.",
+    description: "Van PLA tot PETG, en van klassiek zwart tot felgeel. U bepaalt hoe uw print eruitziet.",
     color: "bg-purple-500",
   },
   {
