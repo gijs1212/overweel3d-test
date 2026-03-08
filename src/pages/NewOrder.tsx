@@ -360,7 +360,7 @@ export default function NewOrder() {
                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card space-y-6">
                       <h2 className="text-xl font-bold flex items-center gap-3">
                         <Info className="w-6 h-6 text-accent" />
-                        Jouw gegevens
+                        Uw gegevens
                       </h2>
 
                       {!user && (
