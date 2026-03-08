@@ -582,7 +582,7 @@ export default function Bestellen() {
 
                 {step === 2 && (
                   <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                    <h2 className="text-xl font-bold mb-6">Jouw gegevens</h2>
+                    <h2 className="text-xl font-bold mb-6">Uw gegevens</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div>
                         <Label htmlFor="name">Naam *</Label>
