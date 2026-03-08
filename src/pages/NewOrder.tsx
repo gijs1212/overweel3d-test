@@ -160,16 +160,22 @@ export default function NewOrder() {
     return MATERIALS.find((m) => m.id === materialId)?.colors || [];
   };
 
-  // Estimate calculator - now volume-based
+  // Calculate per-piece price for a single file
+  const calculatePerPiecePrice = (uf: UploadedFile) => {
+    const mat = MATERIALS.find((m) => m.id === uf.material);
+    if (!mat || !uf.estimatedGrams) return 0;
+    return uf.estimatedGrams * mat.pricePerGram;
+  };
+
+  // Estimate calculator - now volume-based with per-piece minimum €5
   const calculateEstimate = () => {
     let total = 0;
     for (const uf of uploadedFiles) {
-      const mat = MATERIALS.find((m) => m.id === uf.material);
-      if (mat && uf.estimatedGrams) {
-        total += uf.estimatedGrams * mat.pricePerGram * uf.quantity;
-      }
+      const perPiece = calculatePerPiecePrice(uf);
+      const perPieceWithMin = Math.max(perPiece, 5); // Minimum €5 per stuk
+      total += perPieceWithMin * uf.quantity;
     }
-    return Math.max(total, uploadedFiles.length > 0 ? 5 : 0); // Minimum €5
+    return total;
   };
 
   const estimatedPrice = calculateEstimate();
