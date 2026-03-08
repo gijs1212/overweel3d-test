@@ -197,7 +197,7 @@ export default function FAQ() {
               className="max-w-2xl mx-auto mt-16 text-center"
             >
               <h3 className="text-2xl font-bold text-primary mb-4">
-                Staat je vraag er niet tussen?
+                Staat uw vraag er niet tussen?
               </h3>
               <p className="text-muted-foreground mb-6">
                 Geen probleem! Neem contact met ons op en we helpen je graag verder.
