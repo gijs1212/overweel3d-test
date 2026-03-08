@@ -336,10 +336,24 @@ export default function NewOrder() {
                                   <span className="text-xs text-muted-foreground">
                                     ({(uf.file.size / 1024 / 1024).toFixed(1)} MB)
                                   </span>
+                                  {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
+                              </div>
+                              {/* Volume & weight info */}
+                              {!uf.parsing && uf.estimatedGrams && (
+                                <div className="mb-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                  {uf.volumeCm3 != null && (
+                                    <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
+                                  )}
+                                  <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
+                                  {uf.dimensions && (
+                                    <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                  )}
+                                </div>
+                              )}
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
