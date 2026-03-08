@@ -93,7 +93,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
     .warning { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 16px 0; font-size: 14px; }
     .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
   </style></head><body>
-    <div class="header"><h1>Bedankt voor je bestelling! 🎉</h1></div>
+    <div class="header"><h1>Bedankt voor uw bestelling! 🎉</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
       <p>Bedankt voor uw bestelling bij Overweel3D! We hebben uw aanvraag ontvangen en gaan er direct mee aan de slag.</p>
