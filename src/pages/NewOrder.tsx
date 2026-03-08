@@ -63,7 +63,7 @@ export default function NewOrder() {
         postal_code: profile.postal_code || prev.postal_code,
         city: profile.city || prev.city,
         country: profile.country || prev.country,
-        vat_number: profile.vat_number || prev.vat_number,
+        
       }));
     }
   });
