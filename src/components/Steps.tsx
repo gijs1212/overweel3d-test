@@ -4,7 +4,7 @@ import { Upload, Palette, CreditCard, Package } from "lucide-react";
 const steps = [
   {
     icon: Upload,
-    title: "Deel je link",
+    title: "Upload uw bestand",
     description: "Plak een link naar uw 3D-bestanden (bijv. Thingiverse, Printables of WeTransfer). Wij downloaden en controleren alles voor u.",
     color: "bg-blue-500",
   },

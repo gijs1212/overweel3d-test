@@ -38,7 +38,7 @@ export default function Profile() {
         postal_code: profile.postal_code || "",
         city: profile.city || "",
         country: profile.country || "Nederland",
-        vat_number: profile.vat_number || "",
+        
       });
     }
   }, [profile]);
