@@ -21,6 +21,10 @@ interface UploadedFile {
   material: string;
   color: string;
   quantity: number;
+  volumeCm3?: number;
+  estimatedGrams?: number;
+  dimensions?: { width: number; height: number; depth: number };
+  parsing?: boolean;
 }
 
 export default function NewOrder() {
