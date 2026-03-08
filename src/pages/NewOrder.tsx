@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -14,12 +14,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
+import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 
 interface UploadedFile {
   file: File;
   material: string;
   color: string;
   quantity: number;
+  volumeCm3?: number;
+  estimatedGrams?: number;
+  dimensions?: { width: number; height: number; depth: number };
+  parsing?: boolean;
 }
 
 export default function NewOrder() {
@@ -91,7 +96,7 @@ export default function NewOrder() {
 
     const newFiles: UploadedFile[] = validExt
       .filter((f) => f.size <= MAX_FILE_SIZE)
-      .map((file) => ({ file, material: "", color: "", quantity: 1 }));
+      .map((file) => ({ file, material: "", color: "", quantity: 1, parsing: true }));
 
     const tooLarge = validExt.filter((f) => f.size > MAX_FILE_SIZE);
     if (tooLarge.length > 0) {
@@ -101,7 +106,41 @@ export default function NewOrder() {
         variant: "destructive",
       });
     }
-    setUploadedFiles([...uploadedFiles, ...newFiles]);
+    
+    const startIndex = uploadedFiles.length;
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+    
+    // Parse volumes in background
+    for (let i = 0; i < newFiles.length; i++) {
+      const uf = newFiles[i];
+      parse3DFile(uf.file).then((result) => {
+        setUploadedFiles((prev) => {
+          const updated = [...prev];
+          const idx = startIndex + i;
+          if (updated[idx]) {
+            if (result) {
+              const grams = estimatePrintWeight(result.volumeCm3);
+              updated[idx] = {
+                ...updated[idx],
+                volumeCm3: result.volumeCm3,
+                estimatedGrams: grams,
+                dimensions: result.boundingBox,
+                parsing: false,
+              };
+            } else {
+              // Fallback: file-size based estimate
+              updated[idx] = {
+                ...updated[idx],
+                estimatedGrams: Math.max(10, Math.round(uf.file.size / 1024)),
+                parsing: false,
+              };
+            }
+          }
+          return updated;
+        });
+      });
+    }
+    
     e.target.value = "";
   };
 
@@ -120,21 +159,20 @@ export default function NewOrder() {
     return MATERIALS.find((m) => m.id === materialId)?.colors || [];
   };
 
-  // Estimate calculator
+  // Estimate calculator - now volume-based
   const calculateEstimate = () => {
     let total = 0;
     for (const uf of uploadedFiles) {
       const mat = MATERIALS.find((m) => m.id === uf.material);
-      if (mat) {
-        // Rough estimate: file size as proxy for weight
-        const estimatedGrams = Math.max(10, Math.round(uf.file.size / 1024));
-        total += estimatedGrams * mat.pricePerGram * uf.quantity;
+      if (mat && uf.estimatedGrams) {
+        total += uf.estimatedGrams * mat.pricePerGram * uf.quantity;
       }
     }
     return Math.max(total, uploadedFiles.length > 0 ? 5 : 0); // Minimum €5
   };
 
   const estimatedPrice = calculateEstimate();
+  const isParsing = uploadedFiles.some((f) => f.parsing);
   const allFilesConfigured = uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color);
   const canProceed = allFilesConfigured;
   const canSubmit = formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms && canProceed;
@@ -298,11 +336,24 @@ export default function NewOrder() {
                                   <span className="text-xs text-muted-foreground">
                                     ({(uf.file.size / 1024 / 1024).toFixed(1)} MB)
                                   </span>
+                                  {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               </div>
+                              {/* Volume & weight info */}
+                              {!uf.parsing && uf.estimatedGrams && (
+                                <div className="mb-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                  {uf.volumeCm3 != null && (
+                                    <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
+                                  )}
+                                  <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
+                                  {uf.dimensions && (
+                                    <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                  )}
+                                </div>
+                              )}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <Label className="text-xs">Materiaal</Label>
@@ -482,8 +533,10 @@ export default function NewOrder() {
                             <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
+                              {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
                             </p>
                           </div>
+                          {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
                         </div>
                       ))}
 
