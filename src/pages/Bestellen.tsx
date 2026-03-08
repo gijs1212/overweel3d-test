@@ -336,7 +336,7 @@ export default function Bestellen() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
             <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Plaats uw bestelling</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Deel de link naar je gewenste 3D-bestanden, geef per bestand de details op en wij printen het voor je.
+              Deel de link naar uw gewenste 3D-bestanden, geef per bestand de details op en wij printen het voor u.
             </p>
           </motion.div>
 
