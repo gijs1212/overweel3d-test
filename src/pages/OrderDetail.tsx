@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper } from "lucide-react";
-import { FilePreview3D } from "@/components/FilePreview3D";
+
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -263,10 +263,6 @@ export default function OrderDetail() {
                           <Download className="w-4 h-4" />
                         </Button>
                       </div>
-                      <FilePreview3D
-                        url={getFileUrl(file.storage_path)}
-                        filename={file.original_filename}
-                      />
                     </div>
                   ))}
                 </div>

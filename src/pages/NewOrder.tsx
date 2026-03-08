@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info } from "lucide-react";
-import { FilePreview3D } from "@/components/FilePreview3D";
+
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -364,8 +364,6 @@ export default function NewOrder() {
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               </div>
-                              {/* 3D Preview */}
-                              <FilePreview3D file={uf.file} filename={uf.file.name} className="mb-2" />
 
                               {/* Volume & weight info */}
                               {!uf.parsing && uf.estimatedGrams && (
