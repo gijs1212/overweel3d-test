@@ -104,7 +104,7 @@ function buildAcceptEmailCustomer(order: any, orderLink: string): string {
     <div class="header"><h1>Bestelling geaccepteerd! ✅</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
-      <p>Je hebt bestelling <strong>${order.order_number}</strong> geaccepteerd. De productie start na je betaling.</p>
+      <p>U hebt bestelling <strong>${order.order_number}</strong> geaccepteerd. De productie start na uw betaling.</p>
       <div class="section">
         <p><strong>Bestelnummer:</strong> ${order.order_number}</p>
         <p><strong>Definitieve prijs:</strong> €${Number(order.final_price).toFixed(2)}</p>
