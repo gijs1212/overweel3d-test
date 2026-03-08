@@ -117,10 +117,6 @@ export default function Profile() {
                     <Label>Land</Label>
                     <Input value={formData.country} onChange={(e) => update("country", e.target.value)} />
                   </div>
-                  <div>
-                    <Label>BTW-nummer (optioneel)</Label>
-                    <Input value={formData.vat_number} onChange={(e) => update("vat_number", e.target.value)} />
-                  </div>
                 </div>
               </div>
 
