@@ -134,7 +134,7 @@ export default function Contact() {
                 Neem contact op
               </h1>
               <p className="text-lg text-muted-foreground">
-                Vraag, opmerking of gewoon zin in een praatje over 3D-printen? We horen graag van je!
+                Vraag, opmerking of gewoon zin in een praatje over 3D-printen? We horen graag van u!
               </p>
             </motion.div>
           </div>
