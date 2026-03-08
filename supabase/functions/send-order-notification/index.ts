@@ -173,7 +173,7 @@ const handler = async (req: Request): Promise<Response> => {
             <h2>📍 Bezorgadres</h2>
             <p style="margin: 0;">${customer.name}<br>${customer.address}<br>${customer.postalCode} ${customer.city}</p>
           </div>
-          ${customer.notes ? `<div class="section"><h2>📝 Jouw opmerkingen</h2><p>${customer.notes}</p></div>` : ""}
+          ${customer.notes ? `<div class="section"><h2>📝 Uw opmerkingen</h2><p>${customer.notes}</p></div>` : ""}
           <div class="section">
             <h2>❓ Vragen?</h2>
             <p>Heb je vragen over je bestelling? Neem gerust contact met ons op via <a href="mailto:gijsoverweel@gmail.com" style="color: #00b4d8;">gijsoverweel@gmail.com</a>.</p>
