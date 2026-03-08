@@ -135,6 +135,11 @@ export default function OrderDetail() {
     URL.revokeObjectURL(url);
   };
 
+  const getFileUrl = (storagePath: string) => {
+    const { data } = supabase.storage.from("orders").getPublicUrl(storagePath);
+    return data?.publicUrl;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
