@@ -256,7 +256,7 @@ export default function Bestellen() {
       if (error) throw error;
 
       setOrderComplete(true);
-      toast({ title: "Bestelling geplaatst!", description: "Je ontvangt binnenkort een bevestigingsmail." });
+      toast({ title: "Bestelling geplaatst!", description: "U ontvangt binnenkort een bevestigingsmail." });
     } catch (error) {
       console.error("Order error:", error);
       toast({ title: "Er ging iets mis", description: "Probeer het opnieuw of neem contact met ons op.", variant: "destructive" });
