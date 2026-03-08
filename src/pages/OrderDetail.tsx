@@ -177,7 +177,7 @@ export default function OrderDetail() {
               <PartyPopper className="w-12 h-12 text-green-600 mx-auto mb-3" />
               <h2 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Bestelling succesvol geplaatst! 🎉</h2>
               <p className="text-green-700 dark:text-green-300 text-sm">
-                Je ontvangt een bevestigingsmail op <strong>{order.customer_email}</strong>. Bewaar deze link om je bestelling te volgen.
+                U ontvangt een bevestigingsmail op <strong>{order.customer_email}</strong>. Bewaar deze link om uw bestelling te volgen.
               </p>
             </motion.div>
           )}
