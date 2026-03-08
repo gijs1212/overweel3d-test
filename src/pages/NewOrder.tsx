@@ -201,7 +201,7 @@ export default function NewOrder() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Bestelling plaatsen</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload je 3D-bestanden, configureer je print en ontvang direct een indicatieprijs.
+              Upload uw 3D-bestanden, configureer uw print en ontvang direct een indicatieprijs.
             </p>
           </motion.div>
 
