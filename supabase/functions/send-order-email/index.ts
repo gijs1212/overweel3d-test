@@ -119,7 +119,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
       ${order.notes ? `<div class="section"><h2>📝 Uw opmerkingen</h2><p>${order.notes}</p></div>` : ""}
 
       <div style="text-align: center; margin: 24px 0;">
-        <a href="${orderLink}" class="btn">📋 Bekijk je bestelling</a>
+        <a href="${orderLink}" class="btn">📋 Bekijk uw bestelling</a>
       </div>
 
       <p>Bewaar bovenstaande link om je bestelling te volgen. Je kunt hier ook de definitieve offerte bekijken en accepteren of afwijzen.</p>
