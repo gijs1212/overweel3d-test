@@ -181,7 +181,33 @@ export default function AdminOrderEdit() {
     }
   };
 
-  if (loading) {
+  const handleDeleteOrder = async () => {
+    if (!order) return;
+    if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} volledig wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+    setDeleting(true);
+    try {
+      // 1. Delete storage files
+      if (files.length > 0) {
+        const paths = files.map((f) => f.storage_path);
+        await supabase.storage.from("orders").remove(paths);
+      }
+      // 2. Delete order_files records
+      await supabase.from("order_files").delete().eq("order_id", order.id);
+      // 3. Delete order_events records
+      await supabase.from("order_events").delete().eq("order_id", order.id);
+      // 4. Delete the order itself
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) throw error;
+
+      toast({ title: "Bestelling verwijderd" });
+      navigate("/admin");
+    } catch (error: any) {
+      toast({ title: "Fout bij verwijderen", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
     return (
       <div className="min-h-screen">
         <Navbar />
