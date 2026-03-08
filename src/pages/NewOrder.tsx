@@ -96,7 +96,7 @@ export default function NewOrder() {
 
     const newFiles: UploadedFile[] = validExt
       .filter((f) => f.size <= MAX_FILE_SIZE)
-      .map((file) => ({ file, material: "", color: "", quantity: 1 }));
+      .map((file) => ({ file, material: "", color: "", quantity: 1, parsing: true }));
 
     const tooLarge = validExt.filter((f) => f.size > MAX_FILE_SIZE);
     if (tooLarge.length > 0) {
@@ -106,7 +106,41 @@ export default function NewOrder() {
         variant: "destructive",
       });
     }
-    setUploadedFiles([...uploadedFiles, ...newFiles]);
+    
+    const startIndex = uploadedFiles.length;
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+    
+    // Parse volumes in background
+    for (let i = 0; i < newFiles.length; i++) {
+      const uf = newFiles[i];
+      parse3DFile(uf.file).then((result) => {
+        setUploadedFiles((prev) => {
+          const updated = [...prev];
+          const idx = startIndex + i;
+          if (updated[idx]) {
+            if (result) {
+              const grams = estimatePrintWeight(result.volumeCm3);
+              updated[idx] = {
+                ...updated[idx],
+                volumeCm3: result.volumeCm3,
+                estimatedGrams: grams,
+                dimensions: result.boundingBox,
+                parsing: false,
+              };
+            } else {
+              // Fallback: file-size based estimate
+              updated[idx] = {
+                ...updated[idx],
+                estimatedGrams: Math.max(10, Math.round(uf.file.size / 1024)),
+                parsing: false,
+              };
+            }
+          }
+          return updated;
+        });
+      });
+    }
+    
     e.target.value = "";
   };
 
