@@ -10,14 +10,6 @@ import { Mail, MessageSquare, Clock, Send, Loader2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const subjectOptions = [
-  { value: "vraag", label: "Vraag over bestelling" },
-  { value: "aanvraag", label: "Offerte aanvraag" },
-  { value: "compliment", label: "Compliment 🎉" },
-  { value: "feedback", label: "Feedback" },
-  { value: "slechte-grap", label: "Slechte grap door AI 🤖" },
-  { value: "anders", label: "Anders" },
-];
 
 export default function Contact() {
   const { toast } = useToast();
