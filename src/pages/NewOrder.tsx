@@ -145,7 +145,7 @@ export default function NewOrder() {
           postal_code: formData.postal_code,
           city: formData.city,
           country: formData.country,
-          vat_number: formData.vat_number,
+          
           material: uploadedFiles.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", "),
           color: uploadedFiles.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", "),
           quantity: uploadedFiles.reduce((sum, f) => sum + f.quantity, 0),
