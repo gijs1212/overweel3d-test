@@ -56,7 +56,7 @@ const faqData = [
       },
       {
         q: "Zijn er verborgen kosten?",
-        a: "Nee! We zijn transparanter dan helder PLA. Je ziet de geschatte prijs direct, en de definitieve prijs wordt gecommuniceerd vóór productie.",
+        a: "Nee! We zijn transparanter dan helder PLA. U ziet de geschatte prijs direct, en de definitieve prijs wordt gecommuniceerd vóór productie.",
       },
       {
         q: "Moet ik vooraf betalen?",
