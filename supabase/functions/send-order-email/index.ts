@@ -96,7 +96,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
     <div class="header"><h1>Bedankt voor je bestelling! 🎉</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
-      <p>Bedankt voor je bestelling bij Overweel3D! We hebben je aanvraag ontvangen en gaan er direct mee aan de slag.</p>
+      <p>Bedankt voor uw bestelling bij Overweel3D! We hebben uw aanvraag ontvangen en gaan er direct mee aan de slag.</p>
 
       <div class="section">
         <h2>📦 Bestelgegevens</h2>
