@@ -119,7 +119,11 @@ export default function OrderDetail() {
   const downloadFile = async (storagePath: string, filename: string) => {
     const { data, error } = await supabase.storage.from("orders").download(storagePath);
     if (error) {
-      toast({ title: "Download mislukt", variant: "destructive" });
+      toast({
+        title: "Bestand niet beschikbaar",
+        description: "Dit bestand is verplaatst. Neem contact op met gijsoverweel@gmail.com als u een kopie van dit bestand wilt.",
+        variant: "destructive",
+      });
       return;
     }
     const url = URL.createObjectURL(data);
@@ -211,11 +215,18 @@ export default function OrderDetail() {
                       <span className="text-xl font-bold text-accent">€{Number(order.final_price).toFixed(2)}</span>
                     </div>
                   )}
+                  {order.tikkie_link && (
+                    <div className="border-t border-border pt-3">
+                      <a href={order.tikkie_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-accent hover:underline font-medium">
+                        <ExternalLink className="w-4 h-4" /> Betalen via Tikkie
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                   <p className="text-xs text-amber-800 dark:text-amber-200">
-                    ⚠️ De indicatieprijs is slechts een schatting en is nooit de definitieve prijs.
+                    ⚠️ De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimum bestelling is €5,-.
                   </p>
                 </div>
               </div>

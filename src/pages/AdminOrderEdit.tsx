@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft, FileText, Download, Send } from "lucide-react";
+import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -168,6 +168,18 @@ export default function AdminOrderEdit() {
     URL.revokeObjectURL(url);
   };
 
+  const deleteFile = async (fileId: string, storagePath: string) => {
+    if (!confirm("Weet u zeker dat u dit bestand wilt verwijderen? De klant ziet dan een melding dat het bestand is verplaatst.")) return;
+    try {
+      await supabase.storage.from("orders").remove([storagePath]);
+      await supabase.from("order_files").delete().eq("id", fileId);
+      setFiles(files.filter((f) => f.id !== fileId));
+      toast({ title: "Bestand verwijderd" });
+    } catch (error: any) {
+      toast({ title: "Fout bij verwijderen", description: error.message, variant: "destructive" });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -244,9 +256,14 @@ export default function AdminOrderEdit() {
                         </span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                      <Download className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteFile(file.id, file.storage_path)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {files.length === 0 && <p className="text-sm text-muted-foreground">Geen bestanden geüpload.</p>}

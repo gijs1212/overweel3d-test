@@ -23,7 +23,7 @@ export default function Profile() {
     postal_code: "",
     city: "",
     country: "Nederland",
-    vat_number: "",
+    
   });
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function Profile() {
         postal_code: profile.postal_code || "",
         city: profile.city || "",
         country: profile.country || "Nederland",
-        vat_number: profile.vat_number || "",
+        
       });
     }
   }, [profile]);
@@ -116,10 +116,6 @@ export default function Profile() {
                   <div>
                     <Label>Land</Label>
                     <Input value={formData.country} onChange={(e) => update("country", e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>BTW-nummer (optioneel)</Label>
-                    <Input value={formData.vat_number} onChange={(e) => update("vat_number", e.target.value)} />
                   </div>
                 </div>
               </div>

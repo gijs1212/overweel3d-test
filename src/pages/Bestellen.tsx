@@ -277,8 +277,8 @@ export default function Bestellen() {
               </motion.div>
               <h1 className="text-3xl font-bold text-primary mb-4">Bestelling geplaatst! 🎉</h1>
               <p className="text-muted-foreground mb-8">
-                Je bestelling vliegt nu digitaal naar ons toe. We gaan direct aan de slag 
-                en je ontvangt een bevestigingsmail met alle details op {formData.email}.
+                Uw bestelling vliegt nu digitaal naar ons toe. We gaan direct aan de slag 
+                en u ontvangt een bevestigingsmail met alle details op {formData.email}.
               </p>
 
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-card rounded-2xl p-6 shadow-overweel-card text-left">
@@ -334,7 +334,7 @@ export default function Bestellen() {
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Plaats uw bestelling</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Upload uw bestand</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Deel de link naar uw gewenste 3D-bestanden, geef per bestand de details op en wij printen het voor u.
             </p>
@@ -342,9 +342,9 @@ export default function Bestellen() {
 
           {/* Disclaimers */}
           <div className="max-w-4xl mx-auto mb-8 space-y-3">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
-                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan u doorgegeven.
+                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan u doorgegeven. Minimum bestelling is €5,-.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

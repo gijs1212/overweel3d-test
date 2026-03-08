@@ -43,7 +43,7 @@ export default function NewOrder() {
     postal_code: profile?.postal_code || "",
     city: profile?.city || "",
     country: profile?.country || "Nederland",
-    vat_number: profile?.vat_number || "",
+    
     notes: "",
     print_preferences: "",
     agreeTerms: false,
@@ -63,7 +63,7 @@ export default function NewOrder() {
         postal_code: profile.postal_code || prev.postal_code,
         city: profile.city || prev.city,
         country: profile.country || prev.country,
-        vat_number: profile.vat_number || prev.vat_number,
+        
       }));
     }
   });
@@ -74,8 +74,13 @@ export default function NewOrder() {
       .filter((f) => f.size <= MAX_FILE_SIZE)
       .map((file) => ({ file, material: "", color: "", quantity: 1 }));
 
-    if (newFiles.length < files.length) {
-      toast({ title: "Sommige bestanden zijn te groot (max 50MB)", variant: "destructive" });
+    const tooLarge = files.filter((f) => f.size > MAX_FILE_SIZE);
+    if (tooLarge.length > 0) {
+      toast({
+        title: "Bestand(en) te groot (max 10MB)",
+        description: `${tooLarge.map((f) => f.name).join(", ")} — stuur grotere bestanden via e-mail naar gijsoverweel@gmail.com`,
+        variant: "destructive",
+      });
     }
     setUploadedFiles([...uploadedFiles, ...newFiles]);
     e.target.value = "";
@@ -107,7 +112,7 @@ export default function NewOrder() {
         total += estimatedGrams * mat.pricePerGram * uf.quantity;
       }
     }
-    return Math.max(total, uploadedFiles.length > 0 ? 5 : 0);
+    return Math.max(total, uploadedFiles.length > 0 ? 5 : 0); // Minimum €5
   };
 
   const estimatedPrice = calculateEstimate();
@@ -140,7 +145,7 @@ export default function NewOrder() {
           postal_code: formData.postal_code,
           city: formData.city,
           country: formData.country,
-          vat_number: formData.vat_number,
+          
           material: uploadedFiles.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", "),
           color: uploadedFiles.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", "),
           quantity: uploadedFiles.reduce((sum, f) => sum + f.quantity, 0),
@@ -199,7 +204,7 @@ export default function NewOrder() {
       <main className="pt-20 pb-16">
         <div className="container mx-auto px-4 py-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Bestelling plaatsen</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Upload uw bestand</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Upload uw 3D-bestanden, configureer uw print en ontvang direct een indicatieprijs.
             </p>
@@ -210,7 +215,7 @@ export default function NewOrder() {
             <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door de admin vastgesteld.
+                <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door de admin vastgesteld. Minimum bestelling is €5,-.
               </p>
             </div>
           </div>
@@ -257,7 +262,8 @@ export default function NewOrder() {
                         <label htmlFor="file-upload" className="cursor-pointer">
                           <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                           <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
-                          <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 50MB per bestand)</p>
+                          <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 10MB per bestand)</p>
+                          <p className="text-xs text-muted-foreground mt-1">Groter dan 10MB? Stuur het bestand via e-mail naar <a href="mailto:gijsoverweel@gmail.com" className="text-accent underline">gijsoverweel@gmail.com</a></p>
                         </label>
                       </div>
 
@@ -409,10 +415,6 @@ export default function NewOrder() {
                           <Label>Land</Label>
                           <Input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
                         </div>
-                        <div>
-                          <Label>BTW-nummer</Label>
-                          <Input value={formData.vat_number} onChange={(e) => setFormData({ ...formData, vat_number: e.target.value })} />
-                        </div>
                       </div>
 
                       <div className="flex items-start gap-2 pt-4">
@@ -479,7 +481,7 @@ export default function NewOrder() {
 
                   <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                     <p className="text-xs text-amber-800 dark:text-amber-200">
-                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs.
+                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimum bestelling is €5,-.
                     </p>
                   </div>
                 </div>

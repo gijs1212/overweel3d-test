@@ -93,7 +93,7 @@ function buildConfirmationEmail(order: any, orderLink: string): string {
     .warning { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 16px 0; font-size: 14px; }
     .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
   </style></head><body>
-    <div class="header"><h1>Bedankt voor je bestelling! 🎉</h1></div>
+    <div class="header"><h1>Bedankt voor uw bestelling! 🎉</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
       <p>Bedankt voor uw bestelling bij Overweel3D! We hebben uw aanvraag ontvangen en gaan er direct mee aan de slag.</p>
@@ -160,12 +160,12 @@ function buildUpdateEmail(order: any, orderLink: string): string {
     .btn { display: inline-block; background: #00b4d8; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }
     .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
   </style></head><body>
-    <div class="header"><h1>📋 Update voor je bestelling</h1></div>
+    <div class="header"><h1>📋 Update voor uw bestelling</h1></div>
     <div class="content">
       <p>Beste ${order.customer_name},</p>
-      <p>Er is nieuwe informatie beschikbaar voor je bestelling <strong>${order.order_number}</strong>.</p>
+      <p>Er is nieuwe informatie beschikbaar voor uw bestelling <strong>${order.order_number}</strong>.</p>
       ${order.final_price ? `<p>De definitieve prijs is vastgesteld op: <strong style="font-size: 24px; color: #00b4d8;">€${Number(order.final_price).toFixed(2)}</strong></p>` : ""}
-      <p>Bekijk je bestelling voor alle details en om de offerte te accepteren of af te wijzen.</p>
+      <p>Bekijk uw bestelling voor alle details en om de offerte te accepteren of af te wijzen.</p>
       <div style="text-align: center; margin: 24px 0;">
         <a href="${orderLink}" class="btn">Bekijk uw bestelling</a>
       </div>

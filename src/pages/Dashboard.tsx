@@ -61,7 +61,7 @@ export default function Dashboard() {
                 </Link>
               )}
               <Link to="/bestellen">
-                <Button><Plus className="w-4 h-4" /> Nieuwe bestelling</Button>
+                <Button><Plus className="w-4 h-4" /> Upload uw bestand</Button>
               </Link>
             </div>
           </div>
@@ -76,7 +76,7 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold text-primary mb-2">Nog geen bestellingen</h2>
               <p className="text-muted-foreground mb-6">Plaats uw eerste bestelling om te beginnen.</p>
               <Link to="/bestellen">
-                <Button><Plus className="w-4 h-4" /> Bestelling plaatsen</Button>
+                <Button><Plus className="w-4 h-4" /> Upload uw bestand</Button>
               </Link>
             </motion.div>
           ) : (
