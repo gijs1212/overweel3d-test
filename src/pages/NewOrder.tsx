@@ -533,8 +533,10 @@ export default function NewOrder() {
                             <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
+                              {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
                             </p>
                           </div>
+                          {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
                         </div>
                       ))}
 
