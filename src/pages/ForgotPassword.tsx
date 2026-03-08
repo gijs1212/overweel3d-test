@@ -51,7 +51,7 @@ export default function ForgotPassword() {
                 </div>
               ) : (
                 <>
-                  <p className="text-muted-foreground mb-6">Vul je e-mailadres in en we sturen je een reset link.</p>
+                  <p className="text-muted-foreground mb-6">Vul uw e-mailadres in en we sturen u een reset link.</p>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                       <Label htmlFor="email">E-mailadres</Label>
