@@ -74,7 +74,7 @@ const faqData = [
     questions: [
       {
         q: "Hoe lang duurt het voordat ik mijn print heb?",
-        a: "Gemiddeld 3-5 werkdagen, afhankelijk van grootte en drukte. Spoedorders? Neem contact op, we kijken wat mogelijk is.",
+        a: "Gemiddeld 3-5 werkdagen, afhankelijk van grootte en drukte. Spoedorders? Neem contact op, we kijken wat er mogelijk is.",
       },
       {
         q: "Kan ik mijn bestelling tracken?",
