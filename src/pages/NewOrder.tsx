@@ -159,21 +159,20 @@ export default function NewOrder() {
     return MATERIALS.find((m) => m.id === materialId)?.colors || [];
   };
 
-  // Estimate calculator
+  // Estimate calculator - now volume-based
   const calculateEstimate = () => {
     let total = 0;
     for (const uf of uploadedFiles) {
       const mat = MATERIALS.find((m) => m.id === uf.material);
-      if (mat) {
-        // Rough estimate: file size as proxy for weight
-        const estimatedGrams = Math.max(10, Math.round(uf.file.size / 1024));
-        total += estimatedGrams * mat.pricePerGram * uf.quantity;
+      if (mat && uf.estimatedGrams) {
+        total += uf.estimatedGrams * mat.pricePerGram * uf.quantity;
       }
     }
     return Math.max(total, uploadedFiles.length > 0 ? 5 : 0); // Minimum €5
   };
 
   const estimatedPrice = calculateEstimate();
+  const isParsing = uploadedFiles.some((f) => f.parsing);
   const allFilesConfigured = uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color);
   const canProceed = allFilesConfigured;
   const canSubmit = formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms && canProceed;
