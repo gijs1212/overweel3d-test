@@ -43,7 +43,7 @@ export default function ForgotPassword() {
                 <div className="text-center py-8">
                   <Mail className="w-16 h-16 text-accent mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    We hebben een e-mail gestuurd naar <strong>{email}</strong> met een link om je wachtwoord te resetten.
+                    We hebben een e-mail gestuurd naar <strong>{email}</strong> met een link om uw wachtwoord te resetten.
                   </p>
                   <Link to="/login" className="text-accent hover:underline mt-4 inline-block">
                     Terug naar inloggen
