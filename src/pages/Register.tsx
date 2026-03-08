@@ -35,7 +35,7 @@ export default function Register() {
       await signUp(email, password, fullName);
       toast({
         title: "Account aangemaakt!",
-        description: "Controleer je e-mail om je account te bevestigen.",
+        description: "Controleer uw e-mail om uw account te bevestigen.",
       });
       navigate("/login");
     } catch (error: any) {
