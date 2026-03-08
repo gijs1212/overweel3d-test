@@ -208,21 +208,12 @@ export default function Contact() {
 
                   <div className="mb-6">
                     <Label htmlFor="subject">Onderwerp</Label>
-                    <Select
+                    <Input
+                      id="subject"
                       value={formData.subject}
-                      onValueChange={(value) => setFormData({ ...formData, subject: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kies een onderwerp" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjectOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      placeholder="Waar gaat uw bericht over?"
+                    />
                   </div>
 
                   <div className="mb-6">
