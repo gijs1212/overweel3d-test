@@ -325,6 +325,12 @@ export default function AdminOrderEdit() {
                   {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Klant op de hoogte brengen
                 </Button>
+                <div className="sm:ml-auto">
+                  <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
+                    {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Bestelling verwijderen
+                  </Button>
+                </div>
               </div>
             </div>
 
