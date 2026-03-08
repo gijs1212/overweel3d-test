@@ -349,15 +349,34 @@ export default function NewOrder() {
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               </div>
+                              {/* 3D Preview */}
+                              <FilePreview3D file={uf.file} filename={uf.file.name} className="mb-2" />
+
                               {/* Volume & weight info */}
                               {!uf.parsing && uf.estimatedGrams && (
-                                <div className="mb-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                  {uf.volumeCm3 != null && (
-                                    <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
-                                  )}
-                                  <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
-                                  {uf.dimensions && (
-                                    <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                <div className="mb-3 space-y-1">
+                                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                    {uf.volumeCm3 != null && (
+                                      <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
+                                    )}
+                                    <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
+                                    {uf.dimensions && (
+                                      <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                    )}
+                                  </div>
+                                  {uf.material && (
+                                    <div className="text-xs font-medium">
+                                      {(() => {
+                                        const perPiece = calculatePerPiecePrice(uf);
+                                        const isMinimum = perPiece < 5;
+                                        return (
+                                          <span className={isMinimum ? "text-amber-600 dark:text-amber-400" : "text-accent"}>
+                                            💰 Kosten per stuk: €{Math.max(perPiece, 5).toFixed(2)}
+                                            {isMinimum && " (minimum)"}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
                                   )}
                                 </div>
                               )}
