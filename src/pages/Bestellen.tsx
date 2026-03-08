@@ -277,8 +277,8 @@ export default function Bestellen() {
               </motion.div>
               <h1 className="text-3xl font-bold text-primary mb-4">Bestelling geplaatst! 🎉</h1>
               <p className="text-muted-foreground mb-8">
-                Je bestelling vliegt nu digitaal naar ons toe. We gaan direct aan de slag 
-                en je ontvangt een bevestigingsmail met alle details op {formData.email}.
+                Uw bestelling vliegt nu digitaal naar ons toe. We gaan direct aan de slag 
+                en u ontvangt een bevestigingsmail met alle details op {formData.email}.
               </p>
 
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-card rounded-2xl p-6 shadow-overweel-card text-left">
