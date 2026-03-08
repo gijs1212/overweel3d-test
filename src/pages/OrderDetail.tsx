@@ -266,7 +266,8 @@ export default function OrderDetail() {
                     </div>
                   ))}
                 </div>
-              </div>
+                      </div>
+                      <FilePreview3D url={(() => { const { data } = supabase.storage.from("order-files").getPublicUrl(file.storage_path); return data.publicUrl; })()} filename={file.original_filename} />
 
               {/* Address */}
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
