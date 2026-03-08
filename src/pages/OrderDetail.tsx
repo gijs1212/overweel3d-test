@@ -253,14 +253,20 @@ export default function OrderDetail() {
                 <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
                 <div className="space-y-2">
                   {files.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-accent" />
-                        <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                    <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-accent" />
+                          <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                          <Download className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                        <Download className="w-4 h-4" />
-                      </Button>
+                      <FilePreview3D
+                        url={getFileUrl(file.storage_path)}
+                        filename={file.original_filename}
+                      />
                     </div>
                   ))}
                 </div>
