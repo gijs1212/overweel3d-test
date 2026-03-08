@@ -43,7 +43,7 @@ export default function NewOrder() {
     postal_code: profile?.postal_code || "",
     city: profile?.city || "",
     country: profile?.country || "Nederland",
-    vat_number: profile?.vat_number || "",
+    
     notes: "",
     print_preferences: "",
     agreeTerms: false,
