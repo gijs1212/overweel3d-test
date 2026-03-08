@@ -49,5 +49,6 @@ export const MATERIALS = [
   },
 ];
 
-export const ACCEPTED_FILE_TYPES = ".stl,.obj,.3mf,.step,.stp";
+// iOS/Safari doesn't recognize custom extensions well, so we include broad MIME types as fallback
+export const ACCEPTED_FILE_TYPES = ".stl,.obj,.3mf,.step,.stp,model/stl,application/vnd.ms-pki.stl,application/octet-stream,model/obj,application/x-tgif,*/*";
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
