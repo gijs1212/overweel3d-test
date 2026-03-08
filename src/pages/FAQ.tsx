@@ -78,7 +78,7 @@ const faqData = [
       },
       {
         q: "Kan ik mijn bestelling tracken?",
-        a: "Ja! Zodra je pakket onderweg is, krijg je een track & trace code. Je kunt live meekijken hoe je print naar je toe reist.",
+        a: "Ja! Zodra uw pakket onderweg is, krijgt u een track & trace code. U kunt live meekijken hoe uw print naar u toe reist.",
       },
       {
         q: "Leveren jullie ook in België?",
