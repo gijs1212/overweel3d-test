@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper } from "lucide-react";
+import { FilePreview3D } from "@/components/FilePreview3D";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -134,6 +135,11 @@ export default function OrderDetail() {
     URL.revokeObjectURL(url);
   };
 
+  const getFileUrl = (storagePath: string) => {
+    const { data } = supabase.storage.from("orders").getPublicUrl(storagePath);
+    return data?.publicUrl;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -247,14 +253,20 @@ export default function OrderDetail() {
                 <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
                 <div className="space-y-2">
                   {files.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-accent" />
-                        <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                    <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-accent" />
+                          <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                          <Download className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                        <Download className="w-4 h-4" />
-                      </Button>
+                      <FilePreview3D
+                        url={getFileUrl(file.storage_path)}
+                        filename={file.original_filename}
+                      />
                     </div>
                   ))}
                 </div>

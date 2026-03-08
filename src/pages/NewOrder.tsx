@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info } from "lucide-react";
+import { FilePreview3D } from "@/components/FilePreview3D";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -159,16 +160,22 @@ export default function NewOrder() {
     return MATERIALS.find((m) => m.id === materialId)?.colors || [];
   };
 
-  // Estimate calculator - now volume-based
+  // Calculate per-piece price for a single file
+  const calculatePerPiecePrice = (uf: UploadedFile) => {
+    const mat = MATERIALS.find((m) => m.id === uf.material);
+    if (!mat || !uf.estimatedGrams) return 0;
+    return uf.estimatedGrams * mat.pricePerGram;
+  };
+
+  // Estimate calculator - now volume-based with per-piece minimum €5
   const calculateEstimate = () => {
     let total = 0;
     for (const uf of uploadedFiles) {
-      const mat = MATERIALS.find((m) => m.id === uf.material);
-      if (mat && uf.estimatedGrams) {
-        total += uf.estimatedGrams * mat.pricePerGram * uf.quantity;
-      }
+      const perPiece = calculatePerPiecePrice(uf);
+      const perPieceWithMin = Math.max(perPiece, 5); // Minimum €5 per stuk
+      total += perPieceWithMin * uf.quantity;
     }
-    return Math.max(total, uploadedFiles.length > 0 ? 5 : 0); // Minimum €5
+    return total;
   };
 
   const estimatedPrice = calculateEstimate();
@@ -342,15 +349,34 @@ export default function NewOrder() {
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               </div>
+                              {/* 3D Preview */}
+                              <FilePreview3D file={uf.file} filename={uf.file.name} className="mb-2" />
+
                               {/* Volume & weight info */}
                               {!uf.parsing && uf.estimatedGrams && (
-                                <div className="mb-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                  {uf.volumeCm3 != null && (
-                                    <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
-                                  )}
-                                  <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
-                                  {uf.dimensions && (
-                                    <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                <div className="mb-3 space-y-1">
+                                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                    {uf.volumeCm3 != null && (
+                                      <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
+                                    )}
+                                    <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
+                                    {uf.dimensions && (
+                                      <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                    )}
+                                  </div>
+                                  {uf.material && (
+                                    <div className="text-xs font-medium">
+                                      {(() => {
+                                        const perPiece = calculatePerPiecePrice(uf);
+                                        const isMinimum = perPiece < 5;
+                                        return (
+                                          <span className={isMinimum ? "text-amber-600 dark:text-amber-400" : "text-accent"}>
+                                            💰 Kosten per stuk: €{Math.max(perPiece, 5).toFixed(2)}
+                                            {isMinimum && " (minimum)"}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -527,18 +553,27 @@ export default function NewOrder() {
                    <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
                   ) : (
                     <div className="space-y-3">
-                      {uploadedFiles.map((uf, i) => (
-                        <div key={i} className="flex justify-between text-sm border-b border-border pb-2">
-                          <div>
-                            <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
+                      {uploadedFiles.map((uf, i) => {
+                        const perPiece = calculatePerPiecePrice(uf);
+                        const perPieceWithMin = Math.max(perPiece, 5);
+                        return (
+                          <div key={i} className="text-sm border-b border-border pb-2">
+                            <div className="flex justify-between">
+                              <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
+                              {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                               {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
                               {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
                             </p>
+                            {uf.material && uf.estimatedGrams && (
+                              <p className="text-xs font-medium text-accent">
+                                €{perPieceWithMin.toFixed(2)}/stuk{perPiece < 5 && " (min.)"} × {uf.quantity} = €{(perPieceWithMin * uf.quantity).toFixed(2)}
+                              </p>
+                            )}
                           </div>
-                          {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       <div className="border-t border-border pt-3">
                         <div className="flex justify-between items-center">
