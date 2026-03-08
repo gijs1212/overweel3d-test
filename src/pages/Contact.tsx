@@ -216,7 +216,7 @@ export default function Contact() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="je@email.nl"
+                        placeholder="u@email.nl"
                       />
                     </div>
                   </div>
