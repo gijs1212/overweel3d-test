@@ -52,7 +52,7 @@ const faqData = [
     questions: [
       {
         q: "Hoe wordt de prijs berekend?",
-        a: "De prijs hangt af van materiaalverbruik (volume), het type materiaal, en eventuele complexiteit. Je krijgt altijd eerst een offerte voordat we starten.",
+        a: "De prijs hangt af van materiaalverbruik (volume), het type materiaal, en eventuele complexiteit. U krijgt altijd eerst een offerte voordat we starten.",
       },
       {
         q: "Zijn er verborgen kosten?",
