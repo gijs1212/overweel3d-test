@@ -297,7 +297,7 @@ export default function OrderDetail() {
                 <Check className="w-12 h-12 text-green-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Geaccepteerd! 🎉</h3>
                 <p className="text-green-700 dark:text-green-300 mb-4">
-                  De productie start na je betaling.
+                  De productie start na uw betaling.
                 </p>
                 {order.tikkie_link && (
                   <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
