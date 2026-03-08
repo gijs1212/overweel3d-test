@@ -114,7 +114,7 @@ const faqData = [
       },
       {
         q: "Kunnen jullie supports en rafts verwijderen?",
-        a: "Ja, we verwijderen supports standaard. Kleine restanten zijn soms zichtbaar – dat hoort bij FDM printing. We doen ons best voor een mooie finish.",
+        a: "Ja, we verwijderen supports standaard. Kleine restanten zijn soms zichtbaar – dat hoort bij FDM-printing. We doen ons best voor een mooie finish.",
       },
       {
         q: "Wat is infill en welke percentage moet ik kiezen?",

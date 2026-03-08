@@ -49,7 +49,7 @@ serve(async (req: Request) => {
       await resend.emails.send({
         from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
-        subject: `✅ Bestelling ${order.order_number} geaccepteerd`,
+       subject: `✅ Bestelling ${order.order_number} geaccepteerd`,
         html: buildAcceptEmailCustomer(order, orderLink),
       });
 

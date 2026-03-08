@@ -70,7 +70,7 @@ export default function Profile() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-primary">Mijn profiel</h1>
-                <p className="text-muted-foreground text-sm">Beheer je persoonlijke gegevens</p>
+                <p className="text-muted-foreground text-sm">Beheer uw persoonlijke gegevens</p>
               </div>
             </div>
 

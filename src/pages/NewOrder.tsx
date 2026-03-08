@@ -452,7 +452,7 @@ export default function NewOrder() {
                   <h3 className="font-bold text-primary mb-4">Overzicht</h3>
 
                   {uploadedFiles.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
+                   <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
                   ) : (
                     <div className="space-y-3">
                       {uploadedFiles.map((uf, i) => (

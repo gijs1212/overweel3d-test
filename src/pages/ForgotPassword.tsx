@@ -23,7 +23,7 @@ export default function ForgotPassword() {
     try {
       await resetPassword(email);
       setSent(true);
-      toast({ title: "E-mail verzonden", description: "Check je inbox voor de reset link." });
+      toast({ title: "E-mail verzonden", description: "Check uw inbox voor de reset link." });
     } catch (error: any) {
       toast({ title: "Fout", description: error.message, variant: "destructive" });
     } finally {

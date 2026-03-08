@@ -315,7 +315,7 @@ export default function OrderDetail() {
                 <X className="w-12 h-12 text-red-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-red-800 dark:text-red-200 mb-2">Offerte afgewezen</h3>
                 <p className="text-red-700 dark:text-red-300">
-                  Heb je vragen, wil je een nieuw aanbod, meer informatie, of vind je de prijs te hoog? 
+                  Heeft u vragen, wilt u een nieuw aanbod, meer informatie, of vindt u de prijs te hoog? 
                   Stuur dan een bericht naar{" "}
                   <a href="mailto:gijsoverweel@gmail.com" className="underline font-semibold">gijsoverweel@gmail.com</a>.
                   Dan kunnen we samen tot een oplossing komen.

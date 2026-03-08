@@ -23,7 +23,7 @@ const steps = [
   {
     icon: Package,
     title: "Wij printen & versturen",
-    description: "Onze printers gaan aan de slag en je hebt zo snel mogelijk jouw creatie in handen!",
+    description: "Onze printers gaan aan de slag en u hebt zo snel mogelijk uw creatie in handen!",
     color: "bg-accent",
   },
 ];

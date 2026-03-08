@@ -58,7 +58,7 @@ serve(async (req: Request) => {
       await resend.emails.send({
         from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
-        subject: `📋 Update voor bestelling ${order.order_number}`,
+       subject: `📋 Update voor bestelling ${order.order_number}`,
         html: buildUpdateEmail(order, orderLink),
       });
 

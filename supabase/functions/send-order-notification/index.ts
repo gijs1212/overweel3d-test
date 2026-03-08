@@ -159,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
     await resend.emails.send({
       from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
       to: [customer.email],
-      subject: `✅ Bevestiging van je bestelling bij Overweel3D`,
+      subject: `✅ Bevestiging van uw bestelling bij Overweel3D`,
       html: `<!DOCTYPE html><html><head><style>${sharedStyle}</style></head><body>
         <div class="header"><h1>Bedankt voor je bestelling! 🎉</h1></div>
         <div class="content">

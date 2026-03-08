@@ -43,7 +43,7 @@ export default function Contact() {
     if (!formData.name || !formData.email || !formData.subject || !formData.message) {
       toast({
         title: "Vul alle velden in",
-        description: "We hebben al je gegevens nodig om je te kunnen helpen.",
+        description: "We hebben al uw gegevens nodig om u te kunnen helpen.",
         variant: "destructive",
       });
       return;

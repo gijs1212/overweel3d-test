@@ -63,7 +63,7 @@ export default function ResetPassword() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-md mx-auto">
             <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
               <h1 className="text-2xl font-bold text-primary mb-2">Nieuw wachtwoord</h1>
-              <p className="text-muted-foreground mb-6">Kies een nieuw wachtwoord voor je account.</p>
+              <p className="text-muted-foreground mb-6">Kies een nieuw wachtwoord voor uw account.</p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label htmlFor="password">Nieuw wachtwoord</Label>
