@@ -6,25 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Mail, MessageSquare, Clock, Send, Loader2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const subjectOptions = [
-  { value: "vraag", label: "Vraag over bestelling" },
-  { value: "aanvraag", label: "Offerte aanvraag" },
-  { value: "compliment", label: "Compliment 🎉" },
-  { value: "feedback", label: "Feedback" },
-  { value: "slechte-grap", label: "Slechte grap door AI 🤖" },
-  { value: "anders", label: "Anders" },
-];
 
 export default function Contact() {
   const { toast } = useToast();
@@ -56,7 +41,7 @@ export default function Contact() {
         body: {
           name: formData.name,
           email: formData.email,
-          subject: subjectOptions.find(s => s.value === formData.subject)?.label || formData.subject,
+          subject: formData.subject,
           message: formData.message,
         },
       });
@@ -223,21 +208,12 @@ export default function Contact() {
 
                   <div className="mb-6">
                     <Label htmlFor="subject">Onderwerp</Label>
-                    <Select
+                    <Input
+                      id="subject"
                       value={formData.subject}
-                      onValueChange={(value) => setFormData({ ...formData, subject: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kies een onderwerp" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjectOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      placeholder="Waar gaat uw bericht over?"
+                    />
                   </div>
 
                   <div className="mb-6">
