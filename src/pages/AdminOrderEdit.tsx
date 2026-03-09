@@ -66,6 +66,7 @@ export default function AdminOrderEdit() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   // Editable fields
   const [finalPrice, setFinalPrice] = useState("");
