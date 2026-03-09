@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.complete-order]
 verify_jwt = false
+
+[functions.cleanup-exported-order]
+verify_jwt = false
