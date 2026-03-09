@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2 } from "lucide-react";
+import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +66,7 @@ export default function AdminOrderEdit() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   // Editable fields
   const [finalPrice, setFinalPrice] = useState("");
@@ -178,6 +179,24 @@ export default function AdminOrderEdit() {
       toast({ title: "Bestand verwijderd" });
     } catch (error: any) {
       toast({ title: "Fout bij verwijderen", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleCompleteOrder = async () => {
+    if (!order) return;
+    if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} wilt voltooien? De bestelling wordt als afgerond gemarkeerd en verwijderd uit Supabase.`)) return;
+    setCompleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("complete-order", {
+        body: { order_id: order.id, delete_from_supabase: true },
+      });
+      if (error) throw error;
+      toast({ title: "Bestelling voltooid en verwijderd! ✅" });
+      navigate("/admin");
+    } catch (error: any) {
+      toast({ title: "Fout bij voltooien", description: error.message, variant: "destructive" });
+    } finally {
+      setCompleting(false);
     }
   };
 
@@ -352,6 +371,16 @@ export default function AdminOrderEdit() {
                   {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Klant op de hoogte brengen
                 </Button>
+                {(order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production") && (
+                  <Button
+                    onClick={handleCompleteOrder}
+                    disabled={completing}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    Voltooi bestelling
+                  </Button>
+                )}
                 <div className="sm:ml-auto">
                   <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
                     {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

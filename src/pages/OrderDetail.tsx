@@ -316,7 +316,7 @@ export default function OrderDetail() {
                 <Check className="w-12 h-12 text-green-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Geaccepteerd! 🎉</h3>
                 <p className="text-green-700 dark:text-green-300 mb-4">
-                  De productie start na uw betaling.
+                  We zullen zo snel mogelijk contact met u opnemen voor het afronden van deze opdracht.
                 </p>
                 {order.tikkie_link && (
                   <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
@@ -334,10 +334,9 @@ export default function OrderDetail() {
                 <X className="w-12 h-12 text-red-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-red-800 dark:text-red-200 mb-2">Offerte afgewezen</h3>
                 <p className="text-red-700 dark:text-red-300">
-                  Heeft u vragen, wilt u een nieuw aanbod, meer informatie, of vindt u de prijs te hoog? 
-                  Stuur dan een bericht naar{" "}
-                  <a href="mailto:gijsoverweel@gmail.com" className="underline font-semibold">gijsoverweel@gmail.com</a>.
-                  Dan kunnen we samen tot een oplossing komen.
+                  Jammer dat u geweigerd heeft. Vindt u de prijs te hoog of heeft u nog andere vragen? 
+                  Stuur ze dan naar{" "}
+                  <a href="mailto:gijsoverweel@gmail.com" className="underline font-semibold">Gijsoverweel@gmail.com</a>.
                 </p>
               </div>
             )}
