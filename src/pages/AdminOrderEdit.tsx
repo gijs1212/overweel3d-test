@@ -200,7 +200,7 @@ export default function AdminOrderEdit() {
     }
   };
 
-
+  const handleDeleteOrder = async () => {
     if (!order) return;
     if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} volledig wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     setDeleting(true);
