@@ -182,7 +182,25 @@ export default function AdminOrderEdit() {
     }
   };
 
-  const handleDeleteOrder = async () => {
+  const handleCompleteOrder = async () => {
+    if (!order) return;
+    if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} wilt voltooien? De bestelling wordt als afgerond gemarkeerd en verwijderd uit Supabase.`)) return;
+    setCompleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("complete-order", {
+        body: { order_id: order.id, delete_from_supabase: true },
+      });
+      if (error) throw error;
+      toast({ title: "Bestelling voltooid en verwijderd! ✅" });
+      navigate("/admin");
+    } catch (error: any) {
+      toast({ title: "Fout bij voltooien", description: error.message, variant: "destructive" });
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+
     if (!order) return;
     if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} volledig wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     setDeleting(true);
