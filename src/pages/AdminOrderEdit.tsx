@@ -353,6 +353,16 @@ export default function AdminOrderEdit() {
                   {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Klant op de hoogte brengen
                 </Button>
+                {(order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production") && (
+                  <Button
+                    onClick={handleCompleteOrder}
+                    disabled={completing}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    Voltooi bestelling
+                  </Button>
+                )}
                 <div className="sm:ml-auto">
                   <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
                     {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
