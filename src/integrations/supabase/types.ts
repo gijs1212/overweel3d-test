@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      exported_orders: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          download_url: string
+          id: string
+          order_id: string
+          order_number: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          download_url: string
+          id?: string
+          order_id: string
+          order_number: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          download_url?: string
+          id?: string
+          order_id?: string
+          order_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exported_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_events: {
         Row: {
           created_at: string | null
