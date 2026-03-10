@@ -201,15 +201,16 @@ export default function AdminOrderEdit() {
 
   const handleCompleteOrder = async () => {
     if (!order) return;
-    if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} wilt voltooien? De bestelling wordt als afgerond gemarkeerd en verwijderd uit Supabase.`)) return;
+    if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} wilt voltooien?`)) return;
     setCompleting(true);
     try {
       const { data, error } = await supabase.functions.invoke("complete-order", {
-        body: { order_id: order.id, delete_from_supabase: true },
+        body: { order_id: order.id },
       });
       if (error) throw error;
-      toast({ title: "Bestelling voltooid en verwijderd! ✅" });
-      navigate("/admin");
+      toast({ title: "Bestelling voltooid! ✅" });
+      setOrder({ ...order!, status: "completed" as OrderStatus });
+      setStatus("completed" as OrderStatus);
     } catch (error: any) {
       toast({ title: "Fout bij voltooien", description: error.message, variant: "destructive" });
     } finally {
