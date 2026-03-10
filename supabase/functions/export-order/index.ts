@@ -10,10 +10,9 @@ serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // Authenticate via API key header (for n8n) or Bearer token
+    // Auth via API key (for n8n)
     const apiKey = req.headers.get("x-api-key");
     const expectedKey = Deno.env.get("N8N_API_KEY");
-
     if (!expectedKey) throw new Error("N8N_API_KEY not configured");
     if (apiKey !== expectedKey) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -27,22 +26,16 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Parse body - support GET-like calls from n8n with empty body
     let body: any = {};
-    try {
-      body = await req.json();
-    } catch {
-      // No body = fetch all completed orders
-    }
+    try { body = await req.json(); } catch { /* empty body = fetch all completed */ }
 
-    const { order_id, status_filter, include_files = true, mark_exported = false } = body;
+    const { order_id, status_filter, include_files = true } = body;
 
     // Build query
     let ordersQuery = supabase.from("orders").select("*");
     if (order_id) {
       ordersQuery = ordersQuery.eq("id", order_id);
     } else {
-      // Default: only completed orders (ready for n8n export + cleanup)
       const statuses = status_filter || ["completed"];
       ordersQuery = ordersQuery.in("status", statuses);
     }
@@ -56,23 +49,17 @@ serve(async (req: Request) => {
       });
     }
 
+    const baseUrl = Deno.env.get("SUPABASE_URL")!;
     const results = [];
 
     for (const order of orders) {
-      // Get all events
       const { data: events } = await supabase
-        .from("order_events")
-        .select("*")
-        .eq("order_id", order.id)
+        .from("order_events").select("*").eq("order_id", order.id)
         .order("created_at", { ascending: true });
 
-      // Get files metadata
       const { data: files } = await supabase
-        .from("order_files")
-        .select("*")
-        .eq("order_id", order.id);
+        .from("order_files").select("*").eq("order_id", order.id);
 
-      // Generate signed download URLs for each file
       const fileData = [];
       if (files) {
         for (const file of files) {
@@ -86,52 +73,34 @@ serve(async (req: Request) => {
           };
 
           if (include_files) {
-            const { data: signedUrl } = await supabase.storage
-              .from("orders")
-              .createSignedUrl(file.storage_path, 7200); // 2 hour expiry
-            entry.download_url = signedUrl?.signedUrl || null;
+            // Generate a direct download URL via our own edge function
+            entry.download_url = `${baseUrl}/functions/v1/download-order-file?file_id=${file.id}`;
           }
 
           fileData.push(entry);
         }
       }
 
-      // Build complete export document
       results.push({
         order: {
-          id: order.id,
-          order_number: order.order_number,
-          status: order.status,
-          customer_name: order.customer_name,
-          customer_email: order.customer_email,
-          phone: order.phone,
-          company_name: order.company_name,
-          billing_address: order.billing_address,
-          shipping_address: order.shipping_address,
-          postal_code: order.postal_code,
-          city: order.city,
-          country: order.country,
-          material: order.material,
-          color: order.color,
-          quantity: order.quantity,
-          notes: order.notes,
-          print_preferences: order.print_preferences,
-          instant_quote_price: order.instant_quote_price,
-          final_price: order.final_price,
+          id: order.id, order_number: order.order_number, status: order.status,
+          customer_name: order.customer_name, customer_email: order.customer_email,
+          phone: order.phone, company_name: order.company_name,
+          billing_address: order.billing_address, shipping_address: order.shipping_address,
+          postal_code: order.postal_code, city: order.city, country: order.country,
+          material: order.material, color: order.color, quantity: order.quantity,
+          notes: order.notes, print_preferences: order.print_preferences,
+          instant_quote_price: order.instant_quote_price, final_price: order.final_price,
           tikkie_link: order.tikkie_link,
           customer_visible_notes: order.customer_visible_notes,
           internal_notes: order.internal_notes,
-          submitted_at: order.submitted_at,
-          approved_at: order.approved_at,
-          rejected_at: order.rejected_at,
-          created_at: order.created_at,
+          submitted_at: order.submitted_at, approved_at: order.approved_at,
+          rejected_at: order.rejected_at, created_at: order.created_at,
           updated_at: order.updated_at,
         },
         events: (events || []).map((e: any) => ({
-          event_type: e.event_type,
-          event_description: e.event_description,
-          visible_to_customer: e.visible_to_customer,
-          created_at: e.created_at,
+          event_type: e.event_type, event_description: e.event_description,
+          visible_to_customer: e.visible_to_customer, created_at: e.created_at,
         })),
         files: fileData,
         file_count: fileData.length,
@@ -139,11 +108,7 @@ serve(async (req: Request) => {
       });
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      total_orders: results.length,
-      data: results,
-    }), {
+    return new Response(JSON.stringify({ success: true, total_orders: results.length, data: results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {

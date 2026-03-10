@@ -35,10 +35,10 @@ serve(async (req: Request) => {
 
     if (!roleCheck) throw new Error("Geen admin rechten");
 
-    const { order_id, delete_from_supabase } = await req.json();
+    const { order_id } = await req.json();
     if (!order_id) throw new Error("order_id is verplicht");
 
-    // Update status to completed
+    // Update status to completed (keep all data)
     const { error: updateError } = await supabaseAdmin
       .from("orders")
       .update({ status: "completed" })
@@ -55,26 +55,7 @@ serve(async (req: Request) => {
       performed_by: user.id,
     });
 
-    // If requested, delete all data from Supabase
-    if (delete_from_supabase) {
-      // Get files to delete from storage
-      const { data: files } = await supabaseAdmin
-        .from("order_files")
-        .select("storage_path")
-        .eq("order_id", order_id);
-
-      if (files && files.length > 0) {
-        const paths = files.map((f: any) => f.storage_path);
-        await supabaseAdmin.storage.from("orders").remove(paths);
-      }
-
-      // Delete records
-      await supabaseAdmin.from("order_files").delete().eq("order_id", order_id);
-      await supabaseAdmin.from("order_events").delete().eq("order_id", order_id);
-      await supabaseAdmin.from("orders").delete().eq("id", order_id);
-    }
-
-    return new Response(JSON.stringify({ success: true, deleted: !!delete_from_supabase }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {

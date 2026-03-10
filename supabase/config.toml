@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.cleanup-exported-order]
 verify_jwt = false
+
+[functions.download-order-file]
+verify_jwt = false
