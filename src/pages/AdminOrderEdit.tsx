@@ -111,12 +111,17 @@ export default function AdminOrderEdit() {
     if (!order) return;
     setSaving(true);
     try {
+      // Auto-set status to waiting_for_approval when final price is newly set
+      const newFinalPrice = finalPrice ? parseFloat(finalPrice) : null;
+      const priceJustSet = newFinalPrice && !order.final_price;
+      const effectiveStatus = priceJustSet ? "waiting_for_approval" as OrderStatus : status;
+
       const { error } = await supabase
         .from("orders")
         .update({
-          final_price: finalPrice ? parseFloat(finalPrice) : null,
+          final_price: newFinalPrice,
           tikkie_link: tikkieLink || null,
-          status,
+          status: effectiveStatus,
           customer_visible_notes: customerNotes,
           internal_notes: internalNotes,
         })
@@ -128,12 +133,24 @@ export default function AdminOrderEdit() {
       await supabase.from("order_events").insert({
         order_id: order.id,
         event_type: "admin_update",
-        event_description: `Bestelling bijgewerkt door admin. Status: ${ORDER_STATUSES[status].label}`,
+        event_description: priceJustSet
+          ? `Definitieve prijs ingesteld op €${newFinalPrice!.toFixed(2)}. Status: Wacht op goedkeuring klant.`
+          : `Bestelling bijgewerkt door admin. Status: ${ORDER_STATUSES[effectiveStatus].label}`,
         visible_to_customer: true,
       });
 
-      toast({ title: "Bestelling opgeslagen!" });
-      setOrder({ ...order, final_price: finalPrice ? parseFloat(finalPrice) : null, tikkie_link: tikkieLink || null, status, customer_visible_notes: customerNotes, internal_notes: internalNotes });
+      // Auto-send update email to customer when final price is set
+      if (priceJustSet) {
+        await supabase.functions.invoke("send-order-email", {
+          body: { type: "order_updated", orderId: order.id },
+        });
+        toast({ title: "Opgeslagen! Klant is automatisch op de hoogte gebracht van de offerte. ✉️" });
+        setStatus(effectiveStatus);
+      } else {
+        toast({ title: "Bestelling opgeslagen!" });
+      }
+
+      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes });
     } catch (error: any) {
       toast({ title: "Fout bij opslaan", description: error.message, variant: "destructive" });
     } finally {
