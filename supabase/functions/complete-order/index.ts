@@ -38,13 +38,34 @@ serve(async (req: Request) => {
     const { order_id } = await req.json();
     if (!order_id) throw new Error("order_id is verplicht");
 
+    const completedAt = new Date().toISOString();
+
     // Update status to completed with timestamp
     const { error: updateError } = await supabaseAdmin
       .from("orders")
-      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .update({ status: "completed", completed_at: completedAt })
       .eq("id", order_id);
 
     if (updateError) throw updateError;
+
+    // Get order details
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("order_number")
+      .eq("id", order_id)
+      .single();
+
+    // Build download URL for n8n
+    const baseUrl = Deno.env.get("SUPABASE_URL")!;
+    const downloadUrl = `${baseUrl}/functions/v1/export-order`;
+
+    // Upsert into exported_orders for n8n to pick up
+    await supabaseAdmin.from("exported_orders").upsert({
+      order_id,
+      order_number: order?.order_number || "",
+      download_url: downloadUrl,
+      completed_at: completedAt,
+    }, { onConflict: "order_id" });
 
     // Log event
     await supabaseAdmin.from("order_events").insert({
