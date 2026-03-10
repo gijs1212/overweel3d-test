@@ -38,10 +38,10 @@ serve(async (req: Request) => {
     const { order_id } = await req.json();
     if (!order_id) throw new Error("order_id is verplicht");
 
-    // Update status to completed (keep all data)
+    // Update status to completed with timestamp
     const { error: updateError } = await supabaseAdmin
       .from("orders")
-      .update({ status: "completed" })
+      .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", order_id);
 
     if (updateError) throw updateError;
