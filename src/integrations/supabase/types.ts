@@ -151,6 +151,7 @@ export type Database = {
           print_preferences: string | null
           quantity: number | null
           rejected_at: string | null
+          saved: boolean
           shipping_address: string | null
           status: Database["public"]["Enums"]["order_status"]
           submitted_at: string | null
@@ -184,6 +185,7 @@ export type Database = {
           print_preferences?: string | null
           quantity?: number | null
           rejected_at?: string | null
+          saved?: boolean
           shipping_address?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           submitted_at?: string | null
@@ -217,6 +219,7 @@ export type Database = {
           print_preferences?: string | null
           quantity?: number | null
           rejected_at?: string | null
+          saved?: boolean
           shipping_address?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           submitted_at?: string | null

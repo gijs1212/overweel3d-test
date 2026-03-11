@@ -31,14 +31,14 @@ serve(async (req: Request) => {
     // Verify order exists and is completed
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, order_number, status")
+      .select("id, order_number, status, saved")
       .eq("id", order_id)
       .single();
 
     if (orderError || !order) throw new Error("Bestelling niet gevonden");
     if (order.status !== "completed") throw new Error("Bestelling is nog niet voltooid");
 
-    // Delete storage files
+    // Delete storage files (if any remain)
     const { data: files } = await supabase
       .from("order_files")
       .select("storage_path")
@@ -49,7 +49,8 @@ serve(async (req: Request) => {
       await supabase.storage.from("orders").remove(paths);
     }
 
-    // Delete all related records then the order
+    // Delete all related records then the order itself
+    await supabase.from("exported_orders").delete().eq("order_id", order_id);
     await supabase.from("order_files").delete().eq("order_id", order_id);
     await supabase.from("order_events").delete().eq("order_id", order_id);
     await supabase.from("orders").delete().eq("id", order_id);
