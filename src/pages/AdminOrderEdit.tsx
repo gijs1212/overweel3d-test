@@ -400,6 +400,19 @@ export default function AdminOrderEdit() {
                     Voltooi bestelling
                   </Button>
                 )}
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await supabase.from("orders").update({ saved: false }).eq("id", order.id);
+                      toast({ title: "Backup status gereset naar false ✅" });
+                    } catch (e: any) {
+                      toast({ title: "Fout", description: e.message, variant: "destructive" });
+                    }
+                  }}
+                >
+                  🔄 Reset backup status
+                </Button>
                 <div className="sm:ml-auto">
                   <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
                     {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

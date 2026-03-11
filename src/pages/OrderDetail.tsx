@@ -316,7 +316,7 @@ export default function OrderDetail() {
                 <Check className="w-12 h-12 text-green-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Geaccepteerd! 🎉</h3>
                 <p className="text-green-700 dark:text-green-300 mb-4">
-                  We zullen zo snel mogelijk contact met u opnemen voor het afronden van deze opdracht.
+                  Binnenkort zal de betalingslink toegevoegd worden. Na betaling zal de productie beginnen.
                 </p>
                 {order.tikkie_link && (
                   <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
