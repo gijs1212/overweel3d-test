@@ -111,10 +111,9 @@ export default function AdminOrderEdit() {
     if (!order) return;
     setSaving(true);
     try {
-      // Auto-set status to waiting_for_approval when final price is newly set
+      // Auto-set status to waiting_for_approval when final price is set
       const newFinalPrice = finalPrice ? parseFloat(finalPrice) : null;
-      const priceJustSet = newFinalPrice && !order.final_price;
-      const effectiveStatus = priceJustSet ? "waiting_for_approval" as OrderStatus : status;
+      const effectiveStatus = newFinalPrice ? "waiting_for_approval" as OrderStatus : status;
 
       const { error } = await supabase
         .from("orders")
@@ -124,6 +123,7 @@ export default function AdminOrderEdit() {
           status: effectiveStatus,
           customer_visible_notes: customerNotes,
           internal_notes: internalNotes,
+          saved: false,
         })
         .eq("id", order.id);
 
@@ -133,21 +133,22 @@ export default function AdminOrderEdit() {
       await supabase.from("order_events").insert({
         order_id: order.id,
         event_type: "admin_update",
-        event_description: priceJustSet
-          ? `Definitieve prijs ingesteld op €${newFinalPrice!.toFixed(2)}. Status: Wacht op goedkeuring klant.`
+        event_description: newFinalPrice
+          ? `Definitieve prijs ingesteld op €${newFinalPrice.toFixed(2)}. Status: Wacht op goedkeuring klant.`
           : `Bestelling bijgewerkt door admin. Status: ${ORDER_STATUSES[effectiveStatus].label}`,
         visible_to_customer: true,
       });
 
-      // Auto-send update email to customer when final price is set
-      if (priceJustSet) {
-        await supabase.functions.invoke("send-order-email", {
-          body: { type: "order_updated", orderId: order.id },
-        });
+      // Always send update email to customer on save
+      await supabase.functions.invoke("send-order-email", {
+        body: { type: "order_updated", orderId: order.id },
+      });
+
+      if (newFinalPrice) {
         toast({ title: "Opgeslagen! Klant is automatisch op de hoogte gebracht van de offerte. ✉️" });
         setStatus(effectiveStatus);
       } else {
-        toast({ title: "Bestelling opgeslagen!" });
+        toast({ title: "Opgeslagen! Klant is op de hoogte gebracht. ✉️" });
       }
 
       setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes });
