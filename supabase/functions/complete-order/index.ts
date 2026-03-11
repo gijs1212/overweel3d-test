@@ -55,6 +55,17 @@ serve(async (req: Request) => {
       .eq("id", order_id)
       .single();
 
+    // Delete storage files (keep order_files records for metadata)
+    const { data: files } = await supabaseAdmin
+      .from("order_files")
+      .select("storage_path")
+      .eq("order_id", order_id);
+
+    if (files && files.length > 0) {
+      const paths = files.map((f: any) => f.storage_path);
+      await supabaseAdmin.storage.from("orders").remove(paths);
+    }
+
     // Build download URL for n8n
     const baseUrl = Deno.env.get("SUPABASE_URL")!;
     const downloadUrl = `${baseUrl}/functions/v1/export-order`;
