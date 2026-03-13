@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle } from "lucide-react";
+import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,7 @@ interface Order {
   customer_order_token: string;
   customer_visible_notes: string;
   internal_notes: string;
+  file_links: string;
   submitted_at: string;
   approved_at: string | null;
   rejected_at: string | null;
@@ -75,6 +76,9 @@ export default function AdminOrderEdit() {
   const [customerNotes, setCustomerNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
 
+  // Track original final price to detect changes
+  const [originalFinalPrice, setOriginalFinalPrice] = useState<number | null>(null);
+
   useEffect(() => {
     if (!orderId) return;
     const fetch = async () => {
@@ -87,6 +91,7 @@ export default function AdminOrderEdit() {
         setStatus(o.status);
         setCustomerNotes(o.customer_visible_notes || "");
         setInternalNotes(o.internal_notes || "");
+        setOriginalFinalPrice(o.final_price);
       }
       const { data: filesData } = await supabase.from("order_files").select("*").eq("order_id", orderId);
       setFiles((filesData as OrderFile[]) || []);
@@ -111,9 +116,11 @@ export default function AdminOrderEdit() {
     if (!order) return;
     setSaving(true);
     try {
-      // Auto-set status to waiting_for_approval when final price is set
       const newFinalPrice = finalPrice ? parseFloat(finalPrice) : null;
-      const effectiveStatus = newFinalPrice ? "waiting_for_approval" as OrderStatus : status;
+      
+      // Only auto-set to waiting_for_approval if price is newly set or changed
+      const priceChanged = newFinalPrice !== originalFinalPrice && newFinalPrice !== null;
+      const effectiveStatus = priceChanged ? "waiting_for_approval" as OrderStatus : status;
 
       const { error } = await supabase
         .from("orders")
@@ -129,28 +136,31 @@ export default function AdminOrderEdit() {
 
       if (error) throw error;
 
-      // Log event
       await supabase.from("order_events").insert({
         order_id: order.id,
         event_type: "admin_update",
-        event_description: newFinalPrice
-          ? `Definitieve prijs ingesteld op €${newFinalPrice.toFixed(2)}. Status: Wacht op goedkeuring klant.`
+        event_description: priceChanged
+          ? `Definitieve prijs ingesteld op €${newFinalPrice!.toFixed(2)}. Status: Wacht op goedkeuring klant.`
           : `Bestelling bijgewerkt door admin. Status: ${ORDER_STATUSES[effectiveStatus].label}`,
         visible_to_customer: true,
       });
 
-      // Always send update email to customer on save
-      await supabase.functions.invoke("send-order-email", {
-        body: { type: "order_updated", orderId: order.id },
-      });
-
-      if (newFinalPrice) {
-        toast({ title: "Opgeslagen! Klant is automatisch op de hoogte gebracht van de offerte. ✉️" });
-        setStatus(effectiveStatus);
-      } else {
-        toast({ title: "Opgeslagen! Klant is op de hoogte gebracht. ✉️" });
+      // Only send email if order has a real customer (not admin-created)
+      const isAdminOrder = order.customer_email === "admin@overweel3d.nl";
+      if (!isAdminOrder) {
+        await supabase.functions.invoke("send-order-email", {
+          body: { type: "order_updated", orderId: order.id },
+        });
       }
 
+      if (priceChanged) {
+        toast({ title: isAdminOrder ? "Opgeslagen! ✅" : "Opgeslagen! Klant is automatisch op de hoogte gebracht van de offerte. ✉️" });
+        setStatus(effectiveStatus);
+      } else {
+        toast({ title: isAdminOrder ? "Opgeslagen! ✅" : "Opgeslagen! Klant is op de hoogte gebracht. ✉️" });
+      }
+
+      setOriginalFinalPrice(newFinalPrice);
       setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes });
     } catch (error: any) {
       toast({ title: "Fout bij opslaan", description: error.message, variant: "destructive" });
@@ -189,7 +199,7 @@ export default function AdminOrderEdit() {
   };
 
   const deleteFile = async (fileId: string, storagePath: string) => {
-    if (!confirm("Weet u zeker dat u dit bestand wilt verwijderen? De klant ziet dan een melding dat het bestand is verplaatst.")) return;
+    if (!confirm("Weet u zeker dat u dit bestand wilt verwijderen?")) return;
     try {
       await supabase.storage.from("orders").remove([storagePath]);
       await supabase.from("order_files").delete().eq("id", fileId);
@@ -224,16 +234,12 @@ export default function AdminOrderEdit() {
     if (!confirm(`Weet u zeker dat u bestelling ${order.order_number} volledig wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     setDeleting(true);
     try {
-      // 1. Delete storage files
       if (files.length > 0) {
         const paths = files.map((f) => f.storage_path);
         await supabase.storage.from("orders").remove(paths);
       }
-      // 2. Delete order_files records
       await supabase.from("order_files").delete().eq("order_id", order.id);
-      // 3. Delete order_events records
       await supabase.from("order_events").delete().eq("order_id", order.id);
-      // 4. Delete the order itself
       const { error } = await supabase.from("orders").delete().eq("id", order.id);
       if (error) throw error;
 
@@ -261,6 +267,8 @@ export default function AdminOrderEdit() {
   if (!order) return null;
 
   const statusInfo = ORDER_STATUSES[order.status];
+  const isAdminOrder = order.customer_email === "admin@overweel3d.nl";
+  const fileLinksArray = order.file_links ? order.file_links.split("\n").filter(Boolean) : [];
 
   return (
     <div className="min-h-screen">
@@ -273,7 +281,10 @@ export default function AdminOrderEdit() {
             </Button>
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-primary">{order.order_number}</h1>
-              <p className="text-sm text-muted-foreground">{order.customer_name} · {order.customer_email}</p>
+              <p className="text-sm text-muted-foreground">
+                {order.customer_name} · {order.customer_email}
+                {isAdminOrder && <span className="ml-2 text-accent font-medium">(Admin bestelling)</span>}
+              </p>
             </div>
             <span className={`px-4 py-2 rounded-full text-sm font-medium ${statusInfo.color}`}>
               {statusInfo.label}
@@ -281,18 +292,20 @@ export default function AdminOrderEdit() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Customer Info */}
-            <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-              <h3 className="font-bold text-primary mb-4">Klantgegevens</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Naam</span><span>{order.customer_name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">E-mail</span><span>{order.customer_email}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Telefoon</span><span>{order.phone || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Bedrijf</span><span>{order.company_name || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Adres</span><span>{order.billing_address}, {order.postal_code} {order.city}</span></div>
-                {order.vat_number && <div className="flex justify-between"><span className="text-muted-foreground">BTW</span><span>{order.vat_number}</span></div>}
+            {/* Customer Info - hide for admin orders */}
+            {!isAdminOrder && (
+              <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                <h3 className="font-bold text-primary mb-4">Klantgegevens</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Naam</span><span>{order.customer_name}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">E-mail</span><span>{order.customer_email}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Telefoon</span><span>{order.phone || "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Bedrijf</span><span>{order.company_name || "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Adres</span><span>{order.billing_address}, {order.postal_code} {order.city}</span></div>
+                  {order.vat_number && <div className="flex justify-between"><span className="text-muted-foreground">BTW</span><span>{order.vat_number}</span></div>}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Order details */}
             <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
@@ -306,6 +319,28 @@ export default function AdminOrderEdit() {
                 {order.print_preferences && <div><p className="text-muted-foreground text-xs mb-1">Print voorkeuren:</p><p>{order.print_preferences}</p></div>}
               </div>
             </div>
+
+            {/* File Links */}
+            {fileLinksArray.length > 0 && (
+              <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
+                  <Link2 className="w-5 h-5" /> Downloadlinks ({fileLinksArray.length})
+                </h3>
+                <div className="space-y-2">
+                  {fileLinksArray.map((link, i) => (
+                    <a
+                      key={i}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-3 bg-muted/50 rounded-lg text-sm text-accent underline break-all hover:bg-muted transition-colors"
+                    >
+                      {link}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Files */}
             <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
@@ -362,6 +397,9 @@ export default function AdminOrderEdit() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {finalPrice && parseFloat(finalPrice) !== originalFinalPrice && (
+                    <p className="text-xs text-amber-600 mt-1">⚠️ Prijs gewijzigd — status wordt automatisch naar "Wacht op goedkeuring" gezet bij opslaan.</p>
+                  )}
                 </div>
                 <div>
                   <Label>Definitieve prijs (€)</Label>
@@ -386,10 +424,12 @@ export default function AdminOrderEdit() {
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Opslaan
                 </Button>
-                <Button variant="outline" onClick={handleNotifyCustomer} disabled={notifying}>
-                  {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Klant op de hoogte brengen
-                </Button>
+                {!isAdminOrder && (
+                  <Button variant="outline" onClick={handleNotifyCustomer} disabled={notifying}>
+                    {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Klant op de hoogte brengen
+                  </Button>
+                )}
                 {(order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production") && (
                   <Button
                     onClick={handleCompleteOrder}
@@ -422,20 +462,22 @@ export default function AdminOrderEdit() {
               </div>
             </div>
 
-            {/* Order link */}
-            <div className="lg:col-span-2 bg-muted/50 rounded-xl p-4">
-              <p className="text-sm text-muted-foreground">
-                📎 Klant order link:{" "}
-                <a
-                  href={`${window.location.origin}/order/${order.customer_order_token}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-accent underline break-all"
-                >
-                  {window.location.origin}/order/{order.customer_order_token}
-                </a>
-              </p>
-            </div>
+            {/* Order link - only for real customer orders */}
+            {!isAdminOrder && (
+              <div className="lg:col-span-2 bg-muted/50 rounded-xl p-4">
+                <p className="text-sm text-muted-foreground">
+                  📎 Klant order link:{" "}
+                  <a
+                    href={`${window.location.origin}/order/${order.customer_order_token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline break-all"
+                  >
+                    {window.location.origin}/order/{order.customer_order_token}
+                  </a>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </main>

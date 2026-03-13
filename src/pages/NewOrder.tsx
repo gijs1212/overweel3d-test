@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info } from "lucide-react";
+import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,15 +28,26 @@ interface UploadedFile {
   parsing?: boolean;
 }
 
+interface FileLink {
+  url: string;
+  material: string;
+  color: string;
+  quantity: number;
+}
+
 export default function NewOrder() {
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"link" | "file">("link");
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+
+  // Links
+  const [fileLinks, setFileLinks] = useState<FileLink[]>([]);
 
   // Form
   const [formData, setFormData] = useState({
@@ -49,7 +60,6 @@ export default function NewOrder() {
     postal_code: profile?.postal_code || "",
     city: profile?.city || "",
     country: profile?.country || "Nederland",
-    
     notes: "",
     print_preferences: "",
     agreeTerms: false,
@@ -69,7 +79,6 @@ export default function NewOrder() {
         postal_code: profile.postal_code || prev.postal_code,
         city: profile.city || prev.city,
         country: profile.country || prev.country,
-        
       }));
     }
   });
@@ -111,7 +120,6 @@ export default function NewOrder() {
     const startIndex = uploadedFiles.length;
     setUploadedFiles((prev) => [...prev, ...newFiles]);
     
-    // Parse volumes in background
     for (let i = 0; i < newFiles.length; i++) {
       const uf = newFiles[i];
       parse3DFile(uf.file).then((result) => {
@@ -129,7 +137,6 @@ export default function NewOrder() {
                 parsing: false,
               };
             } else {
-              // Fallback: file-size based estimate
               updated[idx] = {
                 ...updated[idx],
                 estimatedGrams: Math.max(10, Math.round(uf.file.size / 1024)),
@@ -156,23 +163,37 @@ export default function NewOrder() {
     setUploadedFiles(updated);
   };
 
+  // Link helpers
+  const addLink = () => {
+    setFileLinks([...fileLinks, { url: "", material: "", color: "", quantity: 1 }]);
+  };
+
+  const removeLink = (index: number) => {
+    setFileLinks(fileLinks.filter((_, i) => i !== index));
+  };
+
+  const updateLink = (index: number, field: keyof FileLink, value: any) => {
+    const updated = [...fileLinks];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === "material") updated[index].color = "";
+    setFileLinks(updated);
+  };
+
   const getColorsForMaterial = (materialId: string) => {
     return MATERIALS.find((m) => m.id === materialId)?.colors || [];
   };
 
-  // Calculate per-piece price for a single file
   const calculatePerPiecePrice = (uf: UploadedFile) => {
     const mat = MATERIALS.find((m) => m.id === uf.material);
     if (!mat || !uf.estimatedGrams) return 0;
     return uf.estimatedGrams * mat.pricePerGram;
   };
 
-  // Estimate calculator - now volume-based with per-piece minimum €5
   const calculateEstimate = () => {
     let total = 0;
     for (const uf of uploadedFiles) {
       const perPiece = calculatePerPiecePrice(uf);
-      const perPieceWithMin = Math.max(perPiece, 5); // Minimum €5 per stuk
+      const perPieceWithMin = Math.max(perPiece, 5);
       total += perPieceWithMin * uf.quantity;
     }
     return total;
@@ -180,7 +201,11 @@ export default function NewOrder() {
 
   const estimatedPrice = calculateEstimate();
   const isParsing = uploadedFiles.some((f) => f.parsing);
-  const allFilesConfigured = uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color);
+  
+  const allFilesConfigured = uploadMode === "file" 
+    ? uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color)
+    : fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color);
+  
   const canProceed = allFilesConfigured;
   const canSubmit = formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms && canProceed;
 
@@ -189,12 +214,19 @@ export default function NewOrder() {
     setIsSubmitting(true);
 
     try {
-      // 1. Generate order number
       const { data: orderNumData, error: orderNumError } = await supabase.rpc("generate_order_number");
       if (orderNumError) throw orderNumError;
       const orderNumber = orderNumData as string;
 
-      // 2. Create order
+      const items = uploadMode === "file" ? uploadedFiles : fileLinks;
+      const materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
+      const colorNames = items.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", ");
+      const totalQuantity = items.reduce((sum, f) => sum + f.quantity, 0);
+
+      const fileLinksText = uploadMode === "link" 
+        ? fileLinks.map((l) => l.url).join("\n") 
+        : "";
+
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -209,13 +241,13 @@ export default function NewOrder() {
           postal_code: formData.postal_code,
           city: formData.city,
           country: formData.country,
-          
-          material: uploadedFiles.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", "),
-          color: uploadedFiles.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", "),
-          quantity: uploadedFiles.reduce((sum, f) => sum + f.quantity, 0),
+          material: materialNames,
+          color: colorNames,
+          quantity: totalQuantity,
           notes: formData.notes,
           print_preferences: formData.print_preferences,
-          instant_quote_price: estimatedPrice,
+          instant_quote_price: uploadMode === "file" ? estimatedPrice : 0,
+          file_links: fileLinksText,
           status: "submitted",
         })
         .select()
@@ -223,54 +255,44 @@ export default function NewOrder() {
 
       if (orderError) throw orderError;
 
-      // 3. Upload files to storage and create records
-      const failedFiles: string[] = [];
-      for (const uf of uploadedFiles) {
-        const storagePath = `${orderNumber}/files/${uf.file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("orders")
-          .upload(storagePath, uf.file, { upsert: true });
+      // Upload files if file mode
+      if (uploadMode === "file") {
+        const failedFiles: string[] = [];
+        for (const uf of uploadedFiles) {
+          const storagePath = `${orderNumber}/files/${uf.file.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("orders")
+            .upload(storagePath, uf.file, { upsert: true });
 
-        if (uploadError) {
-          console.error("Upload error for", uf.file.name, ":", uploadError);
-          failedFiles.push(uf.file.name);
-          continue;
+          if (uploadError) {
+            failedFiles.push(uf.file.name);
+            continue;
+          }
+
+          await supabase.from("order_files").insert({
+            order_id: order.id,
+            storage_path: storagePath,
+            original_filename: uf.file.name,
+            file_size: uf.file.size,
+            mime_type: uf.file.type || "application/octet-stream",
+          });
         }
 
-        const { error: fileRecordError } = await supabase.from("order_files").insert({
-          order_id: order.id,
-          storage_path: storagePath,
-          original_filename: uf.file.name,
-          file_size: uf.file.size,
-          mime_type: uf.file.type || "application/octet-stream",
-        });
-
-        if (fileRecordError) {
-          console.error("File record error for", uf.file.name, ":", fileRecordError);
-          failedFiles.push(uf.file.name);
+        if (failedFiles.length > 0) {
+          toast({
+            title: "Sommige bestanden konden niet worden geüpload",
+            description: `${failedFiles.join(", ")} — stuur deze bestanden via e-mail naar gijsoverweel@gmail.com`,
+            variant: "destructive",
+          });
         }
       }
 
-      if (failedFiles.length > 0) {
-        toast({
-          title: "Sommige bestanden konden niet worden geüpload",
-          description: `${failedFiles.join(", ")} — stuur deze bestanden via e-mail naar gijsoverweel@gmail.com`,
-          variant: "destructive",
-        });
-      }
-
-      // 4. Send confirmation email
       await supabase.functions.invoke("send-order-email", {
-        body: {
-          type: "order_confirmation",
-          orderId: order.id,
-        },
+        body: { type: "order_confirmation", orderId: order.id },
       });
 
-      // 5. Navigate to success
       navigate(`/order/${order.customer_order_token}?success=true`);
     } catch (error: any) {
-      console.error("Order error:", error);
       toast({ title: "Er ging iets mis", description: error.message || "Probeer het opnieuw.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -285,12 +307,12 @@ export default function NewOrder() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Upload uw bestand</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload uw 3D-bestanden, configureer uw print en ontvang direct een indicatieprijs.
+              Deel uw 3D-bestanden via een downloadlink of upload ze direct. Configureer uw print en ontvang direct een indicatieprijs.
             </p>
           </motion.div>
 
           {/* Disclaimer */}
-          <div className="max-w-4xl mx-auto mb-8">
+          <div className="max-w-4xl mx-auto mb-8 space-y-3">
             <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800 dark:text-amber-200">
@@ -322,81 +344,73 @@ export default function NewOrder() {
               <AnimatePresence mode="wait">
                 {step === 1 && (
                   <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                    {/* File Upload */}
-                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                        <Upload className="w-6 h-6 text-accent" />
-                        Upload 3D-bestanden
-                      </h2>
-
-                      <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-accent/50 transition-colors">
-                        <input
-                          type="file"
-                          accept={ACCEPTED_FILE_TYPES}
-                          multiple
-                          onChange={handleFileUpload}
-                          className="hidden"
-                          id="file-upload"
-                        />
-                        <label htmlFor="file-upload" className="cursor-pointer">
-                          <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
-                          <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 10MB per bestand)</p>
-                          <p className="text-xs text-muted-foreground mt-1">Groter dan 10MB? Stuur het bestand via e-mail naar <a href="mailto:gijsoverweel@gmail.com" className="text-accent underline">gijsoverweel@gmail.com</a></p>
-                        </label>
+                    
+                    {/* Upload mode toggle */}
+                    <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                      <h2 className="text-lg font-bold mb-3">Hoe wilt u uw bestand delen?</h2>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden kan ook.
+                      </p>
+                      <div className="flex gap-3">
+                        <Button
+                          variant={uploadMode === "link" ? "default" : "outline"}
+                          onClick={() => setUploadMode("link")}
+                          className="flex-1"
+                        >
+                          <Link2 className="w-4 h-4" /> Downloadlink (voorkeur)
+                        </Button>
+                        <Button
+                          variant={uploadMode === "file" ? "default" : "outline"}
+                          onClick={() => setUploadMode("file")}
+                          className="flex-1"
+                        >
+                          <Upload className="w-4 h-4" /> Bestand uploaden
+                        </Button>
                       </div>
+                    </div>
 
-                      {/* File List */}
-                      {uploadedFiles.length > 0 && (
-                        <div className="mt-6 space-y-4">
-                          {uploadedFiles.map((uf, index) => (
-                            <div key={index} className="border border-border rounded-xl p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="w-5 h-5 text-accent" />
-                                  <span className="font-medium text-sm truncate max-w-[200px]">{uf.file.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    ({(uf.file.size / 1024 / 1024).toFixed(1)} MB)
-                                  </span>
-                                  {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </Button>
+                    {/* Link mode */}
+                    {uploadMode === "link" && (
+                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                          <Link2 className="w-6 h-6 text-accent" />
+                          Downloadlinks
+                        </h2>
+
+                        {/* Link disclaimers */}
+                        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 space-y-2">
+                          <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">📋 Let op bij het delen via een link:</p>
+                          <ul className="text-sm text-blue-700 dark:text-blue-300 list-disc list-inside space-y-1">
+                            <li>Zorg dat de link <strong>openbaar toegankelijk</strong> is (geen inloggegevens nodig)</li>
+                            <li>De link moet <strong>direct downloaden</strong> mogelijk maken</li>
+                            <li>Gebruik services zoals Google Drive, WeTransfer, Dropbox of OneDrive</li>
+                            <li>Ondersteunde formaten: <strong>STL, OBJ, 3MF, STEP</strong></li>
+                            <li>Controleer of de link <strong>niet verloopt</strong> voordat wij het bestand hebben gedownload</li>
+                            <li>Bij Google Drive: stel de link in op "Iedereen met de link kan bekijken"</li>
+                          </ul>
+                        </div>
+
+                        {fileLinks.map((link, index) => (
+                          <div key={index} className="border border-border rounded-xl p-4 mb-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-medium text-sm">Link {index + 1}</span>
+                              <Button variant="ghost" size="sm" onClick={() => removeLink(index)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <Label className="text-xs">Downloadlink *</Label>
+                                <Input
+                                  value={link.url}
+                                  onChange={(e) => updateLink(index, "url", e.target.value)}
+                                  placeholder="https://drive.google.com/... of https://wetransfer.com/..."
+                                />
                               </div>
-                              
-                              {/* Volume & weight info */}
-                              {!uf.parsing && uf.estimatedGrams && (
-                                <div className="mb-3 space-y-1">
-                                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                    {uf.volumeCm3 != null && (
-                                      <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
-                                    )}
-                                    <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
-                                    {uf.dimensions && (
-                                      <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
-                                    )}
-                                  </div>
-                                  {uf.material && (
-                                    <div className="text-xs font-medium">
-                                      {(() => {
-                                        const perPiece = calculatePerPiecePrice(uf);
-                                        const isMinimum = perPiece < 5;
-                                        return (
-                                          <span className={isMinimum ? "text-amber-600 dark:text-amber-400" : "text-accent"}>
-                                            💰 Kosten per stuk: €{Math.max(perPiece, 5).toFixed(2)}
-                                            {isMinimum && " (minimum)"}
-                                          </span>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <Label className="text-xs">Materiaal</Label>
-                                  <Select value={uf.material} onValueChange={(v) => updateFile(index, "material", v)}>
+                                  <Select value={link.material} onValueChange={(v) => updateLink(index, "material", v)}>
                                     <SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger>
                                     <SelectContent>
                                       {MATERIALS.map((m) => (
@@ -407,10 +421,10 @@ export default function NewOrder() {
                                 </div>
                                 <div>
                                   <Label className="text-xs">Kleur</Label>
-                                  <Select value={uf.color} onValueChange={(v) => updateFile(index, "color", v)} disabled={!uf.material}>
+                                  <Select value={link.color} onValueChange={(v) => updateLink(index, "color", v)} disabled={!link.material}>
                                     <SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger>
                                     <SelectContent>
-                                      {getColorsForMaterial(uf.material).map((c) => (
+                                      {getColorsForMaterial(link.material).map((c) => (
                                         <SelectItem key={c.id} value={c.id}>
                                           <div className="flex items-center gap-2">
                                             <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: c.hex }} />
@@ -426,16 +440,135 @@ export default function NewOrder() {
                                   <Input
                                     type="number"
                                     min={1}
-                                    value={uf.quantity}
-                                    onChange={(e) => updateFile(index, "quantity", parseInt(e.target.value) || 1)}
+                                    value={link.quantity}
+                                    onChange={(e) => updateLink(index, "quantity", parseInt(e.target.value) || 1)}
                                   />
                                 </div>
                               </div>
                             </div>
-                          ))}
+                          </div>
+                        ))}
+
+                        <Button variant="outline" onClick={addLink} className="w-full">
+                          <Plus className="w-4 h-4" /> Link toevoegen
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* File mode */}
+                    {uploadMode === "file" && (
+                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                          <Upload className="w-6 h-6 text-accent" />
+                          Upload 3D-bestanden
+                        </h2>
+
+                        <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-accent/50 transition-colors">
+                          <input
+                            type="file"
+                            accept={ACCEPTED_FILE_TYPES}
+                            multiple
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="file-upload"
+                          />
+                          <label htmlFor="file-upload" className="cursor-pointer">
+                            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
+                            <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 10MB per bestand)</p>
+                            <p className="text-xs text-muted-foreground mt-1">Groter dan 10MB? Stuur het bestand via e-mail naar <a href="mailto:gijsoverweel@gmail.com" className="text-accent underline">gijsoverweel@gmail.com</a></p>
+                          </label>
                         </div>
-                      )}
-                    </div>
+
+                        {uploadedFiles.length > 0 && (
+                          <div className="mt-6 space-y-4">
+                            {uploadedFiles.map((uf, index) => (
+                              <div key={index} className="border border-border rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-accent" />
+                                    <span className="font-medium text-sm truncate max-w-[200px]">{uf.file.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({(uf.file.size / 1024 / 1024).toFixed(1)} MB)
+                                    </span>
+                                    {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
+                                  </div>
+                                  <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                                    <Trash2 className="w-4 h-4 text-destructive" />
+                                  </Button>
+                                </div>
+                                
+                                {!uf.parsing && uf.estimatedGrams && (
+                                  <div className="mb-3 space-y-1">
+                                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                      {uf.volumeCm3 != null && (
+                                        <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
+                                      )}
+                                      <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
+                                      {uf.dimensions && (
+                                        <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
+                                      )}
+                                    </div>
+                                    {uf.material && (
+                                      <div className="text-xs font-medium">
+                                        {(() => {
+                                          const perPiece = calculatePerPiecePrice(uf);
+                                          const isMinimum = perPiece < 5;
+                                          return (
+                                            <span className={isMinimum ? "text-amber-600 dark:text-amber-400" : "text-accent"}>
+                                              💰 Kosten per stuk: €{Math.max(perPiece, 5).toFixed(2)}
+                                              {isMinimum && " (minimum)"}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <div>
+                                    <Label className="text-xs">Materiaal</Label>
+                                    <Select value={uf.material} onValueChange={(v) => updateFile(index, "material", v)}>
+                                      <SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger>
+                                      <SelectContent>
+                                        {MATERIALS.map((m) => (
+                                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Kleur</Label>
+                                    <Select value={uf.color} onValueChange={(v) => updateFile(index, "color", v)} disabled={!uf.material}>
+                                      <SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger>
+                                      <SelectContent>
+                                        {getColorsForMaterial(uf.material).map((c) => (
+                                          <SelectItem key={c.id} value={c.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: c.hex }} />
+                                              {c.name}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Aantal</Label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      value={uf.quantity}
+                                      onChange={(e) => updateFile(index, "quantity", parseInt(e.target.value) || 1)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Notes */}
                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
@@ -562,41 +695,60 @@ export default function NewOrder() {
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Overzicht</h3>
 
-                  {uploadedFiles.length === 0 ? (
-                   <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {uploadedFiles.map((uf, i) => {
-                        const perPiece = calculatePerPiecePrice(uf);
-                        const perPieceWithMin = Math.max(perPiece, 5);
-                        return (
+                  {uploadMode === "link" ? (
+                    fileLinks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Voeg downloadlinks toe om te beginnen.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {fileLinks.map((l, i) => (
                           <div key={i} className="text-sm border-b border-border pb-2">
-                            <div className="flex justify-between">
-                              <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
-                              {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                            </div>
+                            <p className="font-medium truncate max-w-[200px]">Link {i + 1}</p>
                             <p className="text-xs text-muted-foreground">
-                              {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
-                              {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
+                              {MATERIALS.find((m) => m.id === l.material)?.name || "—"} · {l.quantity}x
                             </p>
-                            {uf.material && uf.estimatedGrams && (
-                              <p className="text-xs font-medium text-accent">
-                                €{perPieceWithMin.toFixed(2)}/stuk{perPiece < 5 && " (min.)"} × {uf.quantity} = €{(perPieceWithMin * uf.quantity).toFixed(2)}
-                              </p>
-                            )}
                           </div>
-                        );
-                      })}
-
-                      <div className="border-t border-border pt-3">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold text-primary">Indicatieprijs</span>
-                          <span className="text-xl font-bold text-accent">
-                            €{estimatedPrice.toFixed(2)}
-                          </span>
+                        ))}
+                        <div className="border-t border-border pt-3">
+                          <p className="text-xs text-muted-foreground">Prijs wordt na controle vastgesteld.</p>
                         </div>
                       </div>
-                    </div>
+                    )
+                  ) : (
+                    uploadedFiles.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {uploadedFiles.map((uf, i) => {
+                          const perPiece = calculatePerPiecePrice(uf);
+                          const perPieceWithMin = Math.max(perPiece, 5);
+                          return (
+                            <div key={i} className="text-sm border-b border-border pb-2">
+                              <div className="flex justify-between">
+                                <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
+                                {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
+                                {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
+                              </p>
+                              {uf.material && uf.estimatedGrams && (
+                                <p className="text-xs font-medium text-accent">
+                                  €{perPieceWithMin.toFixed(2)}/stuk{perPiece < 5 && " (min.)"} × {uf.quantity} = €{(perPieceWithMin * uf.quantity).toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div className="border-t border-border pt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-primary">Indicatieprijs</span>
+                            <span className="text-xl font-bold text-accent">
+                              €{estimatedPrice.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
                   )}
 
                   <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
