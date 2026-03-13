@@ -20,6 +20,7 @@ import Profile from "./pages/Profile";
 import OrderDetail from "./pages/OrderDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminOrderEdit from "./pages/AdminOrderEdit";
+import AdminNewOrder from "./pages/AdminNewOrder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
