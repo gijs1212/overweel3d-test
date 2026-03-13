@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Package, Plus, Loader2, User } from "lucide-react";
+import { Package, Plus, Loader2, User, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -24,6 +24,9 @@ export default function Dashboard() {
   const { user, profile, isAdmin } = useAuth();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileDismissed, setProfileDismissed] = useState(false);
+
+  const isProfileIncomplete = profile && (!profile.billing_address || !profile.city || !profile.postal_code || !profile.phone);
 
   useEffect(() => {
     if (!user) return;
@@ -65,6 +68,44 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+
+          {/* Profile completion prompt */}
+          {isProfileIncomplete && !profileDismissed && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl p-5">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-1">Vul uw gegevens aan</h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                      Vul uw profiel volledig in zodat uw gegevens bij elke bestelling automatisch ingevuld worden.
+                    </p>
+                    <div className="flex gap-3">
+                      <Link to="/profiel">
+                        <Button size="sm">Profiel aanvullen</Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setProfileDismissed(true)}
+                      >
+                        Overslaan
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Dismissed message */}
+          {isProfileIncomplete && profileDismissed && (
+            <div className="mb-6 bg-muted/50 rounded-lg p-3">
+              <p className="text-sm text-muted-foreground">
+                💡 Ga in dashboard naar <Link to="/profiel" className="text-accent underline font-medium">Profiel</Link> om je gegevens in te vullen zodat het bij elke bestelling automatisch ingevuld zal worden.
+              </p>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-16">

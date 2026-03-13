@@ -139,6 +139,7 @@ export type Database = {
           customer_name: string
           customer_order_token: string
           customer_visible_notes: string | null
+          file_links: string | null
           final_price: number | null
           id: string
           instant_quote_price: number | null
@@ -173,6 +174,7 @@ export type Database = {
           customer_name: string
           customer_order_token?: string
           customer_visible_notes?: string | null
+          file_links?: string | null
           final_price?: number | null
           id?: string
           instant_quote_price?: number | null
@@ -207,6 +209,7 @@ export type Database = {
           customer_name?: string
           customer_order_token?: string
           customer_visible_notes?: string | null
+          file_links?: string | null
           final_price?: number | null
           id?: string
           instant_quote_price?: number | null

@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -78,6 +78,9 @@ export default function AdminDashboard() {
               <h1 className="text-2xl font-bold text-primary">🔒 Admin Dashboard</h1>
               <p className="text-muted-foreground">{orders.length} bestellingen totaal</p>
             </div>
+            <Link to="/admin/new-order">
+              <Button><Plus className="w-4 h-4" /> Bestelling aanmaken</Button>
+            </Link>
           </div>
 
           {/* Filters */}
@@ -131,12 +134,16 @@ export default function AdminDashboard() {
                   <tbody>
                     {filtered.map((order) => {
                       const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.submitted;
+                      const isAdminOrder = order.customer_email === "admin@overweel3d.nl";
                       return (
                         <tr key={order.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                          <td className="p-4 font-medium">{order.order_number}</td>
+                          <td className="p-4 font-medium">
+                            {order.order_number}
+                            {isAdminOrder && <span className="ml-1 text-xs text-accent">(admin)</span>}
+                          </td>
                           <td className="p-4">
                             <div>{order.customer_name}</div>
-                            <div className="text-xs text-muted-foreground">{order.customer_email}</div>
+                            {!isAdminOrder && <div className="text-xs text-muted-foreground">{order.customer_email}</div>}
                           </td>
                           <td className="p-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
