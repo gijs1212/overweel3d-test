@@ -118,6 +118,10 @@ export default function Bestellen() {
   const [prebuiltColors, setPrebuiltColors] = useState<Record<string, string>>({});
   const [prebuiltQuantities, setPrebuiltQuantities] = useState<Record<string, number>>({});
 
+  // Custom order state
+  const [customPhotos, setCustomPhotos] = useState<File[]>([]);
+  const [customDescription, setCustomDescription] = useState("");
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
