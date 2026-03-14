@@ -204,10 +204,30 @@ export default function Bestellen() {
 
   const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
 
+  // Custom photo helpers
+  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    const remaining = 3 - customPhotos.length;
+    const toAdd = imageFiles.slice(0, remaining);
+    if (toAdd.length < imageFiles.length) {
+      toast({ title: "Maximaal 3 foto's", description: "U kunt maximaal 3 foto's uploaden.", variant: "destructive" });
+    }
+    setCustomPhotos(prev => [...prev, ...toAdd]);
+    e.target.value = "";
+  };
+
+  const removeCustomPhoto = (index: number) => {
+    setCustomPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const hasCustomOrder = customPhotos.length > 0 && customDescription.trim().length > 0;
+
   // Validation
   const hasValidLinks = orderLinks.some(l => l.url.trim() !== "" && l.files.some(f => f.name.trim() !== "" && f.material && f.color));
   const hasPrebuiltItems = prebuiltCart.length > 0;
-  const canProceedToStep2 = hasValidLinks || hasPrebuiltItems;
+  const canProceedToStep2 = hasValidLinks || hasPrebuiltItems || hasCustomOrder;
   const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && canProceedToStep2;
 
   const handleSubmit = async () => {
