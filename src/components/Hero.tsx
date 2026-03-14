@@ -70,7 +70,7 @@ export function Hero() {
             <Link to="/bestellen">
               <Button variant="hero" size="xl">
                 <Link2 className="w-5 h-5" />
-                Upload uw bestand
+                Start uw bestelling
               </Button>
             </Link>
             <Link to="/faq">

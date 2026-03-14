@@ -29,7 +29,7 @@ export function CTASection() {
             <Link to="/bestellen">
               <Button variant="hero" size="xl">
                 <Upload className="w-5 h-5" />
-                Upload uw bestand
+                Start uw bestelling
               </Button>
             </Link>
           </div>

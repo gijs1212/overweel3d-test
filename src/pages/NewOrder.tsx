@@ -248,6 +248,7 @@ export default function NewOrder() {
           print_preferences: formData.print_preferences,
           instant_quote_price: uploadMode === "file" ? estimatedPrice : 0,
           file_links: fileLinksText,
+          order_method: uploadMode === "link" ? "link" : "file",
           status: "submitted",
         })
         .select()
