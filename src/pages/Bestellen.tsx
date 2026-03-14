@@ -257,6 +257,21 @@ export default function Bestellen() {
         color: item.colorName,
       }));
 
+      // Upload custom photos if any
+      let customPhotoUrls: string[] = [];
+      if (hasCustomOrder) {
+        const timestamp = Date.now();
+        for (const photo of customPhotos) {
+          const storagePath = `custom-orders/${timestamp}/${photo.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("orders")
+            .upload(storagePath, photo, { upsert: true });
+          if (!uploadError) {
+            customPhotoUrls.push(storagePath);
+          }
+        }
+      }
+
       const customerData = {
         name: formData.name,
         email: formData.email,
@@ -273,6 +288,11 @@ export default function Bestellen() {
             links: linkItems,
             prebuiltItems,
             prebuiltTotal: prebuiltTotal.toFixed(2),
+            customOrder: hasCustomOrder ? {
+              description: customDescription,
+              photoCount: customPhotos.length,
+              photoPaths: customPhotoUrls,
+            } : null,
           },
           customer: customerData,
         },
