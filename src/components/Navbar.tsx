@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/bestellen", label: "Upload uw bestand" },
+  { href: "/bestellen", label: "Start uw bestelling" },
   { href: "/voorwaarden", label: "Voorwaarden" },
   { href: "/opdrachten", label: "Opdrachten" },
   { href: "/faq", label: "FAQ" },

@@ -248,6 +248,7 @@ export default function NewOrder() {
           print_preferences: formData.print_preferences,
           instant_quote_price: uploadMode === "file" ? estimatedPrice : 0,
           file_links: fileLinksText,
+          order_method: uploadMode === "link" ? "link" : "file",
           status: "submitted",
         })
         .select()
@@ -305,7 +306,7 @@ export default function NewOrder() {
       <main className="pt-20 pb-16">
         <div className="container mx-auto px-4 py-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Upload uw bestand</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Start uw bestelling</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Deel uw 3D-bestanden via een downloadlink of upload ze direct. Configureer uw print en ontvang direct een indicatieprijs.
             </p>
@@ -381,9 +382,10 @@ export default function NewOrder() {
                         <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 space-y-2">
                           <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">📋 Let op bij het delen via een link:</p>
                           <ul className="text-sm text-blue-700 dark:text-blue-300 list-disc list-inside space-y-1">
-                            <li>Zorg dat de link <strong>openbaar toegankelijk</strong> is (geen inloggegevens nodig)</li>
+                            <li>Zorg dat de link <strong>openbaar toegankelijk</strong> is</li>
                             <li>De link moet <strong>direct downloaden</strong> mogelijk maken</li>
-                            <li>Gebruik services zoals Google Drive, WeTransfer, Dropbox of OneDrive</li>
+                            <li>Gebruik services zoals Google Drive, WeTransfer, Dropbox, OneDrive of <strong>3DGo</strong></li>
+                            <li>Services zoals <strong>Thingiverse, Printables en 3DGo</strong> worden ondersteund, mits het bestand gratis te downloaden is</li>
                             <li>Ondersteunde formaten: <strong>STL, OBJ, 3MF, STEP</strong></li>
                             <li>Controleer of de link <strong>niet verloopt</strong> voordat wij het bestand hebben gedownload</li>
                             <li>Bij Google Drive: stel de link in op "Iedereen met de link kan bekijken"</li>
