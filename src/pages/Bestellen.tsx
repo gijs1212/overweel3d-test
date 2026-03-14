@@ -615,6 +615,85 @@ export default function Bestellen() {
                       </Button>
                     </div>
 
+                    {/* Custom Opdracht */}
+                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                        <Pencil className="w-6 h-6 text-accent" />
+                        Custom opdracht
+                      </h2>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Heeft u een idee maar nog geen 3D-bestand? Upload foto's van uw idee en beschrijf wat u wilt. Wij ontwerpen het voor u!
+                      </p>
+
+                      {/* Disclaimers */}
+                      <div className="space-y-2 mb-6">
+                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            ⚠️ <strong>Ontwerpkosten:</strong> Er zijn ontwerpkosten van toepassing. Ook als u besluit om niet te printen, zullen de ontwerpkosten betaald moeten worden.
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            ⏳ <strong>Doorlooptijd:</strong> Het ontwerpen kan lang duren. Houd hier rekening mee bij uw bestelling.
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Photo upload */}
+                      <div className="mb-4">
+                        <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          {customPhotos.map((photo, index) => (
+                            <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
+                              <img
+                                src={URL.createObjectURL(photo)}
+                                alt={`Foto ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                onClick={() => removeCustomPhoto(index)}
+                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          {customPhotos.length < 3 && (
+                            <label className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                              <Camera className="w-6 h-6 text-muted-foreground mb-1" />
+                              <span className="text-xs text-muted-foreground">Foto</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleCustomPhotoUpload}
+                                className="hidden"
+                                multiple
+                              />
+                            </label>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{customPhotos.length}/3 foto's geüpload</p>
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <Label className="text-sm mb-1 block">Beschrijving van uw idee *</Label>
+                        <Textarea
+                          value={customDescription}
+                          onChange={(e) => setCustomDescription(e.target.value)}
+                          placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
+                          rows={4}
+                          maxLength={2000}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
+                      </div>
+                    </div>
+
                     {/* Proceed */}
                     <div className="flex justify-end">
                       <Button variant="hero" onClick={() => setStep(2)} disabled={!canProceedToStep2}>
