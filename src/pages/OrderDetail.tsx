@@ -250,25 +250,44 @@ export default function OrderDetail() {
                 </div>
               </div>
 
-              {/* Files */}
-              <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-                <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
-                <div className="space-y-2">
-                  {files.map((file) => (
-                    <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-accent" />
-                          <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                          <Download className="w-4 h-4" />
-                        </Button>
+              {/* Files or Links */}
+              {order.order_method === "link" ? (
+                <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                  <h3 className="font-bold text-primary mb-4">Links</h3>
+                  <div className="space-y-2">
+                    {order.file_links?.split("\n").filter(Boolean).map((link, i) => (
+                      <div key={i} className="p-3 bg-muted/50 rounded-lg">
+                        <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-accent hover:underline break-all">
+                          <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                          {link}
+                        </a>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                    {(!order.file_links || order.file_links.trim() === "") && (
+                      <p className="text-sm text-muted-foreground">Geen links opgegeven.</p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                  <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
+                  <div className="space-y-2">
+                    {files.map((file) => (
+                      <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-accent" />
+                            <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Address */}
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">

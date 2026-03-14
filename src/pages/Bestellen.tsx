@@ -349,7 +349,7 @@ export default function Bestellen() {
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                ℹ️ <strong>Links:</strong> Alleen links met gratis te downloaden bestanden worden geaccepteerd. Zijn de bestanden betaald? Stuur ze dan via <a href="https://wetransfer.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold">WeTransfer</a> en plak de WeTransfer-link hieronder.
+                ℹ️ <strong>Links:</strong> Services zoals <strong>Thingiverse, Printables en 3DGo</strong> worden ondersteund, mits het bestand gratis te downloaden is. Zijn de bestanden betaald? Stuur ze dan via <a href="https://wetransfer.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold">WeTransfer</a> en plak de WeTransfer-link hieronder.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
