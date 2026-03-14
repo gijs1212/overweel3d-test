@@ -64,7 +64,7 @@ export default function Dashboard() {
                 </Link>
               )}
               <Link to="/bestellen">
-                <Button><Plus className="w-4 h-4" /> Upload uw bestand</Button>
+                <Button><Plus className="w-4 h-4" /> Start uw bestelling</Button>
               </Link>
             </div>
           </div>
