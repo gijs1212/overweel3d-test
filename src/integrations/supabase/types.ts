@@ -146,6 +146,7 @@ export type Database = {
           internal_notes: string | null
           material: string | null
           notes: string | null
+          order_method: string
           order_number: string
           phone: string | null
           postal_code: string | null
@@ -181,6 +182,7 @@ export type Database = {
           internal_notes?: string | null
           material?: string | null
           notes?: string | null
+          order_method?: string
           order_number: string
           phone?: string | null
           postal_code?: string | null
@@ -216,6 +218,7 @@ export type Database = {
           internal_notes?: string | null
           material?: string | null
           notes?: string | null
+          order_method?: string
           order_number?: string
           phone?: string | null
           postal_code?: string | null
