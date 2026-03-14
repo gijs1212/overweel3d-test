@@ -26,6 +26,8 @@ interface Order {
   customer_visible_notes: string;
   customer_order_token: string;
   submitted_at: string;
+  order_method?: string;
+  file_links?: string;
   approved_at: string | null;
   rejected_at: string | null;
   billing_address: string;
