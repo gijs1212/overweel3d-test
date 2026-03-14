@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Link2, Check, Package, Loader2, AlertCircle, ShoppingCart, Trash2, Star, Plus, Info } from "lucide-react";
+import { Link2, Check, Package, Loader2, AlertCircle, ShoppingCart, Trash2, Star, Plus, Info, Camera, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -117,6 +117,10 @@ export default function Bestellen() {
   const [prebuiltColors, setPrebuiltColors] = useState<Record<string, string>>({});
   const [prebuiltQuantities, setPrebuiltQuantities] = useState<Record<string, number>>({});
 
+  // Custom order state
+  const [customPhotos, setCustomPhotos] = useState<File[]>([]);
+  const [customDescription, setCustomDescription] = useState("");
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -199,10 +203,30 @@ export default function Bestellen() {
 
   const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
 
+  // Custom photo helpers
+  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    const remaining = 3 - customPhotos.length;
+    const toAdd = imageFiles.slice(0, remaining);
+    if (toAdd.length < imageFiles.length) {
+      toast({ title: "Maximaal 3 foto's", description: "U kunt maximaal 3 foto's uploaden.", variant: "destructive" });
+    }
+    setCustomPhotos(prev => [...prev, ...toAdd]);
+    e.target.value = "";
+  };
+
+  const removeCustomPhoto = (index: number) => {
+    setCustomPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const hasCustomOrder = customPhotos.length > 0 && customDescription.trim().length > 0;
+
   // Validation
   const hasValidLinks = orderLinks.some(l => l.url.trim() !== "" && l.files.some(f => f.name.trim() !== "" && f.material && f.color));
   const hasPrebuiltItems = prebuiltCart.length > 0;
-  const canProceedToStep2 = hasValidLinks || hasPrebuiltItems;
+  const canProceedToStep2 = hasValidLinks || hasPrebuiltItems || hasCustomOrder;
   const canSubmit = formData.name && formData.email && formData.address && formData.city && formData.postalCode && formData.agreeTerms && canProceedToStep2;
 
   const handleSubmit = async () => {
@@ -232,6 +256,21 @@ export default function Bestellen() {
         color: item.colorName,
       }));
 
+      // Upload custom photos if any
+      let customPhotoUrls: string[] = [];
+      if (hasCustomOrder) {
+        const timestamp = Date.now();
+        for (const photo of customPhotos) {
+          const storagePath = `custom-orders/${timestamp}/${photo.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("orders")
+            .upload(storagePath, photo, { upsert: true });
+          if (!uploadError) {
+            customPhotoUrls.push(storagePath);
+          }
+        }
+      }
+
       const customerData = {
         name: formData.name,
         email: formData.email,
@@ -248,6 +287,11 @@ export default function Bestellen() {
             links: linkItems,
             prebuiltItems,
             prebuiltTotal: prebuiltTotal.toFixed(2),
+            customOrder: hasCustomOrder ? {
+              description: customDescription,
+              photoCount: customPhotos.length,
+              photoPaths: customPhotoUrls,
+            } : null,
           },
           customer: customerData,
         },
@@ -571,6 +615,85 @@ export default function Bestellen() {
                       </Button>
                     </div>
 
+                    {/* Custom Opdracht */}
+                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                        <Pencil className="w-6 h-6 text-accent" />
+                        Custom opdracht
+                      </h2>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Heeft u een idee maar nog geen 3D-bestand? Upload foto's van uw idee en beschrijf wat u wilt. Wij ontwerpen het voor u!
+                      </p>
+
+                      {/* Disclaimers */}
+                      <div className="space-y-2 mb-6">
+                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            ⚠️ <strong>Ontwerpkosten:</strong> Er zijn ontwerpkosten van toepassing. Ook als u besluit om niet te printen, zullen de ontwerpkosten betaald moeten worden.
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            ⏳ <strong>Doorlooptijd:</strong> Het ontwerpen kan lang duren. Houd hier rekening mee bij uw bestelling.
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Photo upload */}
+                      <div className="mb-4">
+                        <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          {customPhotos.map((photo, index) => (
+                            <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
+                              <img
+                                src={URL.createObjectURL(photo)}
+                                alt={`Foto ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                onClick={() => removeCustomPhoto(index)}
+                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          {customPhotos.length < 3 && (
+                            <label className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                              <Camera className="w-6 h-6 text-muted-foreground mb-1" />
+                              <span className="text-xs text-muted-foreground">Foto</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleCustomPhotoUpload}
+                                className="hidden"
+                                multiple
+                              />
+                            </label>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{customPhotos.length}/3 foto's geüpload</p>
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <Label className="text-sm mb-1 block">Beschrijving van uw idee *</Label>
+                        <Textarea
+                          value={customDescription}
+                          onChange={(e) => setCustomDescription(e.target.value)}
+                          placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
+                          rows={4}
+                          maxLength={2000}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
+                      </div>
+                    </div>
+
                     {/* Proceed */}
                     <div className="flex justify-end">
                       <Button variant="hero" onClick={() => setStep(2)} disabled={!canProceedToStep2}>
@@ -644,7 +767,7 @@ export default function Bestellen() {
                     Overzicht
                   </h3>
 
-                  {(hasValidLinks || hasPrebuiltItems) ? (
+                  {(hasValidLinks || hasPrebuiltItems || hasCustomOrder) ? (
                     <div className="space-y-4">
                       {/* Links summary */}
                       {orderLinks.filter(l => l.url.trim()).map((link, i) => (
@@ -678,6 +801,17 @@ export default function Bestellen() {
                         </div>
                       ))}
 
+                      {/* Custom order summary */}
+                      {hasCustomOrder && (
+                        <div className="border-b border-border pb-3">
+                          <p className="text-xs font-medium flex items-center gap-1">
+                            <Pencil className="w-3 h-3 text-accent" /> Custom opdracht
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{customDescription}</p>
+                          <p className="text-xs text-muted-foreground">{customPhotos.length} foto('s)</p>
+                        </div>
+                      )}
+
                       {prebuiltCart.length > 0 && (
                         <div className="border-t border-border pt-3">
                           <div className="flex justify-between items-center">
@@ -687,7 +821,7 @@ export default function Bestellen() {
                         </div>
                       )}
 
-                      {hasValidLinks && (
+                      {(hasValidLinks || hasCustomOrder) && (
                         <p className="text-xs text-muted-foreground">
                           * Prijs voor custom prints wordt na controle gecommuniceerd.
                         </p>
@@ -696,7 +830,7 @@ export default function Bestellen() {
                   ) : (
                     <div className="text-center py-8">
                       <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Voeg links of producten toe</p>
+                      <p className="text-muted-foreground">Voeg links, producten of een custom opdracht toe</p>
                     </div>
                   )}
                 </motion.div>
