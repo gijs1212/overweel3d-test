@@ -767,7 +767,7 @@ export default function Bestellen() {
                     Overzicht
                   </h3>
 
-                  {(hasValidLinks || hasPrebuiltItems) ? (
+                  {(hasValidLinks || hasPrebuiltItems || hasCustomOrder) ? (
                     <div className="space-y-4">
                       {/* Links summary */}
                       {orderLinks.filter(l => l.url.trim()).map((link, i) => (
@@ -801,6 +801,17 @@ export default function Bestellen() {
                         </div>
                       ))}
 
+                      {/* Custom order summary */}
+                      {hasCustomOrder && (
+                        <div className="border-b border-border pb-3">
+                          <p className="text-xs font-medium flex items-center gap-1">
+                            <Pencil className="w-3 h-3 text-accent" /> Custom opdracht
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{customDescription}</p>
+                          <p className="text-xs text-muted-foreground">{customPhotos.length} foto('s)</p>
+                        </div>
+                      )}
+
                       {prebuiltCart.length > 0 && (
                         <div className="border-t border-border pt-3">
                           <div className="flex justify-between items-center">
@@ -810,7 +821,7 @@ export default function Bestellen() {
                         </div>
                       )}
 
-                      {hasValidLinks && (
+                      {(hasValidLinks || hasCustomOrder) && (
                         <p className="text-xs text-muted-foreground">
                           * Prijs voor custom prints wordt na controle gecommuniceerd.
                         </p>
@@ -819,7 +830,7 @@ export default function Bestellen() {
                   ) : (
                     <div className="text-center py-8">
                       <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Voeg links of producten toe</p>
+                      <p className="text-muted-foreground">Voeg links, producten of een custom opdracht toe</p>
                     </div>
                   )}
                 </motion.div>
