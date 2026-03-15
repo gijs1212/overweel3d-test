@@ -205,10 +205,32 @@ export default function NewOrder() {
 
   const estimatedPrice = calculateEstimate();
   const isParsing = uploadedFiles.some((f) => f.parsing);
+
+  const hasCustomOrder = customPhotos.length > 0 && customDescription.trim().length > 0;
+
+  // Custom photo helpers
+  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    const remaining = 3 - customPhotos.length;
+    const toAdd = imageFiles.slice(0, remaining);
+    if (toAdd.length < imageFiles.length) {
+      toast({ title: "Maximaal 3 foto's", description: "U kunt maximaal 3 foto's uploaden.", variant: "destructive" });
+    }
+    setCustomPhotos(prev => [...prev, ...toAdd]);
+    e.target.value = "";
+  };
+
+  const removeCustomPhoto = (index: number) => {
+    setCustomPhotos(prev => prev.filter((_, i) => i !== index));
+  };
   
   const allFilesConfigured = uploadMode === "file" 
     ? uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color)
-    : fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color);
+    : uploadMode === "link"
+    ? fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color)
+    : hasCustomOrder;
   
   const canProceed = allFilesConfigured;
   const canSubmit = formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms && canProceed;
