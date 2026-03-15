@@ -829,7 +829,24 @@ export default function NewOrder() {
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Overzicht</h3>
 
-                  {uploadMode === "link" ? (
+                  {uploadMode === "custom" ? (
+                    hasCustomOrder ? (
+                      <div className="space-y-3">
+                        <div className="text-sm border-b border-border pb-2">
+                          <p className="font-medium flex items-center gap-1">
+                            <Pencil className="w-3 h-3 text-accent" /> Custom opdracht
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{customDescription}</p>
+                          <p className="text-xs text-muted-foreground">{customPhotos.length} foto('s)</p>
+                        </div>
+                        <div className="border-t border-border pt-3">
+                          <p className="text-xs text-muted-foreground">Prijs wordt na controle vastgesteld (incl. ontwerpkosten).</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Upload foto's en voeg een beschrijving toe.</p>
+                    )
+                  ) : uploadMode === "link" ? (
                     fileLinks.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Voeg downloadlinks toe om te beginnen.</p>
                     ) : (
