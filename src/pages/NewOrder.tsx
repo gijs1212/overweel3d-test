@@ -391,28 +391,35 @@ export default function NewOrder() {
                   <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
                     
                     {/* Upload mode toggle */}
-                    <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-                      <h2 className="text-lg font-bold mb-3">Hoe wilt u uw bestand delen?</h2>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden kan ook.
-                      </p>
-                      <div className="flex gap-3">
-                        <Button
-                          variant={uploadMode === "link" ? "default" : "outline"}
-                          onClick={() => setUploadMode("link")}
-                          className="flex-1"
-                        >
-                          <Link2 className="w-4 h-4" /> Downloadlink (voorkeur)
-                        </Button>
-                        <Button
-                          variant={uploadMode === "file" ? "default" : "outline"}
-                          onClick={() => setUploadMode("file")}
-                          className="flex-1"
-                        >
-                          <Upload className="w-4 h-4" /> Bestand uploaden
-                        </Button>
-                      </div>
-                    </div>
+                     <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                       <h2 className="text-lg font-bold mb-3">Hoe wilt u bestellen?</h2>
+                       <p className="text-sm text-muted-foreground mb-4">
+                         Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden en custom opdrachten kan ook.
+                       </p>
+                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                         <Button
+                           variant={uploadMode === "link" ? "default" : "outline"}
+                           onClick={() => setUploadMode("link")}
+                           className="flex-1"
+                         >
+                           <Link2 className="w-4 h-4" /> Downloadlink
+                         </Button>
+                         <Button
+                           variant={uploadMode === "file" ? "default" : "outline"}
+                           onClick={() => setUploadMode("file")}
+                           className="flex-1"
+                         >
+                           <Upload className="w-4 h-4" /> Bestand uploaden
+                         </Button>
+                         <Button
+                           variant={uploadMode === "custom" ? "default" : "outline"}
+                           onClick={() => setUploadMode("custom")}
+                           className="flex-1"
+                         >
+                           <Pencil className="w-4 h-4" /> Custom opdracht
+                         </Button>
+                       </div>
+                     </div>
 
                     {/* Link mode */}
                     {uploadMode === "link" && (
