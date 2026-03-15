@@ -531,200 +531,215 @@ export default function Bestellen() {
                             </Button>
                           </div>
                         ))}
-                      </div>
-                    </div>
+                       </div>
+                     </div>
+                     </motion.div>
+                     )}
+                     </AnimatePresence>
 
-                    {/* Links Section */}
-                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                        <Link2 className="w-6 h-6 text-accent" />
-                        Bestanden via link
-                      </h2>
-                      <p className="text-sm text-muted-foreground mb-6">
-                        Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat u wilt. 
-                        Als u alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
-                      </p>
+                     {/* Links Section */}
+                     <AnimatePresence>
+                     {activeSection === "link" && (
+                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                       <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                         <Link2 className="w-6 h-6 text-accent" />
+                         Bestanden via link
+                       </h2>
+                       <p className="text-sm text-muted-foreground mb-6">
+                         Plak een downloadlink (bijv. Thingiverse, Printables, WeTransfer) en geef per bestand aan wat u wilt. 
+                         Als u alle bestanden van een link wilt printen, vul dan "Alle bestanden" in als bestandsnaam.
+                       </p>
 
-                      <div className="space-y-8">
-                        {orderLinks.map((link, linkIndex) => (
-                          <div key={link.id} className="border-2 border-border rounded-xl p-6 relative">
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="font-semibold text-sm text-muted-foreground">Link {linkIndex + 1}</h3>
-                              {orderLinks.length > 1 && (
-                                <Button variant="ghost" size="sm" onClick={() => removeLink(link.id)} className="text-destructive hover:text-destructive">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
+                       <div className="space-y-8">
+                         {orderLinks.map((link, linkIndex) => (
+                           <div key={link.id} className="border-2 border-border rounded-xl p-6 relative">
+                             <div className="flex items-center justify-between mb-4">
+                               <h3 className="font-semibold text-sm text-muted-foreground">Link {linkIndex + 1}</h3>
+                               {orderLinks.length > 1 && (
+                                 <Button variant="ghost" size="sm" onClick={() => removeLink(link.id)} className="text-destructive hover:text-destructive">
+                                   <Trash2 className="w-4 h-4" />
+                                 </Button>
+                               )}
+                             </div>
 
-                            <div className="mb-4">
-                              <Label className="text-sm mb-1 block">Download-link *</Label>
-                              <Input
-                                value={link.url}
-                                onChange={(e) => updateLinkUrl(link.id, e.target.value)}
-                                placeholder="https://www.thingiverse.com/thing/... of WeTransfer-link"
-                              />
-                            </div>
+                             <div className="mb-4">
+                               <Label className="text-sm mb-1 block">Download-link *</Label>
+                               <Input
+                                 value={link.url}
+                                 onChange={(e) => updateLinkUrl(link.id, e.target.value)}
+                                 placeholder="https://www.thingiverse.com/thing/... of WeTransfer-link"
+                               />
+                             </div>
 
-                            <div className="space-y-4">
-                              <Label className="text-sm font-medium block">Bestanden uit deze link:</Label>
-                              {link.files.map((file, fileIndex) => (
-                                <div key={fileIndex} className="bg-muted/50 rounded-lg p-4 space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-muted-foreground">Bestand {fileIndex + 1}</span>
-                                    {link.files.length > 1 && (
-                                      <Button variant="ghost" size="sm" onClick={() => removeFileFromLink(link.id, fileIndex)} className="h-6 w-6 p-0 text-destructive">
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                      <Label className="text-xs">Bestandsnaam *</Label>
-                                      <Input
-                                        value={file.name}
-                                        onChange={(e) => updateFile(link.id, fileIndex, "name", e.target.value)}
-                                        placeholder="bijv. houder.stl of Alle bestanden"
-                                        className="text-sm"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">Aantal *</Label>
-                                      <Input
-                                        type="number"
-                                        min={1}
-                                        value={file.quantity}
-                                        onChange={(e) => updateFile(link.id, fileIndex, "quantity", Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="text-sm"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">Materiaal *</Label>
-                                      <div className="flex flex-wrap gap-2 mt-1">
-                                        {materials.map((m) => (
-                                          <button
-                                            key={m.id}
-                                            onClick={() => updateFile(link.id, fileIndex, "material", m.id)}
-                                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${file.material === m.id ? "border-accent bg-accent/10 text-accent" : "border-border hover:border-accent/50"}`}
-                                          >
-                                            {m.name}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    {file.material && (
-                                      <div>
-                                        <Label className="text-xs">Kleur *</Label>
-                                        <div className="flex flex-wrap gap-2 mt-1">
-                                          {getColorsForMaterial(file.material).map((color) => (
-                                            <button
-                                              key={color.id}
-                                              onClick={() => updateFile(link.id, fileIndex, "color", color.id)}
-                                              className={`w-7 h-7 rounded-full border-2 transition-all ${file.color === color.id ? "border-accent scale-110 ring-2 ring-accent" : "border-border hover:scale-105"}`}
-                                              style={{ backgroundColor: color.hex }}
-                                              title={color.name}
-                                            >
-                                              {file.color === color.id && <Check className={`w-3 h-3 mx-auto ${color.hex === "#FFFFFF" || color.hex === "#FFDD00" ? "text-primary" : "text-white"}`} />}
-                                            </button>
-                                          ))}
-                                        </div>
-                                        {file.color && <p className="text-xs text-muted-foreground mt-1">{getColorsForMaterial(file.material).find(c => c.id === file.color)?.name}</p>}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                              <Button variant="outline" size="sm" onClick={() => addFileToLink(link.id)}>
-                                <Plus className="w-3 h-3 mr-1" /> Bestand toevoegen
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                             <div className="space-y-4">
+                               <Label className="text-sm font-medium block">Bestanden uit deze link:</Label>
+                               {link.files.map((file, fileIndex) => (
+                                 <div key={fileIndex} className="bg-muted/50 rounded-lg p-4 space-y-3">
+                                   <div className="flex items-center justify-between">
+                                     <span className="text-xs font-medium text-muted-foreground">Bestand {fileIndex + 1}</span>
+                                     {link.files.length > 1 && (
+                                       <Button variant="ghost" size="sm" onClick={() => removeFileFromLink(link.id, fileIndex)} className="h-6 w-6 p-0 text-destructive">
+                                         <Trash2 className="w-3 h-3" />
+                                       </Button>
+                                     )}
+                                   </div>
+                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                     <div>
+                                       <Label className="text-xs">Bestandsnaam *</Label>
+                                       <Input
+                                         value={file.name}
+                                         onChange={(e) => updateFile(link.id, fileIndex, "name", e.target.value)}
+                                         placeholder="bijv. houder.stl of Alle bestanden"
+                                         className="text-sm"
+                                       />
+                                     </div>
+                                     <div>
+                                       <Label className="text-xs">Aantal *</Label>
+                                       <Input
+                                         type="number"
+                                         min={1}
+                                         value={file.quantity}
+                                         onChange={(e) => updateFile(link.id, fileIndex, "quantity", Math.max(1, parseInt(e.target.value) || 1))}
+                                         className="text-sm"
+                                       />
+                                     </div>
+                                     <div>
+                                       <Label className="text-xs">Materiaal *</Label>
+                                       <div className="flex flex-wrap gap-2 mt-1">
+                                         {materials.map((m) => (
+                                           <button
+                                             key={m.id}
+                                             onClick={() => updateFile(link.id, fileIndex, "material", m.id)}
+                                             className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${file.material === m.id ? "border-accent bg-accent/10 text-accent" : "border-border hover:border-accent/50"}`}
+                                           >
+                                             {m.name}
+                                           </button>
+                                         ))}
+                                       </div>
+                                     </div>
+                                     {file.material && (
+                                       <div>
+                                         <Label className="text-xs">Kleur *</Label>
+                                         <div className="flex flex-wrap gap-2 mt-1">
+                                           {getColorsForMaterial(file.material).map((color) => (
+                                             <button
+                                               key={color.id}
+                                               onClick={() => updateFile(link.id, fileIndex, "color", color.id)}
+                                               className={`w-7 h-7 rounded-full border-2 transition-all ${file.color === color.id ? "border-accent scale-110 ring-2 ring-accent" : "border-border hover:scale-105"}`}
+                                               style={{ backgroundColor: color.hex }}
+                                               title={color.name}
+                                             >
+                                               {file.color === color.id && <Check className={`w-3 h-3 mx-auto ${color.hex === "#FFFFFF" || color.hex === "#FFDD00" ? "text-primary" : "text-white"}`} />}
+                                             </button>
+                                           ))}
+                                         </div>
+                                         {file.color && <p className="text-xs text-muted-foreground mt-1">{getColorsForMaterial(file.material).find(c => c.id === file.color)?.name}</p>}
+                                       </div>
+                                     )}
+                                   </div>
+                                 </div>
+                               ))}
+                               <Button variant="outline" size="sm" onClick={() => addFileToLink(link.id)}>
+                                 <Plus className="w-3 h-3 mr-1" /> Bestand toevoegen
+                               </Button>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
 
-                      <Button variant="outline" onClick={addLink} className="mt-4 w-full">
-                        <Plus className="w-4 h-4 mr-2" /> Nog een link toevoegen
-                      </Button>
-                    </div>
+                       <Button variant="outline" onClick={addLink} className="mt-4 w-full">
+                         <Plus className="w-4 h-4 mr-2" /> Nog een link toevoegen
+                       </Button>
+                     </div>
+                     </motion.div>
+                     )}
+                     </AnimatePresence>
 
-                    {/* Custom Opdracht */}
-                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                        <Pencil className="w-6 h-6 text-accent" />
-                        Custom opdracht
-                      </h2>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Heeft u een idee maar nog geen 3D-bestand? Upload foto's van uw idee en beschrijf wat u wilt. Wij ontwerpen het voor u!
-                      </p>
+                     {/* Custom Opdracht */}
+                     <AnimatePresence>
+                     {activeSection === "custom" && (
+                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                       <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                         <Pencil className="w-6 h-6 text-accent" />
+                         Custom opdracht
+                       </h2>
+                       <p className="text-sm text-muted-foreground mb-4">
+                         Heeft u een idee maar nog geen 3D-bestand? Upload foto's van uw idee en beschrijf wat u wilt. Wij ontwerpen het voor u!
+                       </p>
 
-                      {/* Disclaimers */}
-                      <div className="space-y-2 mb-6">
-                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                          <p className="text-xs text-amber-800 dark:text-amber-200">
-                            ⚠️ <strong>Ontwerpkosten:</strong> Er zijn ontwerpkosten van toepassing. Ook als u besluit om niet te printen, zullen de ontwerpkosten betaald moeten worden.
-                          </p>
-                        </div>
-                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                          <p className="text-xs text-amber-800 dark:text-amber-200">
-                            ⏳ <strong>Doorlooptijd:</strong> Het ontwerpen kan lang duren. Houd hier rekening mee bij uw bestelling.
-                          </p>
-                        </div>
-                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                          <p className="text-xs text-amber-800 dark:text-amber-200">
-                            ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
-                          </p>
-                        </div>
-                      </div>
+                       {/* Disclaimers */}
+                       <div className="space-y-2 mb-6">
+                         <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                           <p className="text-xs text-amber-800 dark:text-amber-200">
+                             ⚠️ <strong>Ontwerpkosten:</strong> Er zijn ontwerpkosten van toepassing. Ook als u besluit om niet te printen, zullen de ontwerpkosten betaald moeten worden.
+                           </p>
+                         </div>
+                         <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                           <p className="text-xs text-amber-800 dark:text-amber-200">
+                             ⏳ <strong>Doorlooptijd:</strong> Het ontwerpen kan lang duren. Houd hier rekening mee bij uw bestelling.
+                           </p>
+                         </div>
+                         <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                           <p className="text-xs text-amber-800 dark:text-amber-200">
+                             ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
+                           </p>
+                         </div>
+                       </div>
 
-                      {/* Photo upload */}
-                      <div className="mb-4">
-                        <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
-                        <div className="flex flex-wrap gap-3 mb-3">
-                          {customPhotos.map((photo, index) => (
-                            <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
-                              <img
-                                src={URL.createObjectURL(photo)}
-                                alt={`Foto ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                onClick={() => removeCustomPhoto(index)}
-                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                          {customPhotos.length < 3 && (
-                            <label className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
-                              <Camera className="w-6 h-6 text-muted-foreground mb-1" />
-                              <span className="text-xs text-muted-foreground">Foto</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleCustomPhotoUpload}
-                                className="hidden"
-                                multiple
-                              />
-                            </label>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{customPhotos.length}/3 foto's geüpload</p>
-                      </div>
+                       {/* Photo upload */}
+                       <div className="mb-4">
+                         <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
+                         <div className="flex flex-wrap gap-3 mb-3">
+                           {customPhotos.map((photo, index) => (
+                             <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
+                               <img
+                                 src={URL.createObjectURL(photo)}
+                                 alt={`Foto ${index + 1}`}
+                                 className="w-full h-full object-cover"
+                               />
+                               <button
+                                 onClick={() => removeCustomPhoto(index)}
+                                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                               >
+                                 <Trash2 className="w-3 h-3" />
+                               </button>
+                             </div>
+                           ))}
+                           {customPhotos.length < 3 && (
+                             <label className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                               <Camera className="w-6 h-6 text-muted-foreground mb-1" />
+                               <span className="text-xs text-muted-foreground">Foto</span>
+                               <input
+                                 type="file"
+                                 accept="image/*"
+                                 onChange={handleCustomPhotoUpload}
+                                 className="hidden"
+                                 multiple
+                               />
+                             </label>
+                           )}
+                         </div>
+                         <p className="text-xs text-muted-foreground">{customPhotos.length}/3 foto's geüpload</p>
+                       </div>
 
-                      {/* Description */}
-                      <div>
-                        <Label className="text-sm mb-1 block">Beschrijving van uw idee *</Label>
-                        <Textarea
-                          value={customDescription}
-                          onChange={(e) => setCustomDescription(e.target.value)}
-                          placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
-                          rows={4}
-                          maxLength={2000}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
-                      </div>
-                    </div>
+                       {/* Description */}
+                       <div>
+                         <Label className="text-sm mb-1 block">Beschrijving van uw idee *</Label>
+                         <Textarea
+                           value={customDescription}
+                           onChange={(e) => setCustomDescription(e.target.value)}
+                           placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
+                           rows={4}
+                           maxLength={2000}
+                         />
+                         <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
+                       </div>
+                     </div>
+                     </motion.div>
+                     )}
+                     </AnimatePresence>
 
                     {/* Proceed */}
                     <div className="flex justify-end">
