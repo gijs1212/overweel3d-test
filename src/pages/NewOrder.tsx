@@ -41,13 +41,17 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"link" | "file">("link");
+  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom">("link");
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // Links
   const [fileLinks, setFileLinks] = useState<FileLink[]>([]);
+
+  // Custom order state
+  const [customPhotos, setCustomPhotos] = useState<File[]>([]);
+  const [customDescription, setCustomDescription] = useState("");
 
   // Form
   const [formData, setFormData] = useState({
