@@ -244,14 +244,32 @@ export default function NewOrder() {
       if (orderNumError) throw orderNumError;
       const orderNumber = orderNumData as string;
 
-      const items = uploadMode === "file" ? uploadedFiles : fileLinks;
-      const materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
-      const colorNames = items.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", ");
-      const totalQuantity = items.reduce((sum, f) => sum + f.quantity, 0);
+      let materialNames = "";
+      let colorNames = "";
+      let totalQuantity = 1;
+      let fileLinksText = "";
 
-      const fileLinksText = uploadMode === "link" 
-        ? fileLinks.map((l) => l.url).join("\n") 
-        : "";
+      if (uploadMode === "custom") {
+        // Upload custom photos
+        const timestamp = Date.now();
+        const customPhotoUrls: string[] = [];
+        for (const photo of customPhotos) {
+          const storagePath = `custom-orders/${timestamp}/${photo.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("orders")
+            .upload(storagePath, photo, { upsert: true });
+          if (!uploadError) {
+            customPhotoUrls.push(storagePath);
+          }
+        }
+        fileLinksText = `CUSTOM OPDRACHT\nBeschrijving: ${customDescription}\nFoto's: ${customPhotoUrls.join(", ")}`;
+      } else {
+        const items = uploadMode === "file" ? uploadedFiles : fileLinks;
+        materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
+        colorNames = items.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", ");
+        totalQuantity = items.reduce((sum, f) => sum + f.quantity, 0);
+        fileLinksText = uploadMode === "link" ? fileLinks.map((l) => l.url).join("\n") : "";
+      }
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -270,11 +288,11 @@ export default function NewOrder() {
           material: materialNames,
           color: colorNames,
           quantity: totalQuantity,
-          notes: formData.notes,
+          notes: uploadMode === "custom" ? `[CUSTOM OPDRACHT] ${customDescription}\n\n${formData.notes}` : formData.notes,
           print_preferences: formData.print_preferences,
           instant_quote_price: uploadMode === "file" ? estimatedPrice : 0,
           file_links: fileLinksText,
-          order_method: uploadMode === "link" ? "link" : "file",
+          order_method: uploadMode,
           status: "submitted",
         })
         .select()
