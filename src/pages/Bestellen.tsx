@@ -427,12 +427,43 @@ export default function Bestellen() {
               <AnimatePresence mode="wait">
                 {step === 1 && (
                   <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                    {/* Pre-built Models */}
-                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                      <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                        <Star className="w-6 h-6 text-accent" />
-                        Kant-en-klare modellen
-                      </h2>
+                     {/* Order Type Selection Buttons */}
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                       <button
+                         onClick={() => setActiveSection(activeSection === "prebuilt" ? null : "prebuilt")}
+                         className={`p-6 rounded-2xl border-2 transition-all text-left ${activeSection === "prebuilt" ? "border-accent bg-accent/5 shadow-lg" : "border-border bg-card hover:border-accent/50"}`}
+                       >
+                         <Star className={`w-8 h-8 mb-3 ${activeSection === "prebuilt" ? "text-accent" : "text-muted-foreground"}`} />
+                         <h3 className="font-bold text-sm">Kant-en-klare modellen</h3>
+                         <p className="text-xs text-muted-foreground mt-1">Direct leverbaar tegen vaste prijs</p>
+                       </button>
+                       <button
+                         onClick={() => setActiveSection(activeSection === "link" ? null : "link")}
+                         className={`p-6 rounded-2xl border-2 transition-all text-left ${activeSection === "link" ? "border-accent bg-accent/5 shadow-lg" : "border-border bg-card hover:border-accent/50"}`}
+                       >
+                         <Link2 className={`w-8 h-8 mb-3 ${activeSection === "link" ? "text-accent" : "text-muted-foreground"}`} />
+                         <h3 className="font-bold text-sm">Bestanden via link</h3>
+                         <p className="text-xs text-muted-foreground mt-1">Thingiverse, Printables, WeTransfer, etc.</p>
+                       </button>
+                       <button
+                         onClick={() => setActiveSection(activeSection === "custom" ? null : "custom")}
+                         className={`p-6 rounded-2xl border-2 transition-all text-left ${activeSection === "custom" ? "border-accent bg-accent/5 shadow-lg" : "border-border bg-card hover:border-accent/50"}`}
+                       >
+                         <Pencil className={`w-8 h-8 mb-3 ${activeSection === "custom" ? "text-accent" : "text-muted-foreground"}`} />
+                         <h3 className="font-bold text-sm">Custom opdracht</h3>
+                         <p className="text-xs text-muted-foreground mt-1">Wij ontwerpen het voor u</p>
+                       </button>
+                     </div>
+
+                     {/* Pre-built Models */}
+                     <AnimatePresence>
+                     {activeSection === "prebuilt" && (
+                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                       <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                         <Star className="w-6 h-6 text-accent" />
+                         Kant-en-klare modellen
+                       </h2>
                       <p className="text-sm text-muted-foreground mb-6">
                         Direct leverbaar tegen vaste prijs. Deze worden volledig afgemonteerd geleverd.
                       </p>
