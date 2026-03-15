@@ -105,6 +105,7 @@ export default function Bestellen() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+  const [activeSection, setActiveSection] = useState<"prebuilt" | "link" | "custom" | null>(null);
 
   // Links state
   const [orderLinks, setOrderLinks] = useState<OrderLink[]>([
