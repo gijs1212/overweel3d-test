@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2 } from "lucide-react";
+import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,13 +41,17 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"link" | "file">("link");
+  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom">("link");
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // Links
   const [fileLinks, setFileLinks] = useState<FileLink[]>([]);
+
+  // Custom order state
+  const [customPhotos, setCustomPhotos] = useState<File[]>([]);
+  const [customDescription, setCustomDescription] = useState("");
 
   // Form
   const [formData, setFormData] = useState({
@@ -201,10 +205,32 @@ export default function NewOrder() {
 
   const estimatedPrice = calculateEstimate();
   const isParsing = uploadedFiles.some((f) => f.parsing);
+
+  const hasCustomOrder = customPhotos.length > 0 && customDescription.trim().length > 0;
+
+  // Custom photo helpers
+  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    const remaining = 3 - customPhotos.length;
+    const toAdd = imageFiles.slice(0, remaining);
+    if (toAdd.length < imageFiles.length) {
+      toast({ title: "Maximaal 3 foto's", description: "U kunt maximaal 3 foto's uploaden.", variant: "destructive" });
+    }
+    setCustomPhotos(prev => [...prev, ...toAdd]);
+    e.target.value = "";
+  };
+
+  const removeCustomPhoto = (index: number) => {
+    setCustomPhotos(prev => prev.filter((_, i) => i !== index));
+  };
   
   const allFilesConfigured = uploadMode === "file" 
     ? uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color)
-    : fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color);
+    : uploadMode === "link"
+    ? fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color)
+    : hasCustomOrder;
   
   const canProceed = allFilesConfigured;
   const canSubmit = formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms && canProceed;
@@ -218,14 +244,32 @@ export default function NewOrder() {
       if (orderNumError) throw orderNumError;
       const orderNumber = orderNumData as string;
 
-      const items = uploadMode === "file" ? uploadedFiles : fileLinks;
-      const materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
-      const colorNames = items.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", ");
-      const totalQuantity = items.reduce((sum, f) => sum + f.quantity, 0);
+      let materialNames = "";
+      let colorNames = "";
+      let totalQuantity = 1;
+      let fileLinksText = "";
 
-      const fileLinksText = uploadMode === "link" 
-        ? fileLinks.map((l) => l.url).join("\n") 
-        : "";
+      if (uploadMode === "custom") {
+        // Upload custom photos
+        const timestamp = Date.now();
+        const customPhotoUrls: string[] = [];
+        for (const photo of customPhotos) {
+          const storagePath = `custom-orders/${timestamp}/${photo.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("orders")
+            .upload(storagePath, photo, { upsert: true });
+          if (!uploadError) {
+            customPhotoUrls.push(storagePath);
+          }
+        }
+        fileLinksText = `CUSTOM OPDRACHT\nBeschrijving: ${customDescription}\nFoto's: ${customPhotoUrls.join(", ")}`;
+      } else {
+        const items = uploadMode === "file" ? uploadedFiles : fileLinks;
+        materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
+        colorNames = items.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", ");
+        totalQuantity = items.reduce((sum, f) => sum + f.quantity, 0);
+        fileLinksText = uploadMode === "link" ? fileLinks.map((l) => l.url).join("\n") : "";
+      }
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -244,11 +288,11 @@ export default function NewOrder() {
           material: materialNames,
           color: colorNames,
           quantity: totalQuantity,
-          notes: formData.notes,
+          notes: uploadMode === "custom" ? `[CUSTOM OPDRACHT] ${customDescription}\n\n${formData.notes}` : formData.notes,
           print_preferences: formData.print_preferences,
           instant_quote_price: uploadMode === "file" ? estimatedPrice : 0,
           file_links: fileLinksText,
-          order_method: uploadMode === "link" ? "link" : "file",
+          order_method: uploadMode,
           status: "submitted",
         })
         .select()
@@ -347,28 +391,35 @@ export default function NewOrder() {
                   <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
                     
                     {/* Upload mode toggle */}
-                    <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-                      <h2 className="text-lg font-bold mb-3">Hoe wilt u uw bestand delen?</h2>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden kan ook.
-                      </p>
-                      <div className="flex gap-3">
-                        <Button
-                          variant={uploadMode === "link" ? "default" : "outline"}
-                          onClick={() => setUploadMode("link")}
-                          className="flex-1"
-                        >
-                          <Link2 className="w-4 h-4" /> Downloadlink (voorkeur)
-                        </Button>
-                        <Button
-                          variant={uploadMode === "file" ? "default" : "outline"}
-                          onClick={() => setUploadMode("file")}
-                          className="flex-1"
-                        >
-                          <Upload className="w-4 h-4" /> Bestand uploaden
-                        </Button>
-                      </div>
-                    </div>
+                     <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                       <h2 className="text-lg font-bold mb-3">Hoe wilt u bestellen?</h2>
+                       <p className="text-sm text-muted-foreground mb-4">
+                         Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden en custom opdrachten kan ook.
+                       </p>
+                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                         <Button
+                           variant={uploadMode === "link" ? "default" : "outline"}
+                           onClick={() => setUploadMode("link")}
+                           className="flex-1"
+                         >
+                           <Link2 className="w-4 h-4" /> Downloadlink
+                         </Button>
+                         <Button
+                           variant={uploadMode === "file" ? "default" : "outline"}
+                           onClick={() => setUploadMode("file")}
+                           className="flex-1"
+                         >
+                           <Upload className="w-4 h-4" /> Bestand uploaden
+                         </Button>
+                         <Button
+                           variant={uploadMode === "custom" ? "default" : "outline"}
+                           onClick={() => setUploadMode("custom")}
+                           className="flex-1"
+                         >
+                           <Pencil className="w-4 h-4" /> Custom opdracht
+                         </Button>
+                       </div>
+                     </div>
 
                     {/* Link mode */}
                     {uploadMode === "link" && (
@@ -572,7 +623,88 @@ export default function NewOrder() {
                       </div>
                     )}
 
-                    {/* Notes */}
+                    {/* Custom opdracht */}
+                    {uploadMode === "custom" && (
+                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                          <Pencil className="w-6 h-6 text-accent" />
+                          Custom opdracht
+                        </h2>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Heeft u een idee maar nog geen 3D-bestand? Upload foto's van uw idee en beschrijf wat u wilt. Wij ontwerpen het voor u!
+                        </p>
+
+                        {/* Disclaimers */}
+                        <div className="space-y-2 mb-6">
+                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              ⚠️ <strong>Ontwerpkosten:</strong> Er zijn ontwerpkosten van toepassing. Ook als u besluit om niet te printen, zullen de ontwerpkosten betaald moeten worden.
+                            </p>
+                          </div>
+                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              ⏳ <strong>Doorlooptijd:</strong> Het ontwerpen kan lang duren. Houd hier rekening mee bij uw bestelling.
+                            </p>
+                          </div>
+                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Photo upload */}
+                        <div className="mb-4">
+                          <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
+                          <div className="flex flex-wrap gap-3 mb-3">
+                            {customPhotos.map((photo, index) => (
+                              <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
+                                <img
+                                  src={URL.createObjectURL(photo)}
+                                  alt={`Foto ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  onClick={() => removeCustomPhoto(index)}
+                                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {customPhotos.length < 3 && (
+                              <label className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                                <Camera className="w-6 h-6 text-muted-foreground mb-1" />
+                                <span className="text-xs text-muted-foreground">Foto</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleCustomPhotoUpload}
+                                  className="hidden"
+                                  multiple
+                                />
+                              </label>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{customPhotos.length}/3 foto's geüpload</p>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <Label className="text-sm mb-1 block">Beschrijving van uw idee *</Label>
+                          <Textarea
+                            value={customDescription}
+                            onChange={(e) => setCustomDescription(e.target.value)}
+                            placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
+                            rows={4}
+                            maxLength={2000}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
+                        </div>
+                      </div>
+                    )}
+
+                     {/* Notes */}
                     <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
                       <h2 className="text-xl font-bold mb-4">Extra informatie</h2>
                       <div className="space-y-4">
@@ -697,7 +829,24 @@ export default function NewOrder() {
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Overzicht</h3>
 
-                  {uploadMode === "link" ? (
+                  {uploadMode === "custom" ? (
+                    hasCustomOrder ? (
+                      <div className="space-y-3">
+                        <div className="text-sm border-b border-border pb-2">
+                          <p className="font-medium flex items-center gap-1">
+                            <Pencil className="w-3 h-3 text-accent" /> Custom opdracht
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{customDescription}</p>
+                          <p className="text-xs text-muted-foreground">{customPhotos.length} foto('s)</p>
+                        </div>
+                        <div className="border-t border-border pt-3">
+                          <p className="text-xs text-muted-foreground">Prijs wordt na controle vastgesteld (incl. ontwerpkosten).</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Upload foto's en voeg een beschrijving toe.</p>
+                    )
+                  ) : uploadMode === "link" ? (
                     fileLinks.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Voeg downloadlinks toe om te beginnen.</p>
                     ) : (
