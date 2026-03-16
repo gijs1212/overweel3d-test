@@ -651,6 +651,11 @@ export default function NewOrder() {
                               ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
                             </p>
                           </div>
+                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              📐 <strong>Afmetingen:</strong> Als op de afbeelding geen maten staan, zullen deze gegokt worden.
+                            </p>
+                          </div>
                         </div>
 
                         {/* Photo upload */}

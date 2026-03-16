@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2 } from "lucide-react";
+import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,7 @@ interface Order {
   customer_visible_notes: string;
   internal_notes: string;
   file_links: string;
+  order_method: string;
   submitted_at: string;
   approved_at: string | null;
   rejected_at: string | null;
@@ -320,8 +322,10 @@ export default function AdminOrderEdit() {
               </div>
             </div>
 
-            {/* File Links */}
-            {fileLinksArray.length > 0 && (
+            {/* Custom photos or File Links */}
+            {order.order_method === "custom" ? (
+              <CustomPhotosSection fileLinks={order.file_links} />
+            ) : fileLinksArray.length > 0 && (
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                 <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
                   <Link2 className="w-5 h-5" /> Downloadlinks ({fileLinksArray.length})
