@@ -322,8 +322,10 @@ export default function AdminOrderEdit() {
               </div>
             </div>
 
-            {/* File Links */}
-            {fileLinksArray.length > 0 && (
+            {/* Custom photos or File Links */}
+            {order.order_method === "custom" ? (
+              <CustomPhotosSection fileLinks={order.file_links} />
+            ) : fileLinksArray.length > 0 && (
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                 <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
                   <Link2 className="w-5 h-5" /> Downloadlinks ({fileLinksArray.length})
