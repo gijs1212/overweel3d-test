@@ -250,8 +250,10 @@ export default function OrderDetail() {
                 </div>
               </div>
 
-              {/* Files or Links */}
-              {order.order_method === "link" ? (
+              {/* Files, Links, or Custom */}
+              {order.order_method === "custom" ? (
+                <CustomPhotosSection fileLinks={order.file_links} />
+              ) : order.order_method === "link" ? (
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Links</h3>
                   <div className="space-y-2">
