@@ -42,6 +42,7 @@ interface Order {
   customer_visible_notes: string;
   internal_notes: string;
   file_links: string;
+  order_method: string;
   submitted_at: string;
   approved_at: string | null;
   rejected_at: string | null;
