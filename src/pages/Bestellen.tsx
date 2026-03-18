@@ -389,7 +389,7 @@ export default function Bestellen() {
           <div className="max-w-4xl mx-auto mb-8 space-y-3">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
-                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan u doorgegeven. Minimum bestelling is €5,-.
+                ⚠️ <strong>Belangrijk:</strong> De prijs voor custom prints wordt na de controle bepaald en aan u doorgegeven. Minimale bestelwaarde is €5,- totaal.
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
