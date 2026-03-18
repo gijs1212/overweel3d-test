@@ -197,10 +197,9 @@ export default function NewOrder() {
     let total = 0;
     for (const uf of uploadedFiles) {
       const perPiece = calculatePerPiecePrice(uf);
-      const perPieceWithMin = Math.max(perPiece, 5);
-      total += perPieceWithMin * uf.quantity;
+      total += perPiece * uf.quantity;
     }
-    return total;
+    return Math.max(total, 5);
   };
 
   const estimatedPrice = calculateEstimate();
@@ -361,7 +360,7 @@ export default function NewOrder() {
             <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door de admin vastgesteld. Minimum bestelling is €5,-.
+                <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door de admin vastgesteld. Minimale bestelwaarde is €5,- totaal.
               </p>
             </div>
           </div>
@@ -566,11 +565,9 @@ export default function NewOrder() {
                                       <div className="text-xs font-medium">
                                         {(() => {
                                           const perPiece = calculatePerPiecePrice(uf);
-                                          const isMinimum = perPiece < 5;
                                           return (
-                                            <span className={isMinimum ? "text-amber-600 dark:text-amber-400" : "text-accent"}>
-                                              💰 Kosten per stuk: €{Math.max(perPiece, 5).toFixed(2)}
-                                              {isMinimum && " (minimum)"}
+                                            <span className="text-accent">
+                                              💰 Kosten per stuk: €{perPiece.toFixed(2)}
                                             </span>
                                           );
                                         })()}
@@ -876,7 +873,6 @@ export default function NewOrder() {
                       <div className="space-y-3">
                         {uploadedFiles.map((uf, i) => {
                           const perPiece = calculatePerPiecePrice(uf);
-                          const perPieceWithMin = Math.max(perPiece, 5);
                           return (
                             <div key={i} className="text-sm border-b border-border pb-2">
                               <div className="flex justify-between">
@@ -889,7 +885,7 @@ export default function NewOrder() {
                               </p>
                               {uf.material && uf.estimatedGrams && (
                                 <p className="text-xs font-medium text-accent">
-                                  €{perPieceWithMin.toFixed(2)}/stuk{perPiece < 5 && " (min.)"} × {uf.quantity} = €{(perPieceWithMin * uf.quantity).toFixed(2)}
+                                  €{perPiece.toFixed(2)}/stuk × {uf.quantity} = €{(perPiece * uf.quantity).toFixed(2)}
                                 </p>
                               )}
                             </div>
@@ -909,7 +905,7 @@ export default function NewOrder() {
 
                   <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                     <p className="text-xs text-amber-800 dark:text-amber-200">
-                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimum bestelling is €5,-.
+                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimale bestelwaarde is €5,- totaal.
                     </p>
                   </div>
                 </div>
