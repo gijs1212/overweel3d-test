@@ -873,7 +873,6 @@ export default function NewOrder() {
                       <div className="space-y-3">
                         {uploadedFiles.map((uf, i) => {
                           const perPiece = calculatePerPiecePrice(uf);
-                          const perPieceWithMin = Math.max(perPiece, 5);
                           return (
                             <div key={i} className="text-sm border-b border-border pb-2">
                               <div className="flex justify-between">
@@ -886,7 +885,7 @@ export default function NewOrder() {
                               </p>
                               {uf.material && uf.estimatedGrams && (
                                 <p className="text-xs font-medium text-accent">
-                                  €{perPieceWithMin.toFixed(2)}/stuk{perPiece < 5 && " (min.)"} × {uf.quantity} = €{(perPieceWithMin * uf.quantity).toFixed(2)}
+                                  €{perPiece.toFixed(2)}/stuk × {uf.quantity} = €{(perPiece * uf.quantity).toFixed(2)}
                                 </p>
                               )}
                             </div>
