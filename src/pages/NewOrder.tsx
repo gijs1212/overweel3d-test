@@ -565,11 +565,9 @@ export default function NewOrder() {
                                       <div className="text-xs font-medium">
                                         {(() => {
                                           const perPiece = calculatePerPiecePrice(uf);
-                                          const isMinimum = perPiece < 5;
                                           return (
-                                            <span className={isMinimum ? "text-amber-600 dark:text-amber-400" : "text-accent"}>
-                                              💰 Kosten per stuk: €{Math.max(perPiece, 5).toFixed(2)}
-                                              {isMinimum && " (minimum)"}
+                                            <span className="text-accent">
+                                              💰 Kosten per stuk: €{perPiece.toFixed(2)}
                                             </span>
                                           );
                                         })()}
