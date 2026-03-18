@@ -197,10 +197,9 @@ export default function NewOrder() {
     let total = 0;
     for (const uf of uploadedFiles) {
       const perPiece = calculatePerPiecePrice(uf);
-      const perPieceWithMin = Math.max(perPiece, 5);
-      total += perPieceWithMin * uf.quantity;
+      total += perPiece * uf.quantity;
     }
-    return total;
+    return Math.max(total, 5);
   };
 
   const estimatedPrice = calculateEstimate();
