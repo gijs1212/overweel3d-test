@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
