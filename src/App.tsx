@@ -21,6 +21,9 @@ import OrderDetail from "./pages/OrderDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminOrderEdit from "./pages/AdminOrderEdit";
 import AdminNewOrder from "./pages/AdminNewOrder";
+import AdminBlog from "./pages/AdminBlog";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
