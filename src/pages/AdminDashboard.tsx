@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -78,9 +78,12 @@ export default function AdminDashboard() {
               <h1 className="text-2xl font-bold text-primary">🔒 Admin Dashboard</h1>
               <p className="text-muted-foreground">{orders.length} bestellingen totaal</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Link to="/admin/blog">
-                <Button variant="outline"><FileText className="w-4 h-4" /> Blog beheer</Button>
+                <Button variant="outline"><FileText className="w-4 h-4" /> Blog</Button>
+              </Link>
+              <Link to="/admin/content">
+                <Button variant="outline"><Megaphone className="w-4 h-4" /> Content</Button>
               </Link>
               <Link to="/admin/new-order">
                 <Button><Plus className="w-4 h-4" /> Bestelling aanmaken</Button>

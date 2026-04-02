@@ -6,7 +6,9 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
-
+import { OrderChat } from "@/components/OrderChat";
+import { PrintProgress } from "@/components/PrintProgress";
+import { DeliveryScheduler } from "@/components/DeliveryScheduler";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -36,6 +38,9 @@ interface Order {
   postal_code: string;
   city: string;
   country: string;
+  parts_total: number;
+  parts_per_plate: number;
+  plates_completed: number;
 }
 
 interface OrderFile {
@@ -53,6 +58,17 @@ interface OrderEvent {
   created_at: string;
 }
 
+interface Appointment {
+  id: string;
+  proposed_date: string;
+  proposed_time_slot: string;
+  status: string;
+  proposed_by: string;
+  customer_notes: string;
+  admin_notes: string;
+  created_at: string;
+}
+
 export default function OrderDetail() {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
@@ -61,120 +77,86 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [events, setEvents] = useState<OrderEvent[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchOrder = async () => {
     if (!token) return;
-
-    // Try fetching via edge function for token-based access
     const { data, error } = await supabase.functions.invoke("get-order-by-token", {
       body: { token },
     });
-
     if (error || !data?.order) {
       toast({ title: "Bestelling niet gevonden", variant: "destructive" });
       setLoading(false);
       return;
     }
-
     setOrder(data.order);
     setFiles(data.files || []);
     setEvents(data.events || []);
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchOrder();
-  }, [token]);
+  const fetchAppointments = async () => {
+    if (!order?.id) return;
+    const { data } = await supabase
+      .from("delivery_appointments")
+      .select("*")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: false });
+    setAppointments((data as Appointment[]) || []);
+  };
+
+  useEffect(() => { fetchOrder(); }, [token]);
+  useEffect(() => { if (order?.id) fetchAppointments(); }, [order?.id]);
 
   const handleAccept = async () => {
     if (!order) return;
     setActionLoading(true);
     try {
-      await supabase.functions.invoke("update-order-status", {
-        body: { token, action: "accept" },
-      });
+      await supabase.functions.invoke("update-order-status", { body: { token, action: "accept" } });
       toast({ title: "Bestelling geaccepteerd! 🎉" });
       await fetchOrder();
-    } catch (error) {
-      toast({ title: "Er ging iets mis", variant: "destructive" });
-    } finally {
-      setActionLoading(false);
-    }
+    } catch { toast({ title: "Er ging iets mis", variant: "destructive" }); }
+    finally { setActionLoading(false); }
   };
 
   const handleReject = async () => {
     if (!order) return;
     setActionLoading(true);
     try {
-      await supabase.functions.invoke("update-order-status", {
-        body: { token, action: "reject" },
-      });
+      await supabase.functions.invoke("update-order-status", { body: { token, action: "reject" } });
       toast({ title: "Bestelling afgewezen" });
       await fetchOrder();
-    } catch (error) {
-      toast({ title: "Er ging iets mis", variant: "destructive" });
-    } finally {
-      setActionLoading(false);
-    }
+    } catch { toast({ title: "Er ging iets mis", variant: "destructive" }); }
+    finally { setActionLoading(false); }
   };
 
   const downloadFile = async (storagePath: string, filename: string) => {
     const { data, error } = await supabase.storage.from("orders").download(storagePath);
     if (error) {
-      toast({
-        title: "Bestand niet beschikbaar",
-        description: "Dit bestand is verplaatst. Neem contact op met gijsoverweel@gmail.com als u een kopie van dit bestand wilt.",
-        variant: "destructive",
-      });
+      toast({ title: "Bestand niet beschikbaar", description: "Dit bestand is verplaatst. Neem contact op met gijsoverweel@gmail.com.", variant: "destructive" });
       return;
     }
     const url = URL.createObjectURL(data);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   };
 
-  const getFileUrl = (storagePath: string) => {
-    const { data } = supabase.storage.from("orders").getPublicUrl(storagePath);
-    return data?.publicUrl;
-  };
-
   if (loading) {
-    return (
-      <div className="min-h-screen">
-        <Navbar />
-        <main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="w-8 h-8 animate-spin text-accent" />
-        </main>
-        <Footer />
-      </div>
-    );
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-accent" /></main><Footer /></div>);
   }
 
   if (!order) {
-    return (
-      <div className="min-h-screen">
-        <Navbar />
-        <main className="pt-20 pb-16">
-          <div className="container mx-auto px-4 py-16 text-center">
-            <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-primary mb-2">Bestelling niet gevonden</h1>
-            <p className="text-muted-foreground">Controleer of de link correct is.</p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16"><div className="container mx-auto px-4 py-16 text-center"><AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" /><h1 className="text-2xl font-bold text-primary mb-2">Bestelling niet gevonden</h1><p className="text-muted-foreground">Controleer of de link correct is.</p></div></main><Footer /></div>);
   }
 
   const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.submitted;
   const showAcceptReject = order.status === "waiting_for_approval" && order.final_price;
   const isAccepted = order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production";
   const isRejected = order.status === "rejected_by_customer";
+  const showDelivery = order.status === "completed" || order.status === "in_production";
 
   return (
     <div className="min-h-screen">
@@ -182,11 +164,8 @@ export default function OrderDetail() {
       <main className="pt-20 pb-16">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           {isSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-8 text-center"
-            >
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+              className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-8 text-center">
               <PartyPopper className="w-12 h-12 text-green-600 mx-auto mb-3" />
               <h2 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Bestelling succesvol geplaatst! 🎉</h2>
               <p className="text-green-700 dark:text-green-300 text-sm">
@@ -208,6 +187,17 @@ export default function OrderDetail() {
                 {statusInfo.label}
               </span>
             </div>
+
+            {/* Print Progress */}
+            {order.parts_total > 0 && (
+              <div className="mb-6">
+                <PrintProgress
+                  partsTotal={order.parts_total}
+                  partsPerPlate={order.parts_per_plate}
+                  platesCompleted={order.plates_completed}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Pricing */}
@@ -232,10 +222,9 @@ export default function OrderDetail() {
                     </div>
                   )}
                 </div>
-
                 <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                   <p className="text-xs text-amber-800 dark:text-amber-200">
-                    ⚠️ De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimale bestelwaarde is €5,- totaal.
+                    ⚠️ De indicatieprijs is slechts een schatting. Minimale bestelwaarde is €5,- totaal.
                   </p>
                 </div>
               </div>
@@ -251,7 +240,7 @@ export default function OrderDetail() {
                 </div>
               </div>
 
-              {/* Files, Links, or Custom */}
+              {/* Files/Links/Custom */}
               {order.order_method === "custom" ? (
                 <CustomPhotosSection fileLinks={order.file_links} />
               ) : order.order_method === "link" ? (
@@ -261,14 +250,10 @@ export default function OrderDetail() {
                     {order.file_links?.split("\n").filter(Boolean).map((link, i) => (
                       <div key={i} className="p-3 bg-muted/50 rounded-lg">
                         <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-accent hover:underline break-all">
-                          <ExternalLink className="w-4 h-4 flex-shrink-0" />
-                          {link}
+                          <ExternalLink className="w-4 h-4 flex-shrink-0" /> {link}
                         </a>
                       </div>
                     ))}
-                    {(!order.file_links || order.file_links.trim() === "") && (
-                      <p className="text-sm text-muted-foreground">Geen links opgegeven.</p>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -276,16 +261,14 @@ export default function OrderDetail() {
                   <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
                   <div className="space-y-2">
                     {files.map((file) => (
-                      <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-accent" />
-                            <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                            <Download className="w-4 h-4" />
-                          </Button>
+                      <div key={file.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-accent" />
+                          <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
                         </div>
+                        <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                          <Download className="w-4 h-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -316,19 +299,14 @@ export default function OrderDetail() {
             {showAcceptReject && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 bg-card rounded-2xl p-8 shadow-overweel-card text-center">
                 <h3 className="text-xl font-bold text-primary mb-2">Uw definitieve offerte is klaar</h3>
-                <p className="text-muted-foreground mb-4">
-                  Wij hebben uw definitieve prijs vastgesteld. Bekijk het aanbod en kies om te accepteren of af te wijzen.
-                </p>
+                <p className="text-muted-foreground mb-4">Bekijk het aanbod en kies om te accepteren of af te wijzen.</p>
                 <p className="text-3xl font-bold text-accent mb-6">€{Number(order.final_price).toFixed(2)}</p>
-
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button onClick={handleAccept} disabled={actionLoading} size="lg" className="bg-green-600 hover:bg-green-700 text-white">
-                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Accepteren
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Accepteren
                   </Button>
                   <Button onClick={handleReject} disabled={actionLoading} variant="destructive" size="lg">
-                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                    Afwijzen
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Afwijzen
                   </Button>
                 </div>
               </motion.div>
@@ -352,18 +330,28 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* Rejected state */}
             {isRejected && (
               <div className="mt-8 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-2xl p-8 text-center">
                 <X className="w-12 h-12 text-red-600 mx-auto mb-3" />
                 <h3 className="text-xl font-bold text-red-800 dark:text-red-200 mb-2">Offerte afgewezen</h3>
                 <p className="text-red-700 dark:text-red-300">
-                  Jammer dat u geweigerd heeft. Vindt u de prijs te hoog of heeft u nog andere vragen? 
-                  Stuur ze dan naar{" "}
+                  Jammer dat u geweigerd heeft. Stuur uw vragen naar{" "}
                   <a href="mailto:gijsoverweel@gmail.com" className="underline font-semibold">Gijsoverweel@gmail.com</a>.
                 </p>
               </div>
             )}
+
+            {/* Delivery scheduling for completed/in production orders */}
+            {showDelivery && (
+              <div className="mt-6">
+                <DeliveryScheduler orderId={order.id} appointments={appointments} onUpdate={fetchAppointments} />
+              </div>
+            )}
+
+            {/* Chat */}
+            <div className="mt-6">
+              <OrderChat orderId={order.id} senderType="customer" orderNumber={order.order_number} />
+            </div>
 
             {/* Event timeline */}
             {events.length > 0 && (
@@ -375,9 +363,7 @@ export default function OrderDetail() {
                       <div className="w-2 h-2 rounded-full bg-accent mt-2 flex-shrink-0" />
                       <div>
                         <p className="text-sm">{event.event_description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(event.created_at).toLocaleString("nl-NL")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString("nl-NL")}</p>
                       </div>
                     </div>
                   ))}
