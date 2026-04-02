@@ -62,6 +62,53 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_appointments: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          customer_notes: string | null
+          id: string
+          order_id: string
+          proposed_by: string
+          proposed_date: string
+          proposed_time_slot: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          customer_notes?: string | null
+          id?: string
+          order_id: string
+          proposed_by: string
+          proposed_date: string
+          proposed_time_slot?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          customer_notes?: string | null
+          id?: string
+          order_id?: string
+          proposed_by?: string
+          proposed_date?: string
+          proposed_time_slot?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_appointments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exported_orders: {
         Row: {
           completed_at: string | null
@@ -173,6 +220,44 @@ export type Database = {
           },
         ]
       }
+      order_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          order_id: string
+          read: boolean
+          sender_id: string | null
+          sender_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          order_id: string
+          read?: boolean
+          sender_id?: string | null
+          sender_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          order_id?: string
+          read?: boolean
+          sender_id?: string | null
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           approved_at: string | null
@@ -187,6 +272,7 @@ export type Database = {
           customer_name: string
           customer_order_token: string
           customer_visible_notes: string | null
+          delivery_email: string | null
           file_links: string | null
           final_price: number | null
           id: string
@@ -196,7 +282,10 @@ export type Database = {
           notes: string | null
           order_method: string
           order_number: string
+          parts_per_plate: number | null
+          parts_total: number | null
           phone: string | null
+          plates_completed: number | null
           postal_code: string | null
           print_preferences: string | null
           quantity: number | null
@@ -223,6 +312,7 @@ export type Database = {
           customer_name: string
           customer_order_token?: string
           customer_visible_notes?: string | null
+          delivery_email?: string | null
           file_links?: string | null
           final_price?: number | null
           id?: string
@@ -232,7 +322,10 @@ export type Database = {
           notes?: string | null
           order_method?: string
           order_number: string
+          parts_per_plate?: number | null
+          parts_total?: number | null
           phone?: string | null
+          plates_completed?: number | null
           postal_code?: string | null
           print_preferences?: string | null
           quantity?: number | null
@@ -259,6 +352,7 @@ export type Database = {
           customer_name?: string
           customer_order_token?: string
           customer_visible_notes?: string | null
+          delivery_email?: string | null
           file_links?: string | null
           final_price?: number | null
           id?: string
@@ -268,7 +362,10 @@ export type Database = {
           notes?: string | null
           order_method?: string
           order_number?: string
+          parts_per_plate?: number | null
+          parts_total?: number | null
           phone?: string | null
+          plates_completed?: number | null
           postal_code?: string | null
           print_preferences?: string | null
           quantity?: number | null
