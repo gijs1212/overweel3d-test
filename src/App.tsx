@@ -53,6 +53,9 @@ const App = () => (
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/order/:orderId" element={<AdminOrderEdit />} />
             <Route path="/admin/new-order" element={<AdminNewOrder />} />
+            <Route path="/admin/blog" element={<AdminBlog />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
