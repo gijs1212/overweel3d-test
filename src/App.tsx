@@ -21,6 +21,9 @@ import OrderDetail from "./pages/OrderDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminOrderEdit from "./pages/AdminOrderEdit";
 import AdminNewOrder from "./pages/AdminNewOrder";
+import AdminBlog from "./pages/AdminBlog";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +53,9 @@ const App = () => (
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/order/:orderId" element={<AdminOrderEdit />} />
             <Route path="/admin/new-order" element={<AdminNewOrder />} />
+            <Route path="/admin/blog" element={<AdminBlog />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
