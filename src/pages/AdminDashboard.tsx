@@ -82,6 +82,9 @@ export default function AdminDashboard() {
               <Link to="/admin/blog">
                 <Button variant="outline"><FileText className="w-4 h-4" /> Blog</Button>
               </Link>
+              <Link to="/admin/products">
+                <Button variant="outline"><ShoppingBag className="w-4 h-4" /> Producten</Button>
+              </Link>
               <Link to="/admin/content">
                 <Button variant="outline"><Megaphone className="w-4 h-4" /> Content</Button>
               </Link>
