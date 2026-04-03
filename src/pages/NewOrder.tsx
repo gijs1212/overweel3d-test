@@ -271,6 +271,8 @@ export default function NewOrder() {
     ? uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color)
     : uploadMode === "link"
     ? fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color)
+    : uploadMode === "prebuilt"
+    ? prebuiltCart.length > 0
     : hasCustomOrder;
   
   const canProceed = allFilesConfigured;
