@@ -25,10 +25,7 @@ interface PlateTrackerProps {
  */
 async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; itemCount: number } | null> {
   try {
-    const { BlobReader, ZipReader, TextWriter } = await import("@aspect-run/zip" as any).catch(() => null) || {};
-    // Fallback: use JSZip-like approach with raw ZIP parsing
     const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
     
     // Simple ZIP parser to find 3dmodel.model
     const xmlContent = await extractXMLFrom3MF(bytes);
