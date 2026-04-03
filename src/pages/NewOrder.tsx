@@ -111,6 +111,24 @@ export default function NewOrder() {
     }
   });
 
+  // Fetch products
+  useEffect(() => {
+    supabase.from("products").select("*").eq("active", true).then(({ data }) => {
+      setProducts((data as ProductItem[]) || []);
+    });
+  }, []);
+
+  const addToPrebuiltCart = (product: ProductItem, material: string, color: string, quantity: number, customText?: string) => {
+    setPrebuiltCart(prev => [...prev, {
+      productId: product.id, name: product.name, quantity,
+      price: product.price * quantity, material, color, customText,
+    }]);
+    toast({ title: `${product.name} toegevoegd` });
+  };
+
+  const removeFromCart = (index: number) => setPrebuiltCart(prev => prev.filter((_, i) => i !== index));
+  const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
+
   const ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf", ".step", ".stp"];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
