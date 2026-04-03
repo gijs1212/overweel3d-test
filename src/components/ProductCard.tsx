@@ -9,6 +9,7 @@ import { MATERIALS } from "@/lib/constants";
 interface Product {
   id: string;
   name: string;
+  description?: string;
   price: number;
   materials: string[];
   colors: string[];
