@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
+import { ProductCard } from "@/components/ProductCard";
 
 interface UploadedFile {
   file: File;
