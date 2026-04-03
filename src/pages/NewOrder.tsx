@@ -459,6 +459,45 @@ export default function NewOrder() {
                        </div>
                      </div>
 
+                    {/* Prebuilt products */}
+                    {uploadMode === "prebuilt" && (
+                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                          <ShoppingBag className="w-6 h-6 text-accent" /> Kant-en-klare artikelen
+                        </h2>
+                        {products.length === 0 ? (
+                          <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
+                        ) : (
+                          <div className="space-y-4">
+                            {products.map(product => (
+                              <ProductCard key={product.id} product={product} onAdd={addToPrebuiltCart} />
+                            ))}
+                          </div>
+                        )}
+                        {prebuiltCart.length > 0 && (
+                          <div className="mt-6 border-t border-border pt-4">
+                            <h3 className="font-semibold mb-3">Winkelwagen</h3>
+                            {prebuiltCart.map((item, i) => (
+                              <div key={i} className="flex justify-between items-center py-2 border-b border-border">
+                                <div>
+                                  <p className="text-sm font-medium">{item.name} x{item.quantity}</p>
+                                  <p className="text-xs text-muted-foreground">{item.material} · {item.color}{item.customText ? ` · "${item.customText}"` : ""}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-accent">€{item.price.toFixed(2)}</span>
+                                  <Button variant="ghost" size="sm" onClick={() => removeFromCart(i)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="flex justify-between mt-3">
+                              <span className="font-semibold">Totaal</span>
+                              <span className="text-lg font-bold text-accent">€{prebuiltTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Link mode */}
                     {uploadMode === "link" && (
                       <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
