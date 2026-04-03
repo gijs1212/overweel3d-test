@@ -293,7 +293,6 @@ export default function NewOrder() {
       let fileLinksText = "";
 
       if (uploadMode === "custom") {
-        // Upload custom photos
         const timestamp = Date.now();
         const customPhotoUrls: string[] = [];
         for (const photo of customPhotos) {
@@ -306,6 +305,11 @@ export default function NewOrder() {
           }
         }
         fileLinksText = `CUSTOM OPDRACHT\nBeschrijving: ${customDescription}\nFoto's: ${customPhotoUrls.join(", ")}`;
+      } else if (uploadMode === "prebuilt") {
+        materialNames = prebuiltCart.map(i => i.material).join(", ");
+        colorNames = prebuiltCart.map(i => i.color).join(", ");
+        totalQuantity = prebuiltCart.reduce((s, i) => s + i.quantity, 0);
+        fileLinksText = `KANT-EN-KLARE ARTIKELEN\n${prebuiltCart.map(i => `${i.name} x${i.quantity} - ${i.material} ${i.color}${i.customText ? ` (${i.customText})` : ""} - €${i.price.toFixed(2)}`).join("\n")}`;
       } else {
         const items = uploadMode === "file" ? uploadedFiles : fileLinks;
         materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
