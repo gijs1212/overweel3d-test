@@ -35,13 +35,37 @@ interface FileLink {
   quantity: number;
 }
 
+interface ProductItem {
+  id: string;
+  name: string;
+  price: number;
+  materials: string[];
+  colors: string[];
+  photos: string[];
+  custom_text_enabled: boolean;
+  custom_text_label: string;
+  custom_text_max_length: number;
+}
+
+interface CartItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  material: string;
+  color: string;
+  customText?: string;
+}
+
 export default function NewOrder() {
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom">("link");
+  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom" | "prebuilt">("link");
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [prebuiltCart, setPrebuiltCart] = useState<CartItem[]>([]);
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
