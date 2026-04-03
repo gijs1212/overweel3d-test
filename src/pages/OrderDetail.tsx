@@ -4,11 +4,12 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
-import { OrderChat } from "@/components/OrderChat";
 import { PrintProgress } from "@/components/PrintProgress";
-import { DeliveryScheduler } from "@/components/DeliveryScheduler";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -41,33 +42,15 @@ interface Order {
   parts_total: number;
   parts_per_plate: number;
   plates_completed: number;
+  shipping_carrier?: string;
+  tracking_code?: string;
+  shipping_cost?: number;
 }
 
-interface OrderFile {
-  id: string;
-  storage_path: string;
-  original_filename: string;
-  file_size: number;
-}
-
-interface OrderEvent {
-  id: string;
-  event_type: string;
-  event_description: string;
-  visible_to_customer: boolean;
-  created_at: string;
-}
-
-interface Appointment {
-  id: string;
-  proposed_date: string;
-  proposed_time_slot: string;
-  status: string;
-  proposed_by: string;
-  customer_notes: string;
-  admin_notes: string;
-  created_at: string;
-}
+interface OrderFile { id: string; storage_path: string; original_filename: string; file_size: number; }
+interface OrderEvent { id: string; event_type: string; event_description: string; visible_to_customer: boolean; created_at: string; }
+interface Message { id: string; sender_type: string; message: string; created_at: string; read: boolean; }
+interface Appointment { id: string; proposed_date: string; proposed_time_slot: string; status: string; proposed_by: string; customer_notes: string; admin_notes: string; created_at: string; }
 
 export default function OrderDetail() {
   const { token } = useParams<{ token: string }>();
@@ -77,15 +60,21 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [events, setEvents] = useState<OrderEvent[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [showDeliveryForm, setShowDeliveryForm] = useState(false);
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryTime, setDeliveryTime] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [proposingDelivery, setProposingDelivery] = useState(false);
 
   const fetchOrder = async () => {
     if (!token) return;
-    const { data, error } = await supabase.functions.invoke("get-order-by-token", {
-      body: { token },
-    });
+    const { data, error } = await supabase.functions.invoke("get-order-by-token", { body: { token } });
     if (error || !data?.order) {
       toast({ title: "Bestelling niet gevonden", variant: "destructive" });
       setLoading(false);
@@ -94,21 +83,12 @@ export default function OrderDetail() {
     setOrder(data.order);
     setFiles(data.files || []);
     setEvents(data.events || []);
+    setMessages(data.messages || []);
+    setAppointments(data.appointments || []);
     setLoading(false);
   };
 
-  const fetchAppointments = async () => {
-    if (!order?.id) return;
-    const { data } = await supabase
-      .from("delivery_appointments")
-      .select("*")
-      .eq("order_id", order.id)
-      .order("created_at", { ascending: false });
-    setAppointments((data as Appointment[]) || []);
-  };
-
   useEffect(() => { fetchOrder(); }, [token]);
-  useEffect(() => { if (order?.id) fetchAppointments(); }, [order?.id]);
 
   const handleAccept = async () => {
     if (!order) return;
@@ -135,13 +115,44 @@ export default function OrderDetail() {
   const downloadFile = async (storagePath: string, filename: string) => {
     const { data, error } = await supabase.storage.from("orders").download(storagePath);
     if (error) {
-      toast({ title: "Bestand niet beschikbaar", description: "Dit bestand is verplaatst. Neem contact op met gijsoverweel@gmail.com.", variant: "destructive" });
+      toast({ title: "Bestand niet beschikbaar", variant: "destructive" });
       return;
     }
     const url = URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !token) return;
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("get-order-by-token", {
+        body: { token, action: "send_message", message: newMessage.trim() },
+      });
+      if (error) throw error;
+      setNewMessage("");
+      toast({ title: "Bericht verzonden ✅" });
+      await fetchOrder();
+    } catch (e: any) {
+      toast({ title: "Verzenden mislukt", variant: "destructive" });
+    } finally { setSending(false); }
+  };
+
+  const handleProposeDelivery = async () => {
+    if (!deliveryDate || !token) return;
+    setProposingDelivery(true);
+    try {
+      await supabase.functions.invoke("get-order-by-token", {
+        body: { token, action: "propose_delivery", appointmentData: { date: deliveryDate, timeSlot: deliveryTime, notes: deliveryNotes } },
+      });
+      toast({ title: "Bezorgvoorstel ingediend ✅" });
+      setShowDeliveryForm(false);
+      setDeliveryDate(""); setDeliveryTime(""); setDeliveryNotes("");
+      await fetchOrder();
+    } catch {
+      toast({ title: "Fout", variant: "destructive" });
+    } finally { setProposingDelivery(false); }
   };
 
   if (loading) {
@@ -156,7 +167,14 @@ export default function OrderDetail() {
   const showAcceptReject = order.status === "waiting_for_approval" && order.final_price;
   const isAccepted = order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production";
   const isRejected = order.status === "rejected_by_customer";
-  const showDelivery = order.status === "completed" || order.status === "in_production";
+  const totalPrice = (order.final_price || 0) + (order.shipping_cost || 0);
+
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+    confirmed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+  const statusLabels: Record<string, string> = { pending: "In afwachting", confirmed: "Bevestigd", cancelled: "Geannuleerd" };
 
   return (
     <div className="min-h-screen">
@@ -170,6 +188,9 @@ export default function OrderDetail() {
               <h2 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Bestelling succesvol geplaatst! 🎉</h2>
               <p className="text-green-700 dark:text-green-300 text-sm">
                 U ontvangt een bevestigingsmail op <strong>{order.customer_email}</strong>. Bewaar deze link om uw bestelling te volgen.
+              </p>
+              <p className="text-green-600 dark:text-green-400 text-xs mt-2">
+                📧 Als u geen email ontvangt, kijk dan in uw spam/ongewenste berichten.
               </p>
             </motion.div>
           )}
@@ -188,16 +209,17 @@ export default function OrderDetail() {
               </span>
             </div>
 
-            {/* Print Progress */}
-            {order.parts_total > 0 && (
-              <div className="mb-6">
-                <PrintProgress
-                  partsTotal={order.parts_total}
-                  partsPerPlate={order.parts_per_plate}
-                  platesCompleted={order.plates_completed}
-                />
+            {/* Productie voortgang - always show when in_production or parts_total > 0 */}
+            <div className="mb-6">
+              <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50">
+                <h3 className="font-bold text-primary mb-4">🏭 Productie</h3>
+                {order.parts_total > 0 ? (
+                  <PrintProgress partsTotal={order.parts_total} partsPerPlate={order.parts_per_plate} platesCompleted={order.plates_completed} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Productie-informatie wordt bijgewerkt zodra de productie start.</p>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Pricing */}
@@ -206,12 +228,24 @@ export default function OrderDetail() {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Indicatieprijs</span>
-                    <span className="font-medium">€{Number(order.instant_quote_price).toFixed(2)}</span>
+                    <span className="font-medium">€{Number(order.instant_quote_price || 0).toFixed(2)}</span>
                   </div>
-                  {order.final_price && (
+                  {order.final_price != null && order.final_price > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Definitieve prijs</span>
+                      <span className="font-semibold text-accent">€{Number(order.final_price).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {(order.shipping_cost || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Verzendkosten ({order.shipping_carrier || "Verzending"})</span>
+                      <span className="font-medium">€{Number(order.shipping_cost).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.final_price != null && order.final_price > 0 && (
                     <div className="flex justify-between border-t border-border pt-3">
-                      <span className="font-semibold text-primary">Definitieve prijs</span>
-                      <span className="text-xl font-bold text-accent">€{Number(order.final_price).toFixed(2)}</span>
+                      <span className="font-semibold text-primary">Totaal</span>
+                      <span className="text-xl font-bold text-accent">€{totalPrice.toFixed(2)}</span>
                     </div>
                   )}
                   {order.tikkie_link && (
@@ -233,11 +267,46 @@ export default function OrderDetail() {
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                 <h3 className="font-bold text-primary mb-4">Besteldetails</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Materiaal</span><span>{order.material}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Kleur</span><span>{order.color}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Materiaal</span><span>{order.material || "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Kleur</span><span>{order.color || "—"}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Aantal</span><span>{order.quantity}</span></div>
                   {order.notes && <div className="pt-2 border-t border-border"><span className="text-muted-foreground block mb-1">Opmerkingen</span><p>{order.notes}</p></div>}
                 </div>
+              </div>
+
+              {/* Shipping / Track & Trace */}
+              <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                <h3 className="font-bold text-primary mb-4 flex items-center gap-2"><Truck className="w-5 h-5" /> Verzending</h3>
+                {order.shipping_carrier && order.tracking_code ? (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Vervoerder</span>
+                      <span className="font-medium">{order.shipping_carrier}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Track & Trace</span>
+                      <a
+                        href={order.shipping_carrier.toLowerCase().includes("postnl")
+                          ? `https://postnl.nl/tracktrace/?B=${order.tracking_code}`
+                          : order.shipping_carrier.toLowerCase().includes("dhl")
+                          ? `https://www.dhl.nl/nl/particulier/pakket-ontvangen/verzending-volgen.html?tracking-id=${order.tracking_code}`
+                          : `#`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-accent hover:underline font-medium"
+                      >
+                        {order.tracking_code}
+                      </a>
+                    </div>
+                    {(order.shipping_cost || 0) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Verzendkosten</span>
+                        <span>€{Number(order.shipping_cost).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Verzendgegevens worden bijgewerkt zodra het pakket is verzonden.</p>
+                )}
               </div>
 
               {/* Files/Links/Custom */}
@@ -259,19 +328,23 @@ export default function OrderDetail() {
               ) : (
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
-                  <div className="space-y-2">
-                    {files.map((file) => (
-                      <div key={file.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-accent" />
-                          <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                  {files.length > 0 ? (
+                    <div className="space-y-2">
+                      {files.map((file) => (
+                        <div key={file.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-accent" />
+                            <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                            <Download className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Geen bestanden geüpload.</p>
+                  )}
                 </div>
               )}
 
@@ -300,7 +373,10 @@ export default function OrderDetail() {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 bg-card rounded-2xl p-8 shadow-overweel-card text-center">
                 <h3 className="text-xl font-bold text-primary mb-2">Uw definitieve offerte is klaar</h3>
                 <p className="text-muted-foreground mb-4">Bekijk het aanbod en kies om te accepteren of af te wijzen.</p>
-                <p className="text-3xl font-bold text-accent mb-6">€{Number(order.final_price).toFixed(2)}</p>
+                <p className="text-3xl font-bold text-accent mb-6">€{totalPrice.toFixed(2)}</p>
+                {(order.shipping_cost || 0) > 0 && (
+                  <p className="text-sm text-muted-foreground mb-4">incl. €{Number(order.shipping_cost).toFixed(2)} verzendkosten</p>
+                )}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button onClick={handleAccept} disabled={actionLoading} size="lg" className="bg-green-600 hover:bg-green-700 text-white">
                     {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Accepteren
@@ -341,22 +417,119 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* Delivery scheduling for completed/in production orders */}
-            {showDelivery && (
-              <div className="mt-6">
-                <DeliveryScheduler orderId={order.id} appointments={appointments} onUpdate={fetchAppointments} />
+            {/* Bezorgafspraken */}
+            <div className="mt-6">
+              <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50">
+                <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-accent" /> Bezorgafspraken
+                </h3>
+
+                {appointments.length > 0 ? (
+                  <div className="space-y-3 mb-4">
+                    {appointments.map((apt) => (
+                      <div key={apt.id} className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">
+                              {new Date(apt.proposed_date).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })}
+                              {apt.proposed_time_slot && ` — ${apt.proposed_time_slot}`}
+                            </span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[apt.status] || ""}`}>
+                            {statusLabels[apt.status] || apt.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Voorgesteld door {apt.proposed_by === "admin" ? "Overweel3D" : "u"}
+                        </p>
+                        {apt.customer_notes && <p className="text-sm mt-1">U: {apt.customer_notes}</p>}
+                        {apt.admin_notes && <p className="text-sm mt-1">Overweel3D: {apt.admin_notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-4">Nog geen bezorgafspraken. Doe hieronder een voorstel.</p>
+                )}
+
+                {showDeliveryForm ? (
+                  <div className="space-y-3 border-t border-border pt-4">
+                    <div>
+                      <Label>Datum</Label>
+                      <Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
+                    </div>
+                    <div>
+                      <Label>Tijdvak (optioneel)</Label>
+                      <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="bijv. 's ochtends, 14:00-16:00" />
+                    </div>
+                    <div>
+                      <Label>Opmerking (optioneel)</Label>
+                      <Textarea value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} rows={2} />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleProposeDelivery} disabled={proposingDelivery || !deliveryDate} size="sm">
+                        {proposingDelivery ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                        Voorstel indienen
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowDeliveryForm(false)}>Annuleren</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowDeliveryForm(true)}>
+                    <Calendar className="w-4 h-4" /> Bezorgmoment voorstellen
+                  </Button>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Chat */}
             <div className="mt-6">
-              <OrderChat orderId={order.id} senderType="customer" orderNumber={order.order_number} />
+              <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50">
+                <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-accent" /> Berichten — {order.order_number}
+                </h3>
+
+                <div className="space-y-3 max-h-[400px] overflow-y-auto mb-4">
+                  {messages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nog geen berichten. Stel hier uw vragen.</p>
+                  ) : (
+                    messages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.sender_type === "customer" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                          msg.sender_type === "customer"
+                            ? "bg-accent text-accent-foreground rounded-br-md"
+                            : "bg-muted text-foreground rounded-bl-md"
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                          <p className={`text-[10px] mt-1 ${msg.sender_type === "customer" ? "text-accent-foreground/60" : "text-muted-foreground"}`}>
+                            {msg.sender_type === "admin" ? "Overweel3D" : "U"} · {new Date(msg.created_at).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Textarea
+                    value={newMessage}
+                    onChange={e => setNewMessage(e.target.value)}
+                    placeholder="Typ een bericht..."
+                    rows={2}
+                    className="resize-none"
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                  />
+                  <Button onClick={handleSendMessage} disabled={sending || !newMessage.trim()} size="sm" className="self-end">
+                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Event timeline */}
-            {events.length > 0 && (
-              <div className="mt-8 bg-card rounded-2xl p-6 shadow-overweel-card">
-                <h3 className="font-bold text-primary mb-4">Tijdlijn</h3>
+            <div className="mt-8 bg-card rounded-2xl p-6 shadow-overweel-card">
+              <h3 className="font-bold text-primary mb-4">Tijdlijn</h3>
+              {events.length > 0 ? (
                 <div className="space-y-4">
                   {events.map((event) => (
                     <div key={event.id} className="flex gap-3">
@@ -368,8 +541,10 @@ export default function OrderDetail() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">Nog geen updates beschikbaar.</p>
+              )}
+            </div>
           </motion.div>
         </div>
       </main>
