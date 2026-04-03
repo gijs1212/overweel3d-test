@@ -285,6 +285,8 @@ export type Database = {
           parts_per_plate: number | null
           parts_total: number | null
           phone: string | null
+          plate_runs_completed: Json | null
+          plate_runs_required: number | null
           plates_completed: number | null
           postal_code: string | null
           print_preferences: string | null
@@ -292,9 +294,12 @@ export type Database = {
           rejected_at: string | null
           saved: boolean
           shipping_address: string | null
+          shipping_carrier: string | null
+          shipping_cost: number | null
           status: Database["public"]["Enums"]["order_status"]
           submitted_at: string | null
           tikkie_link: string | null
+          tracking_code: string | null
           updated_at: string | null
           user_id: string | null
           vat_number: string | null
@@ -325,6 +330,8 @@ export type Database = {
           parts_per_plate?: number | null
           parts_total?: number | null
           phone?: string | null
+          plate_runs_completed?: Json | null
+          plate_runs_required?: number | null
           plates_completed?: number | null
           postal_code?: string | null
           print_preferences?: string | null
@@ -332,9 +339,12 @@ export type Database = {
           rejected_at?: string | null
           saved?: boolean
           shipping_address?: string | null
+          shipping_carrier?: string | null
+          shipping_cost?: number | null
           status?: Database["public"]["Enums"]["order_status"]
           submitted_at?: string | null
           tikkie_link?: string | null
+          tracking_code?: string | null
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
@@ -365,6 +375,8 @@ export type Database = {
           parts_per_plate?: number | null
           parts_total?: number | null
           phone?: string | null
+          plate_runs_completed?: Json | null
+          plate_runs_required?: number | null
           plates_completed?: number | null
           postal_code?: string | null
           print_preferences?: string | null
@@ -372,12 +384,63 @@ export type Database = {
           rejected_at?: string | null
           saved?: boolean
           shipping_address?: string | null
+          shipping_carrier?: string | null
+          shipping_cost?: number | null
           status?: Database["public"]["Enums"]["order_status"]
           submitted_at?: string | null
           tikkie_link?: string | null
+          tracking_code?: string | null
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          colors: string[]
+          created_at: string
+          custom_text_enabled: boolean
+          custom_text_label: string
+          custom_text_max_length: number
+          description: string
+          id: string
+          materials: string[]
+          name: string
+          photos: string[]
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          colors?: string[]
+          created_at?: string
+          custom_text_enabled?: boolean
+          custom_text_label?: string
+          custom_text_max_length?: number
+          description?: string
+          id?: string
+          materials?: string[]
+          name: string
+          photos?: string[]
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          colors?: string[]
+          created_at?: string
+          custom_text_enabled?: boolean
+          custom_text_label?: string
+          custom_text_max_length?: number
+          description?: string
+          id?: string
+          materials?: string[]
+          name?: string
+          photos?: string[]
+          price?: number
+          updated_at?: string
         }
         Relationships: []
       }

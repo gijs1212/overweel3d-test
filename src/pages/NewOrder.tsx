@@ -9,13 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera } from "lucide-react";
+import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
+import { ProductCard } from "@/components/ProductCard";
 
 interface UploadedFile {
   file: File;
@@ -35,13 +36,37 @@ interface FileLink {
   quantity: number;
 }
 
+interface ProductItem {
+  id: string;
+  name: string;
+  price: number;
+  materials: string[];
+  colors: string[];
+  photos: string[];
+  custom_text_enabled: boolean;
+  custom_text_label: string;
+  custom_text_max_length: number;
+}
+
+interface CartItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  material: string;
+  color: string;
+  customText?: string;
+}
+
 export default function NewOrder() {
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom">("link");
+  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom" | "prebuilt">("link");
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [prebuiltCart, setPrebuiltCart] = useState<CartItem[]>([]);
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -86,6 +111,24 @@ export default function NewOrder() {
       }));
     }
   });
+
+  // Fetch products
+  useEffect(() => {
+    supabase.from("products").select("*").eq("active", true).then(({ data }) => {
+      setProducts((data as ProductItem[]) || []);
+    });
+  }, []);
+
+  const addToPrebuiltCart = (product: ProductItem, material: string, color: string, quantity: number, customText?: string) => {
+    setPrebuiltCart(prev => [...prev, {
+      productId: product.id, name: product.name, quantity,
+      price: product.price * quantity, material, color, customText,
+    }]);
+    toast({ title: `${product.name} toegevoegd` });
+  };
+
+  const removeFromCart = (index: number) => setPrebuiltCart(prev => prev.filter((_, i) => i !== index));
+  const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
 
   const ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf", ".step", ".stp"];
 
@@ -229,6 +272,8 @@ export default function NewOrder() {
     ? uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color)
     : uploadMode === "link"
     ? fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color)
+    : uploadMode === "prebuilt"
+    ? prebuiltCart.length > 0
     : hasCustomOrder;
   
   const canProceed = allFilesConfigured;
@@ -249,7 +294,6 @@ export default function NewOrder() {
       let fileLinksText = "";
 
       if (uploadMode === "custom") {
-        // Upload custom photos
         const timestamp = Date.now();
         const customPhotoUrls: string[] = [];
         for (const photo of customPhotos) {
@@ -262,6 +306,11 @@ export default function NewOrder() {
           }
         }
         fileLinksText = `CUSTOM OPDRACHT\nBeschrijving: ${customDescription}\nFoto's: ${customPhotoUrls.join(", ")}`;
+      } else if (uploadMode === "prebuilt") {
+        materialNames = prebuiltCart.map(i => i.material).join(", ");
+        colorNames = prebuiltCart.map(i => i.color).join(", ");
+        totalQuantity = prebuiltCart.reduce((s, i) => s + i.quantity, 0);
+        fileLinksText = `KANT-EN-KLARE ARTIKELEN\n${prebuiltCart.map(i => `${i.name} x${i.quantity} - ${i.material} ${i.color}${i.customText ? ` (${i.customText})` : ""} - €${i.price.toFixed(2)}`).join("\n")}`;
       } else {
         const items = uploadMode === "file" ? uploadedFiles : fileLinks;
         materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
@@ -287,9 +336,9 @@ export default function NewOrder() {
           material: materialNames,
           color: colorNames,
           quantity: totalQuantity,
-          notes: uploadMode === "custom" ? `[CUSTOM OPDRACHT] ${customDescription}\n\n${formData.notes}` : formData.notes,
+          notes: uploadMode === "custom" ? `[CUSTOM OPDRACHT] ${customDescription}\n\n${formData.notes}` : uploadMode === "prebuilt" ? `[KANT-EN-KLAAR]\n${formData.notes}` : formData.notes,
           print_preferences: formData.print_preferences,
-          instant_quote_price: uploadMode === "file" ? estimatedPrice : 0,
+          instant_quote_price: uploadMode === "file" ? estimatedPrice : uploadMode === "prebuilt" ? prebuiltTotal : 0,
           file_links: fileLinksText,
           order_method: uploadMode,
           status: "submitted",
@@ -395,30 +444,60 @@ export default function NewOrder() {
                        <p className="text-sm text-muted-foreground mb-4">
                          Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden en custom opdrachten kan ook.
                        </p>
-                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                         <Button
-                           variant={uploadMode === "link" ? "default" : "outline"}
-                           onClick={() => setUploadMode("link")}
-                           className="flex-1"
-                         >
+                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                         <Button variant={uploadMode === "link" ? "default" : "outline"} onClick={() => setUploadMode("link")} className="flex-1">
                            <Link2 className="w-4 h-4" /> Downloadlink
                          </Button>
-                         <Button
-                           variant={uploadMode === "file" ? "default" : "outline"}
-                           onClick={() => setUploadMode("file")}
-                           className="flex-1"
-                         >
+                         <Button variant={uploadMode === "file" ? "default" : "outline"} onClick={() => setUploadMode("file")} className="flex-1">
                            <Upload className="w-4 h-4" /> Bestand uploaden
                          </Button>
-                         <Button
-                           variant={uploadMode === "custom" ? "default" : "outline"}
-                           onClick={() => setUploadMode("custom")}
-                           className="flex-1"
-                         >
+                         <Button variant={uploadMode === "prebuilt" ? "default" : "outline"} onClick={() => setUploadMode("prebuilt")} className="flex-1">
+                           <ShoppingBag className="w-4 h-4" /> Kant-en-klaar
+                         </Button>
+                         <Button variant={uploadMode === "custom" ? "default" : "outline"} onClick={() => setUploadMode("custom")} className="flex-1">
                            <Pencil className="w-4 h-4" /> Custom opdracht
                          </Button>
                        </div>
                      </div>
+
+                    {/* Prebuilt products */}
+                    {uploadMode === "prebuilt" && (
+                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                          <ShoppingBag className="w-6 h-6 text-accent" /> Kant-en-klare artikelen
+                        </h2>
+                        {products.length === 0 ? (
+                          <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
+                        ) : (
+                          <div className="space-y-4">
+                            {products.map(product => (
+                              <ProductCard key={product.id} product={product} onAdd={addToPrebuiltCart} />
+                            ))}
+                          </div>
+                        )}
+                        {prebuiltCart.length > 0 && (
+                          <div className="mt-6 border-t border-border pt-4">
+                            <h3 className="font-semibold mb-3">Winkelwagen</h3>
+                            {prebuiltCart.map((item, i) => (
+                              <div key={i} className="flex justify-between items-center py-2 border-b border-border">
+                                <div>
+                                  <p className="text-sm font-medium">{item.name} x{item.quantity}</p>
+                                  <p className="text-xs text-muted-foreground">{item.material} · {item.color}{item.customText ? ` · "${item.customText}"` : ""}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-accent">€{item.price.toFixed(2)}</span>
+                                  <Button variant="ghost" size="sm" onClick={() => removeFromCart(i)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="flex justify-between mt-3">
+                              <span className="font-semibold">Totaal</span>
+                              <span className="text-lg font-bold text-accent">€{prebuiltTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Link mode */}
                     {uploadMode === "link" && (

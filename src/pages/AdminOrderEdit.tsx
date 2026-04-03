@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2 } from "lucide-react";
+import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2, Truck } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { OrderChat } from "@/components/OrderChat";
 import { DeliveryScheduler } from "@/components/DeliveryScheduler";
+import { PlateTracker } from "@/components/PlateTracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +29,8 @@ interface Order {
   rejected_at: string | null; created_at: string; updated_at: string;
   parts_total: number; parts_per_plate: number; plates_completed: number;
   delivery_email: string;
+  shipping_carrier: string; tracking_code: string; shipping_cost: number;
+  plate_runs_required: number; plate_runs_completed: any;
 }
 
 interface OrderFile { id: string; storage_path: string; original_filename: string; file_size: number; mime_type: string; }
@@ -52,10 +55,15 @@ export default function AdminOrderEdit() {
   const [status, setStatus] = useState<OrderStatus>("submitted");
   const [customerNotes, setCustomerNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
-  const [partsTotal, setPartsTotal] = useState("0");
-  const [partsPerPlate, setPartsPerPlate] = useState("1");
-  const [platesCompleted, setPlatesCompleted] = useState("0");
+  const [partsTotal, setPartsTotal] = useState(0);
+  const [partsPerPlate, setPartsPerPlate] = useState(1);
+  const [platesCompleted, setPlatesCompleted] = useState(0);
+  const [plateRunsRequired, setPlateRunsRequired] = useState(1);
+  const [plateRunsCompleted, setPlateRunsCompleted] = useState<number[]>([]);
   const [deliveryEmail, setDeliveryEmail] = useState("");
+  const [shippingCarrier, setShippingCarrier] = useState("");
+  const [trackingCode, setTrackingCode] = useState("");
+  const [shippingCost, setShippingCost] = useState("");
   const [originalFinalPrice, setOriginalFinalPrice] = useState<number | null>(null);
 
   const fetchAppointments = async () => {
@@ -69,17 +77,22 @@ export default function AdminOrderEdit() {
     const load = async () => {
       const { data: orderData } = await supabase.from("orders").select("*").eq("id", orderId).single();
       if (orderData) {
-        const o = orderData as Order;
+        const o = orderData as unknown as Order;
         setOrder(o);
         setFinalPrice(o.final_price?.toString() || "");
         setTikkieLink(o.tikkie_link || "");
         setStatus(o.status);
         setCustomerNotes(o.customer_visible_notes || "");
         setInternalNotes(o.internal_notes || "");
-        setPartsTotal(String(o.parts_total || 0));
-        setPartsPerPlate(String(o.parts_per_plate || 1));
-        setPlatesCompleted(String(o.plates_completed || 0));
+        setPartsTotal(o.parts_total || 0);
+        setPartsPerPlate(o.parts_per_plate || 1);
+        setPlatesCompleted(o.plates_completed || 0);
+        setPlateRunsRequired(o.plate_runs_required || 1);
+        setPlateRunsCompleted(Array.isArray(o.plate_runs_completed) ? o.plate_runs_completed : []);
         setDeliveryEmail(o.delivery_email || "");
+        setShippingCarrier(o.shipping_carrier || "");
+        setTrackingCode(o.tracking_code || "");
+        setShippingCost(o.shipping_cost?.toString() || "");
         setOriginalFinalPrice(o.final_price);
       }
       const { data: filesData } = await supabase.from("order_files").select("*").eq("order_id", orderId);
@@ -108,10 +121,15 @@ export default function AdminOrderEdit() {
         status: effectiveStatus,
         customer_visible_notes: customerNotes,
         internal_notes: internalNotes,
-        parts_total: parseInt(partsTotal) || 0,
-        parts_per_plate: parseInt(partsPerPlate) || 1,
-        plates_completed: parseInt(platesCompleted) || 0,
+        parts_total: partsTotal,
+        parts_per_plate: partsPerPlate,
+        plates_completed: platesCompleted,
+        plate_runs_required: plateRunsRequired,
+        plate_runs_completed: plateRunsCompleted,
         delivery_email: deliveryEmail,
+        shipping_carrier: shippingCarrier,
+        tracking_code: trackingCode,
+        shipping_cost: shippingCost ? parseFloat(shippingCost) : 0,
         saved: false,
       }).eq("id", order.id);
       if (error) throw error;
@@ -132,7 +150,7 @@ export default function AdminOrderEdit() {
       toast({ title: isAdminOrder ? "Opgeslagen! ✅" : "Opgeslagen! Klant op de hoogte gebracht. ✉️" });
       setOriginalFinalPrice(newFinalPrice);
       setStatus(effectiveStatus);
-      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes, parts_total: parseInt(partsTotal) || 0, parts_per_plate: parseInt(partsPerPlate) || 1, plates_completed: parseInt(platesCompleted) || 0, delivery_email: deliveryEmail });
+      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes, parts_total: partsTotal, parts_per_plate: partsPerPlate, plates_completed: platesCompleted, delivery_email: deliveryEmail, shipping_carrier: shippingCarrier, tracking_code: trackingCode, shipping_cost: parseFloat(shippingCost) || 0, plate_runs_required: plateRunsRequired, plate_runs_completed: plateRunsCompleted });
     } catch (error: any) {
       toast({ title: "Fout bij opslaan", description: error.message, variant: "destructive" });
     } finally { setSaving(false); }
@@ -204,7 +222,6 @@ export default function AdminOrderEdit() {
   const statusInfo = ORDER_STATUSES[order.status];
   const isAdminOrder = order.customer_email === "admin@overweel3d.nl";
   const fileLinksArray = order.file_links ? order.file_links.split("\n").filter(Boolean) : [];
-  const totalPlates = Math.ceil((parseInt(partsTotal) || 0) / (parseInt(partsPerPlate) || 1));
 
   return (
     <div className="min-h-screen">
@@ -324,29 +341,53 @@ export default function AdminOrderEdit() {
                   <Input value={tikkieLink} onChange={(e) => setTikkieLink(e.target.value)} placeholder="https://tikkie.me/..." />
                 </div>
 
-                {/* Plate tracking */}
+                {/* Shipping */}
                 <div className="md:col-span-2 border-t border-border pt-4">
-                  <h4 className="font-semibold text-primary mb-3">🖨️ Platen-tracking</h4>
+                  <h4 className="font-semibold text-primary mb-3 flex items-center gap-2"><Truck className="w-4 h-4" /> Verzending</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label>Totaal onderdelen</Label>
-                      <Input type="number" value={partsTotal} onChange={(e) => setPartsTotal(e.target.value)} min="0" />
+                      <Label>Vervoerder</Label>
+                      <Select value={shippingCarrier} onValueChange={setShippingCarrier}>
+                        <SelectTrigger><SelectValue placeholder="Kies vervoerder" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Geen</SelectItem>
+                          <SelectItem value="PostNL">PostNL</SelectItem>
+                          <SelectItem value="DHL">DHL</SelectItem>
+                          <SelectItem value="Bezorgen">Zelf bezorgen</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <Label>Onderdelen per plaat</Label>
-                      <Input type="number" value={partsPerPlate} onChange={(e) => setPartsPerPlate(e.target.value)} min="1" />
+                      <Label>Track & Trace code</Label>
+                      <Input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} placeholder="3SXXXX..." />
                     </div>
                     <div>
-                      <Label>Platen voltooid</Label>
-                      <Input type="number" value={platesCompleted} onChange={(e) => setPlatesCompleted(e.target.value)} min="0" />
+                      <Label>Verzendkosten (€)</Label>
+                      <Input type="number" step="0.01" value={shippingCost} onChange={e => setShippingCost(e.target.value)} placeholder="0.00" />
                     </div>
                   </div>
-                  {parseInt(partsTotal) > 0 && (
-                    <div className="mt-2 text-sm text-muted-foreground">
-                      📊 {Math.min(parseInt(platesCompleted) * parseInt(partsPerPlate), parseInt(partsTotal))}/{partsTotal} onderdelen geprint
-                      ({platesCompleted}/{totalPlates} platen)
-                    </div>
+                  {shippingCost && parseFloat(shippingCost) > 0 && finalPrice && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      💰 Totaal voor klant: €{(parseFloat(finalPrice) + parseFloat(shippingCost)).toFixed(2)} (product + verzending)
+                    </p>
                   )}
+                </div>
+
+                {/* Plate tracking */}
+                <div className="md:col-span-2">
+                  <PlateTracker
+                    partsTotal={partsTotal}
+                    partsPerPlate={partsPerPlate}
+                    plateRunsRequired={plateRunsRequired}
+                    plateRunsCompleted={plateRunsCompleted}
+                    onUpdate={(data) => {
+                      setPartsTotal(data.partsTotal);
+                      setPartsPerPlate(data.partsPerPlate);
+                      setPlateRunsRequired(data.plateRunsRequired);
+                      setPlateRunsCompleted(data.plateRunsCompleted);
+                      setPlatesCompleted(data.platesCompleted);
+                    }}
+                  />
                 </div>
 
                 {/* Delivery email for admin orders */}
