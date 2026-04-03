@@ -443,26 +443,17 @@ export default function NewOrder() {
                        <p className="text-sm text-muted-foreground mb-4">
                          Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden en custom opdrachten kan ook.
                        </p>
-                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                         <Button
-                           variant={uploadMode === "link" ? "default" : "outline"}
-                           onClick={() => setUploadMode("link")}
-                           className="flex-1"
-                         >
+                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                         <Button variant={uploadMode === "link" ? "default" : "outline"} onClick={() => setUploadMode("link")} className="flex-1">
                            <Link2 className="w-4 h-4" /> Downloadlink
                          </Button>
-                         <Button
-                           variant={uploadMode === "file" ? "default" : "outline"}
-                           onClick={() => setUploadMode("file")}
-                           className="flex-1"
-                         >
+                         <Button variant={uploadMode === "file" ? "default" : "outline"} onClick={() => setUploadMode("file")} className="flex-1">
                            <Upload className="w-4 h-4" /> Bestand uploaden
                          </Button>
-                         <Button
-                           variant={uploadMode === "custom" ? "default" : "outline"}
-                           onClick={() => setUploadMode("custom")}
-                           className="flex-1"
-                         >
+                         <Button variant={uploadMode === "prebuilt" ? "default" : "outline"} onClick={() => setUploadMode("prebuilt")} className="flex-1">
+                           <ShoppingBag className="w-4 h-4" /> Kant-en-klaar
+                         </Button>
+                         <Button variant={uploadMode === "custom" ? "default" : "outline"} onClick={() => setUploadMode("custom")} className="flex-1">
                            <Pencil className="w-4 h-4" /> Custom opdracht
                          </Button>
                        </div>
