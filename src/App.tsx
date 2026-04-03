@@ -22,6 +22,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminOrderEdit from "./pages/AdminOrderEdit";
 import AdminNewOrder from "./pages/AdminNewOrder";
 import AdminBlog from "./pages/AdminBlog";
+import AdminProducts from "./pages/AdminProducts";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import AdminContentMarketing from "./pages/AdminContentMarketing";
