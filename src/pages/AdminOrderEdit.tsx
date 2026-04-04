@@ -127,7 +127,7 @@ export default function AdminOrderEdit() {
         plate_runs_required: plateRunsRequired,
         plate_runs_completed: plateRunsCompleted,
         delivery_email: deliveryEmail,
-        shipping_carrier: shippingCarrier,
+        shipping_carrier: shippingCarrier === "none" ? null : shippingCarrier,
         tracking_code: trackingCode,
         shipping_cost: shippingCost ? parseFloat(shippingCost) : 0,
         saved: false,
@@ -350,7 +350,7 @@ export default function AdminOrderEdit() {
                       <Select value={shippingCarrier} onValueChange={setShippingCarrier}>
                         <SelectTrigger><SelectValue placeholder="Kies vervoerder" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Geen</SelectItem>
+                          <SelectItem value="none">Geen</SelectItem>
                           <SelectItem value="PostNL">PostNL</SelectItem>
                           <SelectItem value="DHL">DHL</SelectItem>
                           <SelectItem value="Bezorgen">Zelf bezorgen</SelectItem>
