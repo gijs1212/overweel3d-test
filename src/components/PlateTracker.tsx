@@ -46,59 +46,73 @@ async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; 
 }
 
 async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
-  // ZIP local file header signature: PK\x03\x04
+  // Use Central Directory to find files reliably
   const textDecoder = new TextDecoder();
-  let offset = 0;
   
-  while (offset < bytes.length - 4) {
-    if (bytes[offset] === 0x50 && bytes[offset+1] === 0x4b && bytes[offset+2] === 0x03 && bytes[offset+3] === 0x04) {
-      const nameLen = bytes[offset + 26] | (bytes[offset + 27] << 8);
-      const extraLen = bytes[offset + 28] | (bytes[offset + 29] << 8);
-      const compressedSize = bytes[offset + 18] | (bytes[offset + 19] << 8) | (bytes[offset + 20] << 16) | (bytes[offset + 21] << 24);
-      const compressionMethod = bytes[offset + 8] | (bytes[offset + 9] << 8);
-      const nameBytes = bytes.slice(offset + 30, offset + 30 + nameLen);
-      const fileName = textDecoder.decode(nameBytes);
-      
-      const dataStart = offset + 30 + nameLen + extraLen;
-      
-      if (fileName.toLowerCase().includes("3dmodel.model")) {
-        const fileData = bytes.slice(dataStart, dataStart + compressedSize);
-        
-        if (compressionMethod === 0) {
-          // Stored (no compression)
-          return textDecoder.decode(fileData);
-        } else if (compressionMethod === 8) {
-          // Deflate - use DecompressionStream
-          try {
-            const ds = new DecompressionStream("deflate-raw");
-            const writer = ds.writable.getWriter();
-            const reader = ds.readable.getReader();
-            writer.write(fileData);
-            writer.close();
-            
-            const chunks: Uint8Array[] = [];
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              chunks.push(value);
-            }
-            const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-            const result = new Uint8Array(totalLen);
-            let pos = 0;
-            for (const chunk of chunks) {
-              result.set(chunk, pos);
-              pos += chunk.length;
-            }
-            return textDecoder.decode(result);
-          } catch {
-            return null;
+  // Find End of Central Directory record (search from end)
+  let eocdOffset = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset === -1) return null;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const cdOffset = view.getUint32(eocdOffset + 16, true);
+  const cdEntries = view.getUint16(eocdOffset + 10, true);
+
+  let offset = cdOffset;
+  for (let e = 0; e < cdEntries; e++) {
+    if (offset + 46 > bytes.length) break;
+    if (bytes[offset] !== 0x50 || bytes[offset+1] !== 0x4b || bytes[offset+2] !== 0x01 || bytes[offset+3] !== 0x02) break;
+
+    const compressionMethod = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const nameLen = view.getUint16(offset + 28, true);
+    const extraLen = view.getUint16(offset + 30, true);
+    const commentLen = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
+    const fileName = textDecoder.decode(bytes.slice(offset + 46, offset + 46 + nameLen));
+
+    if (fileName.toLowerCase().includes("3dmodel.model")) {
+      // Read local file header to find data start
+      const localNameLen = view.getUint16(localHeaderOffset + 26, true);
+      const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
+      const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+      const fileData = bytes.slice(dataStart, dataStart + compressedSize);
+
+      if (compressionMethod === 0) {
+        return textDecoder.decode(fileData);
+      } else if (compressionMethod === 8) {
+        try {
+          const ds = new DecompressionStream("deflate-raw");
+          const writer = ds.writable.getWriter();
+          const reader = ds.readable.getReader();
+          writer.write(fileData);
+          writer.close();
+
+          const chunks: Uint8Array[] = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
           }
+          const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+          const result = new Uint8Array(totalLen);
+          let pos = 0;
+          for (const chunk of chunks) {
+            result.set(chunk, pos);
+            pos += chunk.length;
+          }
+          return textDecoder.decode(result);
+        } catch {
+          return null;
         }
       }
-      offset = dataStart + compressedSize;
-    } else {
-      offset++;
     }
+    offset += 46 + nameLen + extraLen + commentLen;
   }
   return null;
 }

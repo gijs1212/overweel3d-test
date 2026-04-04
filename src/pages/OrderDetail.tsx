@@ -417,7 +417,8 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* Bezorgafspraken */}
+            {/* Bezorgafspraken - alleen bij zelf bezorgen */}
+            {order.shipping_carrier === "Bezorgen" && (
             <div className="mt-6">
               <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50">
                 <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
@@ -481,6 +482,7 @@ export default function OrderDetail() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Chat */}
             <div className="mt-6">
