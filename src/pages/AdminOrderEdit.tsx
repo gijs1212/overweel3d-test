@@ -350,7 +350,7 @@ export default function AdminOrderEdit() {
                       <Select value={shippingCarrier} onValueChange={setShippingCarrier}>
                         <SelectTrigger><SelectValue placeholder="Kies vervoerder" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Geen</SelectItem>
+                          <SelectItem value="none">Geen</SelectItem>
                           <SelectItem value="PostNL">PostNL</SelectItem>
                           <SelectItem value="DHL">DHL</SelectItem>
                           <SelectItem value="Bezorgen">Zelf bezorgen</SelectItem>
