@@ -61,7 +61,7 @@ export default function AdminOrderEdit() {
   const [plateRunsRequired, setPlateRunsRequired] = useState(1);
   const [plateRunsCompleted, setPlateRunsCompleted] = useState<number[]>([]);
   const [deliveryEmail, setDeliveryEmail] = useState("");
-  const [shippingCarrier, setShippingCarrier] = useState("");
+  const [shippingCarrier, setShippingCarrier] = useState("none");
   const [trackingCode, setTrackingCode] = useState("");
   const [shippingCost, setShippingCost] = useState("");
   const [originalFinalPrice, setOriginalFinalPrice] = useState<number | null>(null);
@@ -90,7 +90,7 @@ export default function AdminOrderEdit() {
         setPlateRunsRequired(o.plate_runs_required || 1);
         setPlateRunsCompleted(Array.isArray(o.plate_runs_completed) ? o.plate_runs_completed : []);
         setDeliveryEmail(o.delivery_email || "");
-        setShippingCarrier(o.shipping_carrier || "");
+        setShippingCarrier(o.shipping_carrier || "none");
         setTrackingCode(o.tracking_code || "");
         setShippingCost(o.shipping_cost?.toString() || "");
         setOriginalFinalPrice(o.final_price);
