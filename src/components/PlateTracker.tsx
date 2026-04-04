@@ -26,6 +26,7 @@ interface PlateTrackerProps {
 async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; itemCount: number } | null> {
   try {
     const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
     
     // Simple ZIP parser to find 3dmodel.model
     const xmlContent = await extractXMLFrom3MF(bytes);
