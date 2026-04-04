@@ -127,7 +127,7 @@ export default function AdminOrderEdit() {
         plate_runs_required: plateRunsRequired,
         plate_runs_completed: plateRunsCompleted,
         delivery_email: deliveryEmail,
-        shipping_carrier: shippingCarrier,
+        shipping_carrier: shippingCarrier === "none" ? null : shippingCarrier,
         tracking_code: trackingCode,
         shipping_cost: shippingCost ? parseFloat(shippingCost) : 0,
         saved: false,
