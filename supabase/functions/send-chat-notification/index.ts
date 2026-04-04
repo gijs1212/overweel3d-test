@@ -29,7 +29,7 @@ serve(async (req: Request) => {
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
 
-    const { Resend } = await import("resend");
+    const { Resend } = await import("npm:resend@4");
     const resend = new Resend(RESEND_API_KEY);
 
     if (senderType === "customer") {
