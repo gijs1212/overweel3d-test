@@ -1,0 +1,1 @@
+ALTER TABLE public.orders ADD COLUMN plate_runs_required_per_plate jsonb DEFAULT '[]'::jsonb;

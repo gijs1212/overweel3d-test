@@ -58,7 +58,8 @@ export default function AdminOrderEdit() {
   const [partsTotal, setPartsTotal] = useState(0);
   const [partsPerPlate, setPartsPerPlate] = useState(1);
   const [platesCompleted, setPlatesCompleted] = useState(0);
-  const [plateRunsRequired, setPlateRunsRequired] = useState(1);
+  const [defaultRunsRequired, setDefaultRunsRequired] = useState(1);
+  const [runsRequiredPerPlate, setRunsRequiredPerPlate] = useState<number[]>([]);
   const [plateRunsCompleted, setPlateRunsCompleted] = useState<number[]>([]);
   const [deliveryEmail, setDeliveryEmail] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState("none");
@@ -87,7 +88,8 @@ export default function AdminOrderEdit() {
         setPartsTotal(o.parts_total || 0);
         setPartsPerPlate(o.parts_per_plate || 1);
         setPlatesCompleted(o.plates_completed || 0);
-        setPlateRunsRequired(o.plate_runs_required || 1);
+        setDefaultRunsRequired(o.plate_runs_required || 1);
+        setRunsRequiredPerPlate(Array.isArray((o as any).plate_runs_required_per_plate) ? (o as any).plate_runs_required_per_plate : []);
         setPlateRunsCompleted(Array.isArray(o.plate_runs_completed) ? o.plate_runs_completed : []);
         setDeliveryEmail(o.delivery_email || "");
         setShippingCarrier(o.shipping_carrier || "none");
@@ -124,7 +126,8 @@ export default function AdminOrderEdit() {
         parts_total: partsTotal,
         parts_per_plate: partsPerPlate,
         plates_completed: platesCompleted,
-        plate_runs_required: plateRunsRequired,
+        plate_runs_required: defaultRunsRequired,
+        plate_runs_required_per_plate: runsRequiredPerPlate,
         plate_runs_completed: plateRunsCompleted,
         delivery_email: deliveryEmail,
         shipping_carrier: shippingCarrier === "none" ? null : shippingCarrier,
@@ -150,7 +153,7 @@ export default function AdminOrderEdit() {
       toast({ title: isAdminOrder ? "Opgeslagen! ✅" : "Opgeslagen! Klant op de hoogte gebracht. ✉️" });
       setOriginalFinalPrice(newFinalPrice);
       setStatus(effectiveStatus);
-      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes, parts_total: partsTotal, parts_per_plate: partsPerPlate, plates_completed: platesCompleted, delivery_email: deliveryEmail, shipping_carrier: shippingCarrier, tracking_code: trackingCode, shipping_cost: parseFloat(shippingCost) || 0, plate_runs_required: plateRunsRequired, plate_runs_completed: plateRunsCompleted });
+      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes, parts_total: partsTotal, parts_per_plate: partsPerPlate, plates_completed: platesCompleted, delivery_email: deliveryEmail, shipping_carrier: shippingCarrier, tracking_code: trackingCode, shipping_cost: parseFloat(shippingCost) || 0, plate_runs_required: defaultRunsRequired, plate_runs_completed: plateRunsCompleted });
     } catch (error: any) {
       toast({ title: "Fout bij opslaan", description: error.message, variant: "destructive" });
     } finally { setSaving(false); }
@@ -378,12 +381,14 @@ export default function AdminOrderEdit() {
                   <PlateTracker
                     partsTotal={partsTotal}
                     partsPerPlate={partsPerPlate}
-                    plateRunsRequired={plateRunsRequired}
+                    defaultRunsRequired={defaultRunsRequired}
+                    runsRequiredPerPlate={runsRequiredPerPlate}
                     plateRunsCompleted={plateRunsCompleted}
                     onUpdate={(data) => {
                       setPartsTotal(data.partsTotal);
                       setPartsPerPlate(data.partsPerPlate);
-                      setPlateRunsRequired(data.plateRunsRequired);
+                      setDefaultRunsRequired(data.defaultRunsRequired);
+                      setRunsRequiredPerPlate(data.runsRequiredPerPlate);
                       setPlateRunsCompleted(data.plateRunsCompleted);
                       setPlatesCompleted(data.platesCompleted);
                     }}
