@@ -231,7 +231,7 @@ export default function AdminOrderEdit() {
     } finally { setGeneratingInvoice(false); }
   };
 
-  const handleDeleteOrder_real = async () => {
+  const handleDeleteOrder = async () => {
     if (!order || !confirm(`Bestelling ${order.order_number} VERWIJDEREN? Dit kan niet ongedaan worden.`)) return;
     setDeleting(true);
     try {
