@@ -24,6 +24,7 @@ interface Product {
   custom_text_enabled: boolean;
   custom_text_label: string;
   custom_text_max_length: number;
+  customer_photo_required: boolean;
   active: boolean;
 }
 
@@ -40,7 +41,7 @@ export default function AdminProducts() {
   const emptyProduct: Omit<Product, "id"> = {
     name: "", description: "", price: 0, materials: [], colors: [],
     photos: [], custom_text_enabled: false, custom_text_label: "Aangepaste tekst",
-    custom_text_max_length: 50, active: true,
+    custom_text_max_length: 50, customer_photo_required: false, active: true,
   };
 
   const [form, setForm] = useState<Omit<Product, "id">>(emptyProduct);
@@ -101,7 +102,7 @@ export default function AdminProducts() {
 
   const handleEdit = (p: Product) => {
     setEditing(p);
-    setForm({ name: p.name, description: p.description, price: p.price, materials: p.materials, colors: p.colors, photos: p.photos, custom_text_enabled: p.custom_text_enabled, custom_text_label: p.custom_text_label, custom_text_max_length: p.custom_text_max_length, active: p.active });
+    setForm({ name: p.name, description: p.description, price: p.price, materials: p.materials, colors: p.colors, photos: p.photos, custom_text_enabled: p.custom_text_enabled, custom_text_label: p.custom_text_label, custom_text_max_length: p.custom_text_max_length, customer_photo_required: p.customer_photo_required ?? false, active: p.active });
     setPhotoFiles([]);
   };
 
