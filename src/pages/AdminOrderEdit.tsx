@@ -505,7 +505,7 @@ export default function AdminOrderEdit() {
                     </div>
                   </div>
                 </div>
-              )
+              )}
             </div>
 
             {/* Delivery Appointments */}
