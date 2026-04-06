@@ -49,6 +49,12 @@ export default function AdminOrderEdit() {
   const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoiceDesc, setInvoiceDesc] = useState("");
+  const [invoiceBank, setInvoiceBank] = useState("");
+  const [invoiceKvk, setInvoiceKvk] = useState("");
+  const [invoiceBtw, setInvoiceBtw] = useState("");
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
 
   const [finalPrice, setFinalPrice] = useState("");
   const [tikkieLink, setTikkieLink] = useState("");
