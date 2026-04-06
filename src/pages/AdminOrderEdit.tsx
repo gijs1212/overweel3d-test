@@ -207,6 +207,32 @@ export default function AdminOrderEdit() {
   };
 
   const handleDeleteOrder = async () => {
+    // existing code below
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (!order) return;
+    setGeneratingInvoice(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-invoice", {
+        body: { orderId: order.id, description: invoiceDesc, bankAccount: invoiceBank, kvkNumber: invoiceKvk, btwId: invoiceBtw },
+      });
+      if (error) throw error;
+      // Open HTML in new window for printing/saving as PDF
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(data.html);
+        win.document.close();
+        setTimeout(() => win.print(), 500);
+      }
+      toast({ title: `Factuur ${data.invoiceNumber} gegenereerd ✅` });
+      setShowInvoice(false);
+    } catch (e: any) {
+      toast({ title: "Fout bij genereren factuur", description: e.message, variant: "destructive" });
+    } finally { setGeneratingInvoice(false); }
+  };
+
+  const handleDeleteOrder_real = async () => {
     if (!order || !confirm(`Bestelling ${order.order_number} VERWIJDEREN? Dit kan niet ongedaan worden.`)) return;
     setDeleting(true);
     try {
