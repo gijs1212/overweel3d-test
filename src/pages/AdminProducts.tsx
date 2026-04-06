@@ -239,6 +239,15 @@ export default function AdminProducts() {
                   </div>
                 )}
               </div>
+
+              {/* Customer photo required */}
+              <div className="md:col-span-2 border-t border-border pt-4">
+                <div className="flex items-center gap-3">
+                  <Checkbox checked={form.customer_photo_required} onCheckedChange={v => setForm({ ...form, customer_photo_required: v === true })} />
+                  <Label>Klant moet een foto uploaden bij bestelling</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-7">De klant moet minimaal 1 foto uploaden voordat dit product besteld kan worden.</p>
+              </div>
             </div>
 
             <div className="flex gap-3 mt-6">
