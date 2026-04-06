@@ -287,6 +287,7 @@ export default function AdminProducts() {
                   <div className="flex flex-wrap gap-1 text-xs">
                     {p.materials.map(m => <span key={m} className="px-2 py-0.5 bg-muted rounded-full">{m}</span>)}
                     {p.custom_text_enabled && <span className="px-2 py-0.5 bg-accent/20 text-accent rounded-full">✏️ Tekst</span>}
+                    {p.customer_photo_required && <span className="px-2 py-0.5 bg-accent/20 text-accent rounded-full">📷 Foto verplicht</span>}
                   </div>
                   {p.photos.length > 0 && (
                     <div className="flex gap-2 mt-2">
