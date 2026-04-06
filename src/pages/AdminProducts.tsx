@@ -24,6 +24,7 @@ interface Product {
   custom_text_enabled: boolean;
   custom_text_label: string;
   custom_text_max_length: number;
+  customer_photo_required: boolean;
   active: boolean;
 }
 
@@ -40,7 +41,7 @@ export default function AdminProducts() {
   const emptyProduct: Omit<Product, "id"> = {
     name: "", description: "", price: 0, materials: [], colors: [],
     photos: [], custom_text_enabled: false, custom_text_label: "Aangepaste tekst",
-    custom_text_max_length: 50, active: true,
+    custom_text_max_length: 50, customer_photo_required: false, active: true,
   };
 
   const [form, setForm] = useState<Omit<Product, "id">>(emptyProduct);
@@ -101,7 +102,7 @@ export default function AdminProducts() {
 
   const handleEdit = (p: Product) => {
     setEditing(p);
-    setForm({ name: p.name, description: p.description, price: p.price, materials: p.materials, colors: p.colors, photos: p.photos, custom_text_enabled: p.custom_text_enabled, custom_text_label: p.custom_text_label, custom_text_max_length: p.custom_text_max_length, active: p.active });
+    setForm({ name: p.name, description: p.description, price: p.price, materials: p.materials, colors: p.colors, photos: p.photos, custom_text_enabled: p.custom_text_enabled, custom_text_label: p.custom_text_label, custom_text_max_length: p.custom_text_max_length, customer_photo_required: p.customer_photo_required ?? false, active: p.active });
     setPhotoFiles([]);
   };
 
@@ -238,6 +239,15 @@ export default function AdminProducts() {
                   </div>
                 )}
               </div>
+
+              {/* Customer photo required */}
+              <div className="md:col-span-2 border-t border-border pt-4">
+                <div className="flex items-center gap-3">
+                  <Checkbox checked={form.customer_photo_required} onCheckedChange={v => setForm({ ...form, customer_photo_required: v === true })} />
+                  <Label>Klant moet een foto uploaden bij bestelling</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-7">De klant moet minimaal 1 foto uploaden voordat dit product besteld kan worden.</p>
+              </div>
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -277,6 +287,7 @@ export default function AdminProducts() {
                   <div className="flex flex-wrap gap-1 text-xs">
                     {p.materials.map(m => <span key={m} className="px-2 py-0.5 bg-muted rounded-full">{m}</span>)}
                     {p.custom_text_enabled && <span className="px-2 py-0.5 bg-accent/20 text-accent rounded-full">✏️ Tekst</span>}
+                    {p.customer_photo_required && <span className="px-2 py-0.5 bg-accent/20 text-accent rounded-full">📷 Foto verplicht</span>}
                   </div>
                   {p.photos.length > 0 && (
                     <div className="flex gap-2 mt-2">

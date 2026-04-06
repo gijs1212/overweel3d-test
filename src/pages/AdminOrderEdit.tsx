@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2, Truck } from "lucide-react";
+import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2, Truck, Receipt } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { OrderChat } from "@/components/OrderChat";
 import { DeliveryScheduler } from "@/components/DeliveryScheduler";
@@ -49,6 +49,12 @@ export default function AdminOrderEdit() {
   const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoiceDesc, setInvoiceDesc] = useState("");
+  const [invoiceBank, setInvoiceBank] = useState("");
+  const [invoiceKvk, setInvoiceKvk] = useState("");
+  const [invoiceBtw, setInvoiceBtw] = useState("");
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
 
   const [finalPrice, setFinalPrice] = useState("");
   const [tikkieLink, setTikkieLink] = useState("");
@@ -198,6 +204,31 @@ export default function AdminOrderEdit() {
       setStatus("completed" as OrderStatus);
     } catch (error: any) { toast({ title: "Fout", description: error.message, variant: "destructive" }); }
     finally { setCompleting(false); }
+  };
+
+
+
+
+  const handleGenerateInvoice = async () => {
+    if (!order) return;
+    setGeneratingInvoice(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-invoice", {
+        body: { orderId: order.id, description: invoiceDesc, bankAccount: invoiceBank, kvkNumber: invoiceKvk, btwId: invoiceBtw },
+      });
+      if (error) throw error;
+      // Open HTML in new window for printing/saving as PDF
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(data.html);
+        win.document.close();
+        setTimeout(() => win.print(), 500);
+      }
+      toast({ title: `Factuur ${data.invoiceNumber} gegenereerd ✅` });
+      setShowInvoice(false);
+    } catch (e: any) {
+      toast({ title: "Fout bij genereren factuur", description: e.message, variant: "destructive" });
+    } finally { setGeneratingInvoice(false); }
   };
 
   const handleDeleteOrder = async () => {
@@ -431,12 +462,50 @@ export default function AdminOrderEdit() {
                   try { await supabase.from("orders").update({ saved: false }).eq("id", order.id); toast({ title: "Backup status gereset ✅" }); }
                   catch (e: any) { toast({ title: "Fout", description: e.message, variant: "destructive" }); }
                 }}>🔄 Reset backup</Button>
+                <Button variant="outline" onClick={() => setShowInvoice(true)}>
+                  <Receipt className="w-4 h-4" /> Factuur
+                </Button>
                 <div className="sm:ml-auto">
                   <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
                     {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Verwijderen
                   </Button>
                 </div>
               </div>
+
+              {/* Invoice Modal */}
+              {showInvoice && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowInvoice(false)}>
+                  <div className="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2"><Receipt className="w-5 h-5" /> Factuur genereren</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <Label>Omschrijving</Label>
+                        <Textarea value={invoiceDesc} onChange={e => setInvoiceDesc(e.target.value)} placeholder={`3D Print bestelling ${order.order_number}`} rows={2} />
+                      </div>
+                      <div>
+                        <Label>IBAN rekeningnummer</Label>
+                        <Input value={invoiceBank} onChange={e => setInvoiceBank(e.target.value)} placeholder="NL00 BANK 0000 0000 00" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>KVK-nummer</Label>
+                          <Input value={invoiceKvk} onChange={e => setInvoiceKvk(e.target.value)} placeholder="12345678" />
+                        </div>
+                        <div>
+                          <Label>BTW-ID</Label>
+                          <Input value={invoiceBtw} onChange={e => setInvoiceBtw(e.target.value)} placeholder="NL000000000B01" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <Button onClick={handleGenerateInvoice} disabled={generatingInvoice}>
+                        {generatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />} Genereren & Printen
+                      </Button>
+                      <Button variant="ghost" onClick={() => setShowInvoice(false)}>Annuleren</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Delivery Appointments */}

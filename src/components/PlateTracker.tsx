@@ -21,20 +21,37 @@ interface PlateTrackerProps {
   }) => void;
 }
 
-async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; itemCount: number } | null> {
+async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; itemCount: number; error?: string } | { error: string }> {
   try {
+    if (!file.name.toLowerCase().endsWith(".3mf")) {
+      return { error: "Bestand is geen .3mf bestand" };
+    }
     const buffer = await file.arrayBuffer();
+    if (buffer.byteLength < 22) {
+      return { error: "Bestand is te klein om een geldig 3MF (ZIP) te zijn" };
+    }
     const bytes = new Uint8Array(buffer);
+    
+    // Check ZIP magic bytes
+    if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
+      return { error: "Bestand is geen geldig ZIP/3MF bestand (verkeerde magic bytes)" };
+    }
+    
     const xmlContent = await extractXMLFrom3MF(bytes);
-    if (!xmlContent) return null;
+    if (!xmlContent) {
+      return { error: "Kon 3dmodel.model niet vinden in het 3MF bestand. Mogelijk is het bestand beschadigd of bevat het geen 3D-model." };
+    }
     const objectMatches = xmlContent.match(/<object\s/gi);
     const itemMatches = xmlContent.match(/<item\s/gi);
     const objectCount = objectMatches?.length || 0;
     const itemCount = itemMatches?.length || 0;
+    if (objectCount === 0 && itemCount === 0) {
+      return { error: "Geen objecten gevonden in het 3MF model. Het bestand bevat mogelijk geen mesh data." };
+    }
     return { objectCount, itemCount: itemCount || objectCount };
-  } catch (e) {
+  } catch (e: any) {
     console.error("3MF parse error:", e);
-    return null;
+    return { error: `Fout bij verwerken: ${e?.message || "Onbekende fout"}` };
   }
 }
 
@@ -141,14 +158,14 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
     setParsing(true);
     try {
       const result = await parse3MFForPlateInfo(file);
-      if (result) {
+      if ('itemCount' in result) {
         setLocalPartsPerPlate(String(result.itemCount));
         toast({ title: `3MF verwerkt: ${result.itemCount} onderdelen per plaat, ${result.objectCount} unieke objecten` });
       } else {
-        toast({ title: "Kon 3MF niet verwerken", description: "Voer de waarden handmatig in.", variant: "destructive" });
+        toast({ title: "3MF fout", description: result.error, variant: "destructive" });
       }
-    } catch {
-      toast({ title: "Fout bij verwerken 3MF", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Fout bij verwerken 3MF", description: err?.message || "Onbekende fout", variant: "destructive" });
     } finally {
       setParsing(false);
       e.target.value = "";
