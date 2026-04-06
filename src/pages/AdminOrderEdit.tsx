@@ -206,9 +206,8 @@ export default function AdminOrderEdit() {
     finally { setCompleting(false); }
   };
 
-  const handleDeleteOrder = async () => {
-    // existing code below
-  };
+
+
 
   const handleGenerateInvoice = async () => {
     if (!order) return;
