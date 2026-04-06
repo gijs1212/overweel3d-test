@@ -8,36 +8,29 @@ import { useToast } from "@/hooks/use-toast";
 interface PlateTrackerProps {
   partsTotal: number;
   partsPerPlate: number;
-  plateRunsRequired: number;
-  plateRunsCompleted: number[]; // array tracking how many times each plate was completed
+  defaultRunsRequired: number;
+  runsRequiredPerPlate: number[];
+  plateRunsCompleted: number[];
   onUpdate: (data: {
     partsTotal: number;
     partsPerPlate: number;
-    plateRunsRequired: number;
+    defaultRunsRequired: number;
+    runsRequiredPerPlate: number[];
     plateRunsCompleted: number[];
     platesCompleted: number;
   }) => void;
 }
 
-/**
- * Parse a 3MF file locally (ZIP containing XML) to extract part count info.
- * 3MF is a ZIP with model/3dmodel.model XML - we count <object> elements and <item> elements.
- */
 async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; itemCount: number } | null> {
   try {
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-    
-    // Simple ZIP parser to find 3dmodel.model
     const xmlContent = await extractXMLFrom3MF(bytes);
     if (!xmlContent) return null;
-
-    // Count <object> tags (unique parts) and <item> tags (instances on plate)
     const objectMatches = xmlContent.match(/<object\s/gi);
     const itemMatches = xmlContent.match(/<item\s/gi);
     const objectCount = objectMatches?.length || 0;
     const itemCount = itemMatches?.length || 0;
-
     return { objectCount, itemCount: itemCount || objectCount };
   } catch (e) {
     console.error("3MF parse error:", e);
@@ -46,10 +39,7 @@ async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; 
 }
 
 async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
-  // Use Central Directory to find files reliably
   const textDecoder = new TextDecoder();
-  
-  // Find End of Central Directory record (search from end)
   let eocdOffset = -1;
   for (let i = bytes.length - 22; i >= 0; i--) {
     if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
@@ -58,16 +48,13 @@ async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
     }
   }
   if (eocdOffset === -1) return null;
-
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const cdOffset = view.getUint32(eocdOffset + 16, true);
   const cdEntries = view.getUint16(eocdOffset + 10, true);
-
   let offset = cdOffset;
   for (let e = 0; e < cdEntries; e++) {
     if (offset + 46 > bytes.length) break;
     if (bytes[offset] !== 0x50 || bytes[offset+1] !== 0x4b || bytes[offset+2] !== 0x01 || bytes[offset+3] !== 0x02) break;
-
     const compressionMethod = view.getUint16(offset + 10, true);
     const compressedSize = view.getUint32(offset + 20, true);
     const nameLen = view.getUint16(offset + 28, true);
@@ -75,14 +62,11 @@ async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
     const commentLen = view.getUint16(offset + 32, true);
     const localHeaderOffset = view.getUint32(offset + 42, true);
     const fileName = textDecoder.decode(bytes.slice(offset + 46, offset + 46 + nameLen));
-
     if (fileName.toLowerCase().includes("3dmodel.model")) {
-      // Read local file header to find data start
       const localNameLen = view.getUint16(localHeaderOffset + 26, true);
       const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
       const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
       const fileData = bytes.slice(dataStart, dataStart + compressedSize);
-
       if (compressionMethod === 0) {
         return textDecoder.decode(fileData);
       } else if (compressionMethod === 8) {
@@ -92,7 +76,6 @@ async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
           const reader = ds.readable.getReader();
           writer.write(fileData);
           writer.close();
-
           const chunks: Uint8Array[] = [];
           while (true) {
             const { done, value } = await reader.read();
@@ -117,29 +100,38 @@ async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
   return null;
 }
 
-export function PlateTracker({ partsTotal, partsPerPlate, plateRunsRequired, plateRunsCompleted, onUpdate }: PlateTrackerProps) {
+export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, runsRequiredPerPlate, plateRunsCompleted, onUpdate }: PlateTrackerProps) {
   const { toast } = useToast();
   const [localPartsTotal, setLocalPartsTotal] = useState(String(partsTotal));
   const [localPartsPerPlate, setLocalPartsPerPlate] = useState(String(partsPerPlate));
-  const [localRunsRequired, setLocalRunsRequired] = useState(String(plateRunsRequired));
+  const [localDefaultRuns, setLocalDefaultRuns] = useState(String(defaultRunsRequired));
+  const [localRunsPerPlate, setLocalRunsPerPlate] = useState<number[]>(runsRequiredPerPlate);
   const [localCompleted, setLocalCompleted] = useState<number[]>(plateRunsCompleted);
   const [parsing, setParsing] = useState(false);
 
   useEffect(() => {
     setLocalPartsTotal(String(partsTotal));
     setLocalPartsPerPlate(String(partsPerPlate));
-    setLocalRunsRequired(String(plateRunsRequired));
+    setLocalDefaultRuns(String(defaultRunsRequired));
+    setLocalRunsPerPlate(runsRequiredPerPlate);
     setLocalCompleted(plateRunsCompleted);
-  }, [partsTotal, partsPerPlate, plateRunsRequired, plateRunsCompleted]);
+  }, [partsTotal, partsPerPlate, defaultRunsRequired, runsRequiredPerPlate, plateRunsCompleted]);
 
   const totalPlates = Math.ceil((parseInt(localPartsTotal) || 0) / (parseInt(localPartsPerPlate) || 1));
-  const runsReq = parseInt(localRunsRequired) || 1;
+  const defaultRuns = parseInt(localDefaultRuns) || 1;
 
-  // Ensure completed array matches plate count
+  // Get required runs for a specific plate
+  const getRunsRequired = (plateIndex: number) => {
+    return localRunsPerPlate[plateIndex] || defaultRuns;
+  };
+
+  // Ensure arrays match plate count
   useEffect(() => {
     if (localCompleted.length !== totalPlates) {
-      const newCompleted = Array.from({ length: totalPlates }, (_, i) => localCompleted[i] || 0);
-      setLocalCompleted(newCompleted);
+      setLocalCompleted(Array.from({ length: totalPlates }, (_, i) => localCompleted[i] || 0));
+    }
+    if (localRunsPerPlate.length !== totalPlates) {
+      setLocalRunsPerPlate(Array.from({ length: totalPlates }, (_, i) => localRunsPerPlate[i] || defaultRuns));
     }
   }, [totalPlates]);
 
@@ -165,31 +157,45 @@ export function PlateTracker({ partsTotal, partsPerPlate, plateRunsRequired, pla
 
   const togglePlateRun = (plateIndex: number) => {
     const newCompleted = [...localCompleted];
-    if (newCompleted[plateIndex] < runsReq) {
+    const req = getRunsRequired(plateIndex);
+    if (newCompleted[plateIndex] < req) {
       newCompleted[plateIndex] = (newCompleted[plateIndex] || 0) + 1;
     } else {
-      newCompleted[plateIndex] = 0; // Reset
+      newCompleted[plateIndex] = 0;
     }
     setLocalCompleted(newCompleted);
   };
 
+  const updatePlateRunsRequired = (plateIndex: number, value: number) => {
+    const newRuns = [...localRunsPerPlate];
+    newRuns[plateIndex] = Math.max(1, value);
+    setLocalRunsPerPlate(newRuns);
+  };
+
   const totalCompletedRuns = localCompleted.reduce((s, c) => s + c, 0);
-  const totalRequiredRuns = totalPlates * runsReq;
+  const totalRequiredRuns = Array.from({ length: totalPlates }, (_, i) => getRunsRequired(i)).reduce((s, r) => s + r, 0);
   const totalPartsCompleted = localCompleted.reduce((sum, runs, i) => {
     const ppp = parseInt(localPartsPerPlate) || 1;
-    return sum + Math.min(runs, runsReq) * ppp;
+    const req = getRunsRequired(i);
+    return sum + Math.min(runs, req) * ppp;
   }, 0);
   const actualPartsCompleted = Math.min(totalPartsCompleted, parseInt(localPartsTotal) || 0);
-  const fullyCompletedPlates = localCompleted.filter(c => c >= runsReq).length;
+  const fullyCompletedPlates = localCompleted.filter((c, i) => c >= getRunsRequired(i)).length;
 
   const handleApply = () => {
     onUpdate({
       partsTotal: parseInt(localPartsTotal) || 0,
       partsPerPlate: parseInt(localPartsPerPlate) || 1,
-      plateRunsRequired: runsReq,
+      defaultRunsRequired: defaultRuns,
+      runsRequiredPerPlate: localRunsPerPlate,
       plateRunsCompleted: localCompleted,
       platesCompleted: fullyCompletedPlates,
     });
+  };
+
+  // Apply default to all plates
+  const applyDefaultToAll = () => {
+    setLocalRunsPerPlate(Array.from({ length: totalPlates }, () => defaultRuns));
   };
 
   return (
@@ -216,8 +222,13 @@ export function PlateTracker({ partsTotal, partsPerPlate, plateRunsRequired, pla
           <Input type="number" value={localPartsPerPlate} onChange={e => setLocalPartsPerPlate(e.target.value)} min="1" />
         </div>
         <div>
-          <Label className="text-xs">Runs per plaat</Label>
-          <Input type="number" value={localRunsRequired} onChange={e => setLocalRunsRequired(e.target.value)} min="1" />
+          <Label className="text-xs">Standaard runs per plaat</Label>
+          <div className="flex gap-1">
+            <Input type="number" value={localDefaultRuns} onChange={e => setLocalDefaultRuns(e.target.value)} min="1" />
+            <Button onClick={applyDefaultToAll} size="sm" variant="outline" className="whitespace-nowrap text-xs" title="Pas standaard toe op alle platen">
+              Alles
+            </Button>
+          </div>
         </div>
         <div className="flex items-end">
           <Button onClick={handleApply} size="sm" className="w-full">Toepassen</Button>
@@ -238,27 +249,40 @@ export function PlateTracker({ partsTotal, partsPerPlate, plateRunsRequired, pla
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {Array.from({ length: totalPlates }, (_, i) => {
               const runs = localCompleted[i] || 0;
-              const isComplete = runs >= runsReq;
+              const req = getRunsRequired(i);
+              const isComplete = runs >= req;
               return (
-                <button
+                <div
                   key={i}
-                  onClick={() => togglePlateRun(i)}
                   className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
                     isComplete
                       ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
                       : runs > 0
                       ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300"
-                      : "border-border hover:border-accent/50"
+                      : "border-border"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1">
                     <span>Plaat {i + 1}</span>
                     {isComplete && <Check className="w-4 h-4" />}
                   </div>
-                  <div className="text-xs mt-1">
-                    {runs}/{runsReq} runs
+                  <div className="flex items-center gap-1 mb-1">
+                    <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Nodig:</Label>
+                    <Input
+                      type="number"
+                      value={req}
+                      onChange={e => updatePlateRunsRequired(i, parseInt(e.target.value) || 1)}
+                      min="1"
+                      className="h-6 text-xs px-1 w-14"
+                    />
                   </div>
-                </button>
+                  <button
+                    onClick={() => togglePlateRun(i)}
+                    className="w-full text-xs mt-1 px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors"
+                  >
+                    {runs}/{req} runs ✓
+                  </button>
+                </div>
               );
             })}
           </div>
