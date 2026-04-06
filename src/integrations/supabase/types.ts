@@ -287,6 +287,7 @@ export type Database = {
           phone: string | null
           plate_runs_completed: Json | null
           plate_runs_required: number | null
+          plate_runs_required_per_plate: Json | null
           plates_completed: number | null
           postal_code: string | null
           print_preferences: string | null
@@ -332,6 +333,7 @@ export type Database = {
           phone?: string | null
           plate_runs_completed?: Json | null
           plate_runs_required?: number | null
+          plate_runs_required_per_plate?: Json | null
           plates_completed?: number | null
           postal_code?: string | null
           print_preferences?: string | null
@@ -377,6 +379,7 @@ export type Database = {
           phone?: string | null
           plate_runs_completed?: Json | null
           plate_runs_required?: number | null
+          plate_runs_required_per_plate?: Json | null
           plates_completed?: number | null
           postal_code?: string | null
           print_preferences?: string | null
