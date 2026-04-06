@@ -158,14 +158,14 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
     setParsing(true);
     try {
       const result = await parse3MFForPlateInfo(file);
-      if (result) {
+      if ('itemCount' in result) {
         setLocalPartsPerPlate(String(result.itemCount));
         toast({ title: `3MF verwerkt: ${result.itemCount} onderdelen per plaat, ${result.objectCount} unieke objecten` });
       } else {
-        toast({ title: "Kon 3MF niet verwerken", description: "Voer de waarden handmatig in.", variant: "destructive" });
+        toast({ title: "3MF fout", description: result.error, variant: "destructive" });
       }
-    } catch {
-      toast({ title: "Fout bij verwerken 3MF", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Fout bij verwerken 3MF", description: err?.message || "Onbekende fout", variant: "destructive" });
     } finally {
       setParsing(false);
       e.target.value = "";
