@@ -407,6 +407,7 @@ export type Database = {
           custom_text_enabled: boolean
           custom_text_label: string
           custom_text_max_length: number
+          customer_photo_required: boolean
           description: string
           id: string
           materials: string[]
@@ -422,6 +423,7 @@ export type Database = {
           custom_text_enabled?: boolean
           custom_text_label?: string
           custom_text_max_length?: number
+          customer_photo_required?: boolean
           description?: string
           id?: string
           materials?: string[]
@@ -437,6 +439,7 @@ export type Database = {
           custom_text_enabled?: boolean
           custom_text_label?: string
           custom_text_max_length?: number
+          customer_photo_required?: boolean
           description?: string
           id?: string
           materials?: string[]
