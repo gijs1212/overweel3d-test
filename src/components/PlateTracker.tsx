@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Loader2, Upload } from "lucide-react";
+import { Check, Loader2, Upload, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PlateTrackerProps {
@@ -21,98 +21,200 @@ interface PlateTrackerProps {
   }) => void;
 }
 
-async function parse3MFForPlateInfo(file: File): Promise<{ objectCount: number; itemCount: number; error?: string } | { error: string }> {
+interface Parse3MFResult {
+  objectCount: number;
+  itemCount: number;
+  plateCount: number;
+  details: string;
+}
+
+/**
+ * Parse Bambu Studio 3MF files.
+ * Bambu Studio stores plate/build-plate info in Metadata/plate_N.gcode or
+ * in the 3dmodel.model XML. It also has a project settings file.
+ * The key insight: Bambu uses <object> for unique meshes and <item> for instances on the plate.
+ * Multiple plates are stored as separate model files or via Metadata/model_settings.config
+ */
+async function parse3MFForPlateInfo(file: File): Promise<Parse3MFResult | { error: string }> {
   try {
     if (!file.name.toLowerCase().endsWith(".3mf")) {
-      return { error: "Bestand is geen .3mf bestand" };
+      return { error: "Bestand is geen .3mf bestand. Selecteer een bestand met de extensie .3mf." };
     }
+
     const buffer = await file.arrayBuffer();
     if (buffer.byteLength < 22) {
-      return { error: "Bestand is te klein om een geldig 3MF (ZIP) te zijn" };
+      return { error: `Bestand is te klein (${buffer.byteLength} bytes) om een geldig 3MF/ZIP te zijn. Minimaal 22 bytes nodig.` };
     }
+
     const bytes = new Uint8Array(buffer);
-    
+
     // Check ZIP magic bytes
     if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
-      return { error: "Bestand is geen geldig ZIP/3MF bestand (verkeerde magic bytes)" };
+      const got = `0x${bytes[0].toString(16).padStart(2, '0')} 0x${bytes[1].toString(16).padStart(2, '0')}`;
+      return { error: `Bestand is geen geldig ZIP/3MF (verwacht 0x50 0x4b, kreeg ${got}). Mogelijk is het bestand beschadigd of geen 3MF.` };
     }
-    
-    const xmlContent = await extractXMLFrom3MF(bytes);
+
+    const allFiles = await listZipEntries(bytes);
+    const fileNames = allFiles.map(f => f.name);
+
+    // Try to find Bambu Studio model_settings.config for plate info
+    let plateCount = 1;
+    let bambuDetails = "";
+
+    const modelSettingsEntry = allFiles.find(f =>
+      f.name.toLowerCase().includes("model_settings.config") ||
+      f.name.toLowerCase().includes("metadata/model_settings")
+    );
+
+    if (modelSettingsEntry) {
+      const content = await extractFileContent(bytes, modelSettingsEntry);
+      if (content) {
+        // Count plates from Bambu model_settings
+        const plateMatches = content.match(/<plate\s/gi);
+        if (plateMatches && plateMatches.length > 0) {
+          plateCount = plateMatches.length;
+          bambuDetails += `Bambu Studio project: ${plateCount} plaat/platen gevonden in model_settings.config. `;
+        }
+
+        // Count objects assigned to plates
+        const objectMatches = content.match(/<object\s/gi);
+        if (objectMatches) {
+          bambuDetails += `${objectMatches.length} objecten in project. `;
+        }
+      }
+    }
+
+    // Also check for plate gcode files (Bambu pattern: Metadata/plate_1.gcode)
+    const plateGcodeFiles = fileNames.filter(f =>
+      /metadata\/plate_\d+/i.test(f)
+    );
+    if (plateGcodeFiles.length > 0 && plateGcodeFiles.length > plateCount) {
+      plateCount = plateGcodeFiles.length;
+      bambuDetails += `${plateGcodeFiles.length} plate gcode bestanden gevonden. `;
+    }
+
+    // Parse the main 3D model XML
+    const modelEntry = allFiles.find(f =>
+      f.name.toLowerCase().includes("3dmodel.model") ||
+      f.name.toLowerCase() === "3d/3dmodel.model"
+    );
+
+    if (!modelEntry) {
+      // List available files for debugging
+      const availableFiles = fileNames.slice(0, 10).join(", ");
+      return {
+        error: `Kon 3dmodel.model niet vinden in het 3MF bestand. Gevonden bestanden: ${availableFiles}${fileNames.length > 10 ? ` (en ${fileNames.length - 10} meer)` : ""}. Mogelijk is het bestand beschadigd.`
+      };
+    }
+
+    const xmlContent = await extractFileContent(bytes, modelEntry);
     if (!xmlContent) {
-      return { error: "Kon 3dmodel.model niet vinden in het 3MF bestand. Mogelijk is het bestand beschadigd of bevat het geen 3D-model." };
+      return { error: "Kon de inhoud van 3dmodel.model niet lezen. Het bestand is mogelijk beschadigd of gebruikt een niet-ondersteunde compressie." };
     }
+
     const objectMatches = xmlContent.match(/<object\s/gi);
     const itemMatches = xmlContent.match(/<item\s/gi);
     const objectCount = objectMatches?.length || 0;
     const itemCount = itemMatches?.length || 0;
+
     if (objectCount === 0 && itemCount === 0) {
-      return { error: "Geen objecten gevonden in het 3MF model. Het bestand bevat mogelijk geen mesh data." };
+      return { error: "Geen 3D-objecten gevonden in het model. Het bestand bevat mogelijk geen mesh data. Controleer of het bestand correct is opgeslagen vanuit Bambu Studio." };
     }
-    return { objectCount, itemCount: itemCount || objectCount };
+
+    const details = `${bambuDetails}${objectCount} unieke objecten, ${itemCount || objectCount} items op de plaat.`;
+
+    return {
+      objectCount,
+      itemCount: itemCount || objectCount,
+      plateCount,
+      details,
+    };
   } catch (e: any) {
     console.error("3MF parse error:", e);
-    return { error: `Fout bij verwerken: ${e?.message || "Onbekende fout"}` };
+    return { error: `Fout bij verwerken van 3MF: ${e?.message || "Onbekende fout"}. Probeer het bestand opnieuw op te slaan vanuit Bambu Studio.` };
   }
 }
 
-async function extractXMLFrom3MF(bytes: Uint8Array): Promise<string | null> {
+interface ZipEntry {
+  name: string;
+  compressionMethod: number;
+  compressedSize: number;
+  localHeaderOffset: number;
+}
+
+function listZipEntries(bytes: Uint8Array): ZipEntry[] {
   const textDecoder = new TextDecoder();
+  const entries: ZipEntry[] = [];
+
+  // Find End of Central Directory
   let eocdOffset = -1;
-  for (let i = bytes.length - 22; i >= 0; i--) {
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
     if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
       eocdOffset = i;
       break;
     }
   }
-  if (eocdOffset === -1) return null;
+  if (eocdOffset === -1) return entries;
+
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const cdOffset = view.getUint32(eocdOffset + 16, true);
   const cdEntries = view.getUint16(eocdOffset + 10, true);
+
   let offset = cdOffset;
   for (let e = 0; e < cdEntries; e++) {
     if (offset + 46 > bytes.length) break;
     if (bytes[offset] !== 0x50 || bytes[offset+1] !== 0x4b || bytes[offset+2] !== 0x01 || bytes[offset+3] !== 0x02) break;
+
     const compressionMethod = view.getUint16(offset + 10, true);
     const compressedSize = view.getUint32(offset + 20, true);
     const nameLen = view.getUint16(offset + 28, true);
     const extraLen = view.getUint16(offset + 30, true);
     const commentLen = view.getUint16(offset + 32, true);
     const localHeaderOffset = view.getUint32(offset + 42, true);
-    const fileName = textDecoder.decode(bytes.slice(offset + 46, offset + 46 + nameLen));
-    if (fileName.toLowerCase().includes("3dmodel.model")) {
-      const localNameLen = view.getUint16(localHeaderOffset + 26, true);
-      const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
-      const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
-      const fileData = bytes.slice(dataStart, dataStart + compressedSize);
-      if (compressionMethod === 0) {
-        return textDecoder.decode(fileData);
-      } else if (compressionMethod === 8) {
-        try {
-          const ds = new DecompressionStream("deflate-raw");
-          const writer = ds.writable.getWriter();
-          const reader = ds.readable.getReader();
-          writer.write(fileData);
-          writer.close();
-          const chunks: Uint8Array[] = [];
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-          }
-          const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-          const result = new Uint8Array(totalLen);
-          let pos = 0;
-          for (const chunk of chunks) {
-            result.set(chunk, pos);
-            pos += chunk.length;
-          }
-          return textDecoder.decode(result);
-        } catch {
-          return null;
-        }
-      }
-    }
+    const name = textDecoder.decode(bytes.slice(offset + 46, offset + 46 + nameLen));
+
+    entries.push({ name, compressionMethod, compressedSize, localHeaderOffset });
     offset += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+
+async function extractFileContent(bytes: Uint8Array, entry: ZipEntry): Promise<string | null> {
+  const textDecoder = new TextDecoder();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  const localNameLen = view.getUint16(entry.localHeaderOffset + 26, true);
+  const localExtraLen = view.getUint16(entry.localHeaderOffset + 28, true);
+  const dataStart = entry.localHeaderOffset + 30 + localNameLen + localExtraLen;
+  const fileData = bytes.slice(dataStart, dataStart + entry.compressedSize);
+
+  if (entry.compressionMethod === 0) {
+    return textDecoder.decode(fileData);
+  } else if (entry.compressionMethod === 8) {
+    try {
+      const ds = new DecompressionStream("deflate-raw");
+      const writer = ds.writable.getWriter();
+      const reader = ds.readable.getReader();
+      writer.write(fileData);
+      writer.close();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+      const result = new Uint8Array(totalLen);
+      let pos = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, pos);
+        pos += chunk.length;
+      }
+      return textDecoder.decode(result);
+    } catch (e) {
+      console.error("Decompression error for", entry.name, e);
+      return null;
+    }
   }
   return null;
 }
@@ -125,6 +227,7 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
   const [localRunsPerPlate, setLocalRunsPerPlate] = useState<number[]>(runsRequiredPerPlate);
   const [localCompleted, setLocalCompleted] = useState<number[]>(plateRunsCompleted);
   const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalPartsTotal(String(partsTotal));
@@ -137,12 +240,10 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
   const totalPlates = Math.ceil((parseInt(localPartsTotal) || 0) / (parseInt(localPartsPerPlate) || 1));
   const defaultRuns = parseInt(localDefaultRuns) || 1;
 
-  // Get required runs for a specific plate
   const getRunsRequired = (plateIndex: number) => {
     return localRunsPerPlate[plateIndex] || defaultRuns;
   };
 
-  // Ensure arrays match plate count
   useEffect(() => {
     if (localCompleted.length !== totalPlates) {
       setLocalCompleted(Array.from({ length: totalPlates }, (_, i) => localCompleted[i] || 0));
@@ -156,16 +257,24 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
     const file = e.target.files?.[0];
     if (!file) return;
     setParsing(true);
+    setParseError(null);
     try {
       const result = await parse3MFForPlateInfo(file);
-      if ('itemCount' in result) {
-        setLocalPartsPerPlate(String(result.itemCount));
-        toast({ title: `3MF verwerkt: ${result.itemCount} onderdelen per plaat, ${result.objectCount} unieke objecten` });
-      } else {
+      if ('error' in result) {
+        setParseError(result.error);
         toast({ title: "3MF fout", description: result.error, variant: "destructive" });
+      } else {
+        setLocalPartsPerPlate(String(result.itemCount));
+        setParseError(null);
+        toast({
+          title: `3MF verwerkt ✅`,
+          description: result.details,
+        });
       }
     } catch (err: any) {
-      toast({ title: "Fout bij verwerken 3MF", description: err?.message || "Onbekende fout", variant: "destructive" });
+      const msg = err?.message || "Onbekende fout";
+      setParseError(msg);
+      toast({ title: "Fout bij verwerken 3MF", description: msg, variant: "destructive" });
     } finally {
       setParsing(false);
       e.target.value = "";
@@ -210,7 +319,6 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
     });
   };
 
-  // Apply default to all plates
   const applyDefaultToAll = () => {
     setLocalRunsPerPlate(Array.from({ length: totalPlates }, () => defaultRuns));
   };
@@ -223,10 +331,17 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
       <div className="mb-4">
         <label className="inline-flex items-center gap-2 px-3 py-2 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors text-sm">
           {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          3MF inladen voor plaatinfo
+          3MF inladen (Bambu Studio)
           <input type="file" accept=".3mf" onChange={handle3MFUpload} className="hidden" />
         </label>
-        <p className="text-xs text-muted-foreground mt-1">Het 3MF bestand wordt lokaal verwerkt en niet geüpload.</p>
+        <p className="text-xs text-muted-foreground mt-1">Het 3MF bestand wordt lokaal verwerkt en niet geüpload. Ondersteunt Bambu Studio projectbestanden.</p>
+        
+        {parseError && (
+          <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-destructive">{parseError}</p>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">

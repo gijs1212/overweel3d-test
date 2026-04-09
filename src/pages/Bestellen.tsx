@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Link2, Check, Package, Loader2, AlertCircle, ShoppingCart, Trash2, Star, Plus, Info, Camera, Pencil, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Link2, Check, Package, Loader2, AlertCircle, ShoppingCart, Trash2, Star, Plus, Info, Camera, Pencil, Upload, X, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -91,6 +92,12 @@ export default function Bestellen() {
   // DB products
   const [dbProducts, setDbProducts] = useState<DBProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<DBProduct | null>(null);
+
+  // Discount code
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountApplied, setDiscountApplied] = useState<{ type: string; value: number; code: string } | null>(null);
+  const [checkingDiscount, setCheckingDiscount] = useState(false);
 
   useEffect(() => {
     supabase.from("products").select("*").eq("active", true).then(({ data }) => {
@@ -119,6 +126,8 @@ export default function Bestellen() {
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", address: "", city: "", postalCode: "", notes: "", agreeTerms: false,
   });
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
   // Link management
   const addLink = () => {
@@ -183,6 +192,7 @@ export default function Bestellen() {
       customerPhoto: prebuiltPhotos[product.id] || undefined,
     };
     setPrebuiltCart([...prebuiltCart, newItem]);
+    setSelectedProduct(null);
     toast({ title: "Toegevoegd", description: `${product.name} is toegevoegd.` });
   };
 
@@ -191,6 +201,49 @@ export default function Bestellen() {
   };
 
   const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
+
+  const getDiscountedTotal = () => {
+    if (!discountApplied) return prebuiltTotal;
+    if (discountApplied.type === "percentage") {
+      return prebuiltTotal * (1 - discountApplied.value / 100);
+    }
+    return Math.max(0, prebuiltTotal - discountApplied.value);
+  };
+
+  const applyDiscountCode = async () => {
+    if (!discountCode.trim()) return;
+    setCheckingDiscount(true);
+    try {
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .eq("code", discountCode.toUpperCase().trim())
+        .eq("active", true)
+        .maybeSingle();
+
+      if (error || !data) {
+        toast({ title: "Ongeldige kortingscode", variant: "destructive" });
+        setCheckingDiscount(false);
+        return;
+      }
+
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        toast({ title: "Deze kortingscode is verlopen", variant: "destructive" });
+        setCheckingDiscount(false);
+        return;
+      }
+      if (data.max_uses !== null && data.times_used >= data.max_uses) {
+        toast({ title: "Deze kortingscode is al maximaal gebruikt", variant: "destructive" });
+        setCheckingDiscount(false);
+        return;
+      }
+
+      setDiscountApplied({ type: data.discount_type, value: Number(data.discount_value), code: data.code });
+      toast({ title: `Kortingscode "${data.code}" toegepast! 🎉` });
+    } catch {
+      toast({ title: "Fout bij controleren code", variant: "destructive" });
+    } finally { setCheckingDiscount(false); }
+  };
 
   // Custom photo helpers
   const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,7 +281,6 @@ export default function Bestellen() {
           })),
         }));
 
-      // Upload customer photos for prebuilt items
       const prebuiltItems = [];
       for (const item of prebuiltCart) {
         let customerPhotoPath: string | undefined;
@@ -255,10 +307,19 @@ export default function Bestellen() {
         }
       }
 
+      // Increment discount code usage if applied
+      if (discountApplied) {
+        try {
+          await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code });
+        } catch {}
+      }
+
       const { error } = await supabase.functions.invoke("send-order-notification", {
         body: {
           orderDetails: {
             links: linkItems, prebuiltItems, prebuiltTotal: prebuiltTotal.toFixed(2),
+            discountCode: discountApplied?.code,
+            discountedTotal: discountApplied ? getDiscountedTotal().toFixed(2) : undefined,
             customOrder: hasCustomOrder ? { description: customDescription, photoCount: customPhotos.length, photoPaths: customPhotoUrls } : null,
           },
           customer: { name: formData.name, email: formData.email, phone: formData.phone, address: formData.address, city: formData.city, postalCode: formData.postalCode, notes: formData.notes },
@@ -272,8 +333,6 @@ export default function Bestellen() {
       toast({ title: "Er ging iets mis", description: "Probeer het opnieuw of neem contact met ons op.", variant: "destructive" });
     } finally { setIsSubmitting(false); }
   };
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
   if (orderComplete) {
     return (
@@ -303,6 +362,10 @@ export default function Bestellen() {
       </div>
     );
   }
+
+  const getProductImageUrl = (photoPath: string) => {
+    return `${supabaseUrl}/storage/v1/object/public/orders/${photoPath}`;
+  };
 
   return (
     <div className="min-h-screen">
@@ -372,7 +435,7 @@ export default function Bestellen() {
                        </button>
                      </div>
 
-                     {/* Pre-built Models from DB */}
+                     {/* Pre-built Models - Card Grid */}
                      <AnimatePresence>
                      {activeSection === "prebuilt" && (
                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -380,119 +443,176 @@ export default function Bestellen() {
                        <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
                          <Star className="w-6 h-6 text-accent" /> Kant-en-klare modellen
                        </h2>
-                       <p className="text-sm text-muted-foreground mb-6">Direct leverbaar tegen vaste prijs. Deze worden volledig afgemonteerd geleverd.</p>
+                       <p className="text-sm text-muted-foreground mb-6">Klik op een product voor meer info en om te bestellen.</p>
 
                        {loadingProducts ? (
                          <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>
                        ) : dbProducts.length === 0 ? (
                          <p className="text-muted-foreground text-center py-4">Momenteel geen producten beschikbaar.</p>
                        ) : (
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           {dbProducts.map((product) => {
-                             const productColors = getProductColors(product);
-                             const qty = prebuiltQuantities[product.id] || 1;
-                             return (
-                               <div key={product.id} className="p-6 rounded-xl border-2 border-border hover:border-accent/50 transition-all">
-                                 {/* Product photos */}
-                                 {product.photos.length > 0 && (
-                                   <div className="flex gap-2 mb-4 overflow-x-auto">
-                                     {product.photos.map((photo, i) => (
-                                       <img
-                                         key={i}
-                                         src={`${supabaseUrl}/storage/v1/object/public/orders/${photo}`}
-                                         alt={`${product.name} foto ${i + 1}`}
-                                         className="w-24 h-24 rounded-lg object-cover flex-shrink-0 border border-border"
-                                       />
-                                     ))}
+                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                           {dbProducts.map((product) => (
+                             <button
+                               key={product.id}
+                               onClick={() => setSelectedProduct(product)}
+                               className="group text-left rounded-xl border-2 border-border hover:border-accent/50 transition-all overflow-hidden bg-background hover:shadow-lg"
+                             >
+                               {/* Large product photo */}
+                               <div className="aspect-square w-full bg-muted relative overflow-hidden">
+                                 {product.photos.length > 0 ? (
+                                   <img
+                                     src={getProductImageUrl(product.photos[0])}
+                                     alt={product.name}
+                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                     loading="lazy"
+                                     onError={(e) => {
+                                       (e.target as HTMLImageElement).style.display = 'none';
+                                     }}
+                                   />
+                                 ) : (
+                                   <div className="w-full h-full flex items-center justify-center">
+                                     <Package className="w-16 h-16 text-muted-foreground/30" />
                                    </div>
                                  )}
-
-                                 <div className="flex items-center gap-3 mb-4">
-                                   <div>
-                                     <p className="font-semibold">{product.name}</p>
-                                     <p className="text-accent font-bold">€{product.price.toFixed(2)}</p>
-                                     {product.description && <p className="text-xs text-muted-foreground mt-1">{product.description}</p>}
-                                   </div>
-                                 </div>
-
-                                 {/* Custom text */}
-                                 {product.custom_text_enabled && (
-                                   <div className="mb-4">
-                                     <Label className="text-sm mb-1 block">{product.custom_text_label}</Label>
-                                     <Input
-                                       maxLength={product.custom_text_max_length}
-                                       value={prebuiltTexts[product.id] || ""}
-                                       onChange={(e) => setPrebuiltTexts({ ...prebuiltTexts, [product.id]: e.target.value })}
-                                       placeholder={`Max ${product.custom_text_max_length} tekens`}
-                                     />
-                                     <p className="text-xs text-muted-foreground mt-1">{(prebuiltTexts[product.id] || "").length}/{product.custom_text_max_length} tekens</p>
-                                   </div>
-                                 )}
-
-                                 {/* Color choice */}
-                                 {productColors.length > 0 && (
-                                   <div className="mb-4">
-                                     <Label className="text-sm mb-2 block">Kies een kleur (verplicht)</Label>
-                                     <div className="flex flex-wrap gap-2">
-                                       {productColors.map((color) => (
-                                         <button key={color.id}
-                                           onClick={() => setPrebuiltColors({ ...prebuiltColors, [product.id]: color.id })}
-                                           className={`w-8 h-8 rounded-full border-3 transition-all ${prebuiltColors[product.id] === color.id ? "border-accent scale-110 ring-2 ring-accent" : "border-border hover:scale-105"}`}
-                                           style={{ backgroundColor: color.hex }} title={color.name}>
-                                           {prebuiltColors[product.id] === color.id && (
-                                             <Check className={`w-4 h-4 mx-auto ${color.hex === "#FFFFFF" || color.hex === "#FFDD00" ? "text-primary" : "text-white"}`} />
-                                           )}
-                                         </button>
-                                       ))}
-                                     </div>
-                                     {prebuiltColors[product.id] && <p className="text-xs text-muted-foreground mt-1">Gekozen: {productColors.find(c => c.id === prebuiltColors[product.id])?.name}</p>}
-                                   </div>
-                                 )}
-
-                                 {/* Customer photo upload */}
-                                 {product.customer_photo_required && (
-                                   <div className="mb-4">
-                                     <Label className="text-sm mb-2 block">Foto uploaden (verplicht) 📷</Label>
-                                     {prebuiltPhotos[product.id] ? (
-                                       <div className="flex items-center gap-3">
-                                         <img src={URL.createObjectURL(prebuiltPhotos[product.id]!)} alt="Klantfoto" className="w-16 h-16 rounded-lg object-cover border" />
-                                         <Button variant="ghost" size="sm" onClick={() => setPrebuiltPhotos({ ...prebuiltPhotos, [product.id]: null })}>
-                                           <Trash2 className="w-4 h-4 text-destructive" />
-                                         </Button>
-                                       </div>
-                                     ) : (
-                                       <label className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors text-sm">
-                                         <Upload className="w-4 h-4" /> Kies een foto
-                                         <input type="file" accept="image/*" className="hidden" onChange={e => {
-                                           const f = e.target.files?.[0];
-                                           if (f) setPrebuiltPhotos({ ...prebuiltPhotos, [product.id]: f });
-                                           e.target.value = "";
-                                         }} />
-                                       </label>
-                                     )}
-                                   </div>
-                                 )}
-
-                                 <div className="mb-4">
-                                   <Label className="text-sm mb-1 block">Aantal</Label>
-                                   <Input type="number" min={1} value={qty}
-                                     onChange={(e) => setPrebuiltQuantities({ ...prebuiltQuantities, [product.id]: Math.max(1, parseInt(e.target.value) || 1) })}
-                                     className="w-24" />
-                                 </div>
-
-                                 <Button variant="outline" size="sm" onClick={() => addPrebuiltToCart(product)} className="w-full">
-                                   <ShoppingCart className="w-4 h-4 mr-2" />
-                                   Toevoegen (€{(qty * product.price).toFixed(2)})
-                                 </Button>
                                </div>
-                             );
-                           })}
+                               {/* Product info below photo */}
+                               <div className="p-4">
+                                 <h3 className="font-bold text-primary text-lg">{product.name}</h3>
+                                 <p className="text-accent font-bold text-xl mt-1">€{product.price.toFixed(2)}</p>
+                                 {product.description && (
+                                   <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{product.description}</p>
+                                 )}
+                                 <div className="flex flex-wrap gap-1 mt-3">
+                                   {product.custom_text_enabled && <span className="text-[10px] px-2 py-0.5 bg-accent/10 text-accent rounded-full">✏️ Tekst</span>}
+                                   {product.customer_photo_required && <span className="text-[10px] px-2 py-0.5 bg-accent/10 text-accent rounded-full">📷 Foto</span>}
+                                 </div>
+                               </div>
+                             </button>
+                           ))}
                          </div>
                        )}
                      </div>
                      </motion.div>
                      )}
                      </AnimatePresence>
+
+                     {/* Product Detail Modal */}
+                     <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+                       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                         {selectedProduct && (() => {
+                           const product = selectedProduct;
+                           const productColors = getProductColors(product);
+                           const qty = prebuiltQuantities[product.id] || 1;
+                           return (
+                             <>
+                               <DialogHeader>
+                                 <DialogTitle className="text-xl">{product.name}</DialogTitle>
+                               </DialogHeader>
+
+                               {/* Photo gallery */}
+                               {product.photos.length > 0 && (
+                                 <div className="space-y-2">
+                                   <img
+                                     src={getProductImageUrl(product.photos[0])}
+                                     alt={product.name}
+                                     className="w-full rounded-lg object-cover max-h-72"
+                                     loading="lazy"
+                                   />
+                                   {product.photos.length > 1 && (
+                                     <div className="flex gap-2 overflow-x-auto">
+                                       {product.photos.slice(1).map((photo, i) => (
+                                         <img
+                                           key={i}
+                                           src={getProductImageUrl(photo)}
+                                           alt={`${product.name} ${i + 2}`}
+                                           className="w-20 h-20 rounded-lg object-cover flex-shrink-0 border"
+                                           loading="lazy"
+                                         />
+                                       ))}
+                                     </div>
+                                   )}
+                                 </div>
+                               )}
+
+                               <p className="text-2xl font-bold text-accent">€{product.price.toFixed(2)}</p>
+                               {product.description && <p className="text-muted-foreground">{product.description}</p>}
+
+                               {/* Custom text */}
+                               {product.custom_text_enabled && (
+                                 <div>
+                                   <Label className="text-sm mb-1 block">{product.custom_text_label}</Label>
+                                   <Input
+                                     maxLength={product.custom_text_max_length}
+                                     value={prebuiltTexts[product.id] || ""}
+                                     onChange={(e) => setPrebuiltTexts({ ...prebuiltTexts, [product.id]: e.target.value })}
+                                     placeholder={`Max ${product.custom_text_max_length} tekens`}
+                                   />
+                                   <p className="text-xs text-muted-foreground mt-1">{(prebuiltTexts[product.id] || "").length}/{product.custom_text_max_length} tekens</p>
+                                 </div>
+                               )}
+
+                               {/* Color choice */}
+                               {productColors.length > 0 && (
+                                 <div>
+                                   <Label className="text-sm mb-2 block">Kies een kleur (verplicht)</Label>
+                                   <div className="flex flex-wrap gap-2">
+                                     {productColors.map((color) => (
+                                       <button key={color.id}
+                                         onClick={() => setPrebuiltColors({ ...prebuiltColors, [product.id]: color.id })}
+                                         className={`w-10 h-10 rounded-full border-3 transition-all ${prebuiltColors[product.id] === color.id ? "border-accent scale-110 ring-2 ring-accent" : "border-border hover:scale-105"}`}
+                                         style={{ backgroundColor: color.hex }} title={color.name}>
+                                         {prebuiltColors[product.id] === color.id && (
+                                           <Check className={`w-4 h-4 mx-auto ${color.hex === "#FFFFFF" || color.hex === "#FFDD00" ? "text-primary" : "text-white"}`} />
+                                         )}
+                                       </button>
+                                     ))}
+                                   </div>
+                                   {prebuiltColors[product.id] && <p className="text-xs text-muted-foreground mt-1">Gekozen: {productColors.find(c => c.id === prebuiltColors[product.id])?.name}</p>}
+                                 </div>
+                               )}
+
+                               {/* Customer photo upload */}
+                               {product.customer_photo_required && (
+                                 <div>
+                                   <Label className="text-sm mb-2 block">Foto uploaden (verplicht) 📷</Label>
+                                   {prebuiltPhotos[product.id] ? (
+                                     <div className="flex items-center gap-3">
+                                       <img src={URL.createObjectURL(prebuiltPhotos[product.id]!)} alt="Klantfoto" className="w-20 h-20 rounded-lg object-cover border" />
+                                       <Button variant="ghost" size="sm" onClick={() => setPrebuiltPhotos({ ...prebuiltPhotos, [product.id]: null })}>
+                                         <Trash2 className="w-4 h-4 text-destructive" />
+                                       </Button>
+                                     </div>
+                                   ) : (
+                                     <label className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors text-sm">
+                                       <Upload className="w-4 h-4" /> Kies een foto
+                                       <input type="file" accept="image/*" className="hidden" onChange={e => {
+                                         const f = e.target.files?.[0];
+                                         if (f) setPrebuiltPhotos({ ...prebuiltPhotos, [product.id]: f });
+                                         e.target.value = "";
+                                       }} />
+                                     </label>
+                                   )}
+                                 </div>
+                               )}
+
+                               {/* Quantity + add */}
+                               <div className="flex items-end gap-4">
+                                 <div>
+                                   <Label className="text-sm mb-1 block">Aantal</Label>
+                                   <Input type="number" min={1} value={qty}
+                                     onChange={(e) => setPrebuiltQuantities({ ...prebuiltQuantities, [product.id]: Math.max(1, parseInt(e.target.value) || 1) })}
+                                     className="w-24" />
+                                 </div>
+                                 <Button variant="hero" onClick={() => addPrebuiltToCart(product)} className="flex-1">
+                                   <ShoppingCart className="w-4 h-4 mr-2" />
+                                   Toevoegen (€{(qty * product.price).toFixed(2)})
+                                 </Button>
+                               </div>
+                             </>
+                           );
+                         })()}
+                       </DialogContent>
+                     </Dialog>
 
                      {/* Links Section */}
                      <AnimatePresence>
@@ -655,6 +775,37 @@ export default function Bestellen() {
                       <div className="md:col-span-2"><Label htmlFor="city">Plaats *</Label><Input id="city" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} placeholder="Woonplaats" /></div>
                       <div className="md:col-span-2"><Label htmlFor="notes">Opmerkingen / speciale instructies</Label><Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Bijv. specifieke bestanden uit een link, infill-percentage, etc." rows={3} /></div>
                     </div>
+
+                    {/* Discount code */}
+                    {hasPrebuiltItems && (
+                      <div className="mb-6 p-4 border border-border rounded-xl">
+                        <Label className="text-sm mb-2 block flex items-center gap-2"><Tag className="w-4 h-4" /> Kortingscode</Label>
+                        {discountApplied ? (
+                          <div className="flex items-center justify-between bg-accent/10 rounded-lg p-3">
+                            <span className="text-sm font-medium text-accent">
+                              ✅ {discountApplied.code} — {discountApplied.type === "percentage" ? `${discountApplied.value}%` : `€${discountApplied.value.toFixed(2)}`} korting
+                            </span>
+                            <Button variant="ghost" size="sm" onClick={() => { setDiscountApplied(null); setDiscountCode(""); }}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Input
+                              value={discountCode}
+                              onChange={e => setDiscountCode(e.target.value)}
+                              placeholder="Voer kortingscode in"
+                              className="uppercase"
+                              onKeyDown={e => e.key === "Enter" && applyDiscountCode()}
+                            />
+                            <Button variant="outline" onClick={applyDiscountCode} disabled={checkingDiscount || !discountCode.trim()}>
+                              {checkingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Toepassen"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="space-y-4 mb-8">
                       <div className="flex items-start gap-3">
                         <Checkbox id="terms" checked={formData.agreeTerms} onCheckedChange={(checked) => setFormData({ ...formData, agreeTerms: checked as boolean })} />
@@ -717,10 +868,22 @@ export default function Bestellen() {
                         </div>
                       )}
                       {prebuiltCart.length > 0 && (
-                        <div className="border-t border-border pt-3">
+                        <div className="border-t border-border pt-3 space-y-1">
+                          {discountApplied && (
+                            <>
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Subtotaal</span>
+                                <span>€{prebuiltTotal.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm text-accent">
+                                <span>Korting ({discountApplied.code})</span>
+                                <span>-€{(prebuiltTotal - getDiscountedTotal()).toFixed(2)}</span>
+                              </div>
+                            </>
+                          )}
                           <div className="flex justify-between items-center">
-                            <span className="font-semibold text-sm">Kant-en-klaar totaal</span>
-                            <span className="text-xl font-bold text-accent">€{prebuiltTotal.toFixed(2)}</span>
+                            <span className="font-semibold text-sm">Totaal</span>
+                            <span className="text-xl font-bold text-accent">€{getDiscountedTotal().toFixed(2)}</span>
                           </div>
                         </div>
                       )}

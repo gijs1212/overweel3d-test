@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -87,6 +87,9 @@ export default function AdminDashboard() {
               </Link>
               <Link to="/admin/content">
                 <Button variant="outline"><Megaphone className="w-4 h-4" /> Content</Button>
+              </Link>
+              <Link to="/admin/discounts">
+                <Button variant="outline"><Tag className="w-4 h-4" /> Kortingscodes</Button>
               </Link>
               <Link to="/admin/new-order">
                 <Button><Plus className="w-4 h-4" /> Bestelling aanmaken</Button>

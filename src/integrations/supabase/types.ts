@@ -109,6 +109,45 @@ export type Database = {
           },
         ]
       }
+      discount_codes: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          max_uses: number | null
+          times_used: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          times_used?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          times_used?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       exported_orders: {
         Row: {
           completed_at: string | null
@@ -531,6 +570,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_discount_usage: {
+        Args: { code_text: string }
+        Returns: undefined
       }
     }
     Enums: {
