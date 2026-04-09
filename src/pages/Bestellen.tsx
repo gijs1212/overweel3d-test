@@ -310,7 +310,7 @@ export default function Bestellen() {
       // Increment discount code usage if applied
       if (discountApplied) {
         try {
-          await supabase.from("discount_codes").update({ times_used: 1 } as any).eq("code", discountApplied.code);
+          await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code });
         } catch {}
       }
 
