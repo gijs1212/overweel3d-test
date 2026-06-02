@@ -474,12 +474,22 @@ export default function NewOrder() {
                         {products.length === 0 ? (
                           <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
                         ) : (
-                          <div className="space-y-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {products.map(product => (
-                              <ProductCard key={product.id} product={product} onAdd={addToPrebuiltCart} />
+                              <ProductTile
+                                key={product.id}
+                                product={product}
+                                onClick={() => setSelectedProduct(product)}
+                              />
                             ))}
                           </div>
                         )}
+                        <ProductDetailDialog
+                          product={selectedProduct}
+                          open={!!selectedProduct}
+                          onOpenChange={(o) => !o && setSelectedProduct(null)}
+                          onAdd={addToPrebuiltCart}
+                        />
                         {prebuiltCart.length > 0 && (
                           <div className="mt-6 border-t border-border pt-4">
                             <h3 className="font-semibold mb-3">Winkelwagen</h3>
