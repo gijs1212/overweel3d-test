@@ -16,7 +16,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
-import { ProductCard } from "@/components/ProductCard";
+import { ProductTile } from "@/components/ProductTile";
+import { ProductDetailDialog } from "@/components/ProductDetailDialog";
+import { OrderAuthGate } from "@/components/OrderAuthGate";
 
 interface UploadedFile {
   file: File;
@@ -39,6 +41,7 @@ interface FileLink {
 interface ProductItem {
   id: string;
   name: string;
+  description?: string;
   price: number;
   materials: string[];
   colors: string[];
@@ -67,6 +70,7 @@ export default function NewOrder() {
   const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom" | "prebuilt">("link");
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [prebuiltCart, setPrebuiltCart] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -248,7 +252,7 @@ export default function NewOrder() {
   const estimatedPrice = calculateEstimate();
   const isParsing = uploadedFiles.some((f) => f.parsing);
 
-  const hasCustomOrder = customPhotos.length > 0 && customDescription.trim().length > 0;
+  const hasCustomOrder = customDescription.trim().length > 0;
 
   // Custom photo helpers
   const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -393,6 +397,7 @@ export default function NewOrder() {
   };
 
   return (
+    <OrderAuthGate>
     <div className="min-h-screen">
       <Navbar />
       <main className="pt-20 pb-16">
@@ -469,12 +474,22 @@ export default function NewOrder() {
                         {products.length === 0 ? (
                           <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
                         ) : (
-                          <div className="space-y-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {products.map(product => (
-                              <ProductCard key={product.id} product={product} onAdd={addToPrebuiltCart} />
+                              <ProductTile
+                                key={product.id}
+                                product={product}
+                                onClick={() => setSelectedProduct(product)}
+                              />
                             ))}
                           </div>
                         )}
+                        <ProductDetailDialog
+                          product={selectedProduct}
+                          open={!!selectedProduct}
+                          onOpenChange={(o) => !o && setSelectedProduct(null)}
+                          onAdd={addToPrebuiltCart}
+                        />
                         {prebuiltCart.length > 0 && (
                           <div className="mt-6 border-t border-border pt-4">
                             <h3 className="font-semibold mb-3">Winkelwagen</h3>
@@ -736,7 +751,7 @@ export default function NewOrder() {
 
                         {/* Photo upload */}
                         <div className="mb-4">
-                          <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
+                          <Label className="text-sm mb-2 block">Foto's (optioneel, max 3)</Label>
                           <div className="flex flex-wrap gap-3 mb-3">
                             {customPhotos.map((photo, index) => (
                               <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
@@ -778,9 +793,7 @@ export default function NewOrder() {
                             onChange={(e) => setCustomDescription(e.target.value)}
                             placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
                             rows={4}
-                            maxLength={2000}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
                         </div>
                       </div>
                     )}
@@ -995,5 +1008,6 @@ export default function NewOrder() {
       </main>
       <Footer />
     </div>
+    </OrderAuthGate>
   );
 }
