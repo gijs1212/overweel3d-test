@@ -1009,5 +1009,6 @@ export default function NewOrder() {
       </main>
       <Footer />
     </div>
+    </OrderAuthGate>
   );
 }
