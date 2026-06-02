@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { getProductPhotoUrl } from "@/lib/productPhotos";
 
 interface Product {
   id: string;
@@ -14,9 +16,19 @@ interface ProductTileProps {
 }
 
 export function ProductTile({ product, onClick }: ProductTileProps) {
-  const photoUrl = product.photos[0]
-    ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/orders/${product.photos[0]}`
-    : null;
+  const [photoUrl, setPhotoUrl] = useState<string>("");
+
+  useEffect(() => {
+    let active = true;
+    if (product.photos[0]) {
+      getProductPhotoUrl(product.photos[0]).then((url) => {
+        if (active) setPhotoUrl(url);
+      });
+    } else {
+      setPhotoUrl("");
+    }
+    return () => { active = false; };
+  }, [product.photos]);
 
   return (
     <Card
