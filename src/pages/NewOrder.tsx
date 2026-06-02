@@ -398,6 +398,7 @@ export default function NewOrder() {
   };
 
   return (
+    <OrderAuthGate>
     <div className="min-h-screen">
       <Navbar />
       <main className="pt-20 pb-16">
