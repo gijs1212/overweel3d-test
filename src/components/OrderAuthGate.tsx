@@ -107,11 +107,10 @@ export function OrderAuthGate({ children }: { children: React.ReactNode }) {
 
       <Dialog open={true} onOpenChange={noClose}>
         <DialogContent
-          className="max-w-md"
+          className="max-w-md [&>button]:hidden"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
-          hideClose
         >
           {!user ? (
             <>
