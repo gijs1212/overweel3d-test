@@ -751,7 +751,7 @@ export default function NewOrder() {
 
                         {/* Photo upload */}
                         <div className="mb-4">
-                          <Label className="text-sm mb-2 block">Foto's (1-3) *</Label>
+                          <Label className="text-sm mb-2 block">Foto's (optioneel, max 3)</Label>
                           <div className="flex flex-wrap gap-3 mb-3">
                             {customPhotos.map((photo, index) => (
                               <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
@@ -793,9 +793,7 @@ export default function NewOrder() {
                             onChange={(e) => setCustomDescription(e.target.value)}
                             placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
                             rows={4}
-                            maxLength={2000}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">{customDescription.length}/2000 tekens</p>
                         </div>
                       </div>
                     )}
