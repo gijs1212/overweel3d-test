@@ -12,6 +12,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS } from "@/lib/constants";
+import { getProductPhotoUrl } from "@/lib/productPhotos";
+
+function SignedImg({ path, className }: { path: string; className?: string }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    let active = true;
+    getProductPhotoUrl(path).then((u) => { if (active) setUrl(u); });
+    return () => { active = false; };
+  }, [path]);
+  return <img src={url} alt="" className={className} />;
+}
 
 interface Product {
   id: string;
@@ -173,9 +184,9 @@ export default function AdminProducts() {
               <div className="md:col-span-2">
                 <Label>Foto's</Label>
                 <div className="flex flex-wrap gap-3 mt-2">
-                  {form.photos.map((p, i) => (
-                    <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border group">
-                      <img src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/orders/${p}`} alt="" className="w-full h-full object-cover" />
+                   {form.photos.map((p, i) => (
+                     <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border group">
+                       <SignedImg path={p} className="w-full h-full object-cover" />
                       <button onClick={() => removeExistingPhoto(i)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">×</button>
                     </div>
                   ))}
@@ -291,9 +302,9 @@ export default function AdminProducts() {
                   </div>
                   {p.photos.length > 0 && (
                     <div className="flex gap-2 mt-2">
-                      {p.photos.slice(0, 3).map((ph, i) => (
-                        <img key={i} src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/orders/${ph}`} alt="" className="w-12 h-12 rounded object-cover" />
-                      ))}
+                       {p.photos.slice(0, 3).map((ph, i) => (
+                         <SignedImg key={i} path={ph} className="w-12 h-12 rounded object-cover" />
+                       ))}
                     </div>
                   )}
                 </div>

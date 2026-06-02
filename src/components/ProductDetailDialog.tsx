@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { MATERIALS } from "@/lib/constants";
+import { getProductPhotoUrls } from "@/lib/productPhotos";
 
 interface Product {
   id: string;
@@ -33,6 +34,7 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
   const [quantity, setQuantity] = useState(1);
   const [customText, setCustomText] = useState("");
   const [activePhoto, setActivePhoto] = useState(0);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
 
   useEffect(() => {
     if (product) {
@@ -41,6 +43,7 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
       setQuantity(1);
       setCustomText("");
       setActivePhoto(0);
+      getProductPhotoUrls(product.photos).then(setPhotoUrls);
     }
   }, [product]);
 
@@ -50,10 +53,6 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
   const availableColors = material
     ? MATERIALS.find(m => m.id === material)?.colors.filter(c => product.colors.length === 0 || product.colors.includes(c.id)) || []
     : [];
-
-  const photoUrls = product.photos.map(
-    p => `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/orders/${p}`
-  );
 
   const handleAdd = () => {
     if (!material || !color) return;
