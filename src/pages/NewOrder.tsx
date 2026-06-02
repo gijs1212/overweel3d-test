@@ -17,6 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductTile } from "@/components/ProductTile";
+import { ProductDetailDialog } from "@/components/ProductDetailDialog";
+import { OrderAuthGate } from "@/components/OrderAuthGate";
 
 interface UploadedFile {
   file: File;
@@ -39,6 +42,7 @@ interface FileLink {
 interface ProductItem {
   id: string;
   name: string;
+  description?: string;
   price: number;
   materials: string[];
   colors: string[];
@@ -67,6 +71,7 @@ export default function NewOrder() {
   const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom" | "prebuilt">("link");
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [prebuiltCart, setPrebuiltCart] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 
   // Files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -248,7 +253,7 @@ export default function NewOrder() {
   const estimatedPrice = calculateEstimate();
   const isParsing = uploadedFiles.some((f) => f.parsing);
 
-  const hasCustomOrder = customPhotos.length > 0 && customDescription.trim().length > 0;
+  const hasCustomOrder = customDescription.trim().length > 0;
 
   // Custom photo helpers
   const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
