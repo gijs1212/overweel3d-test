@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package } from "lucide-react";
+import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package, Upload, Eye } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { PrintProgress } from "@/components/PrintProgress";
+import { ModelViewer } from "@/components/ModelViewer";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
@@ -45,6 +47,9 @@ interface Order {
   shipping_carrier?: string;
   tracking_code?: string;
   shipping_cost?: number;
+  customer_upload_requested?: boolean;
+  customer_upload_request_note?: string | null;
+  user_id?: string | null;
 }
 
 interface OrderFile { id: string; storage_path: string; original_filename: string; file_size: number; }
@@ -57,6 +62,7 @@ export default function OrderDetail() {
   const [searchParams] = useSearchParams();
   const isSuccess = searchParams.get("success") === "true";
   const { toast } = useToast();
+  const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [events, setEvents] = useState<OrderEvent[]>([]);
@@ -71,6 +77,8 @@ export default function OrderDetail() {
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [proposingDelivery, setProposingDelivery] = useState(false);
+  const [uploadingCustomer, setUploadingCustomer] = useState(false);
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
   const fetchOrder = async () => {
     if (!token) return;
