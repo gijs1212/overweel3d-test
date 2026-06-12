@@ -336,17 +336,78 @@ export default function OrderDetail() {
               ) : (
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
+
+                  {order.customer_upload_requested && user && order.user_id === user.id && (
+                    <div className="mb-4 p-4 rounded-lg border-2 border-dashed border-accent/50 bg-accent/5">
+                      <p className="text-sm font-medium text-primary mb-1">📤 Upload-verzoek van Overweel3D</p>
+                      {order.customer_upload_request_note && (
+                        <p className="text-xs text-muted-foreground mb-3 whitespace-pre-wrap">{order.customer_upload_request_note}</p>
+                      )}
+                      <label className="inline-flex items-center gap-2 px-3 py-2 bg-accent text-accent-foreground rounded-md text-sm cursor-pointer hover:opacity-90">
+                        {uploadingCustomer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        Bestand(en) uploaden
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingCustomer}
+                          onChange={async (e) => {
+                            const fs = Array.from(e.target.files || []);
+                            if (!fs.length) return;
+                            setUploadingCustomer(true);
+                            try {
+                              for (const f of fs) {
+                                const path = `${order.order_number}/files/customer-${Date.now()}-${f.name}`;
+                                const { error: upErr } = await supabase.storage.from("orders").upload(path, f, { upsert: true });
+                                if (upErr) throw upErr;
+                                const { error: insErr } = await supabase.from("order_files").insert({
+                                  order_id: order.id,
+                                  storage_path: path,
+                                  original_filename: f.name,
+                                  file_size: f.size,
+                                  mime_type: f.type || "application/octet-stream",
+                                });
+                                if (insErr) throw insErr;
+                              }
+                              toast({ title: `${fs.length} bestand(en) geüpload ✅` });
+                              await fetchOrder();
+                            } catch (err: any) {
+                              toast({ title: "Upload mislukt", description: err.message, variant: "destructive" });
+                            } finally {
+                              setUploadingCustomer(false);
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+
                   {files.length > 0 ? (
                     <div className="space-y-2">
                       {files.map((file) => (
-                        <div key={file.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-accent" />
-                            <span className="text-sm truncate max-w-[200px]">{file.original_filename}</span>
+                        <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="w-4 h-4 text-accent flex-shrink-0" />
+                              <span className="text-sm truncate">{file.original_filename}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {/\.(stl|obj)$/i.test(file.original_filename) && (
+                                <Button variant="ghost" size="sm" onClick={() => setPreviewFileId(previewFileId === file.id ? null : file.id)}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                            <Download className="w-4 h-4" />
-                          </Button>
+                          {previewFileId === file.id && (
+                            <div className="mt-3">
+                              <ModelViewer storagePath={file.storage_path} filename={file.original_filename} height={240} />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
