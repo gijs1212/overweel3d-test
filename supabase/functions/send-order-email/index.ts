@@ -13,7 +13,7 @@ serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { type, orderId } = await req.json();
+    const { type, orderId, note } = await req.json();
     if (!type || !orderId) throw new Error("Type and orderId are required");
 
     const supabase = createClient(
@@ -66,6 +66,19 @@ serve(async (req: Request) => {
         order_id: order.id,
         event_type: "order_updated",
         event_description: "Bestelling is bijgewerkt. De klant is per e-mail geïnformeerd.",
+        visible_to_customer: true,
+      });
+    } else if (type === "customer_upload_request") {
+      await resend.emails.send({
+        from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+        to: [order.customer_email],
+        subject: `📤 Upload-verzoek voor bestelling ${order.order_number}`,
+        html: buildUploadRequestEmail(order, orderLink, note || ""),
+      });
+      await supabase.from("order_events").insert({
+        order_id: order.id,
+        event_type: "customer_upload_request",
+        event_description: "De admin heeft u gevraagd bestanden te uploaden.",
         visible_to_customer: true,
       });
     }
@@ -168,6 +181,31 @@ function buildUpdateEmail(order: any, orderLink: string): string {
       <p>Bekijk uw bestelling voor alle details en om de offerte te accepteren of af te wijzen.</p>
       <div style="text-align: center; margin: 24px 0;">
         <a href="${orderLink}" class="btn">Bekijk uw bestelling</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Met vriendelijke groet,<br><strong>Team Overweel3D</strong></p>
+    </div>
+  </body></html>`;
+}
+
+function buildUploadRequestEmail(order: any, orderLink: string, note: string): string {
+  return `<!DOCTYPE html><html><head><style>
+    body { font-family: 'Segoe UI', sans-serif; color: #1B365D; max-width: 600px; margin: 0 auto; line-height: 1.6; }
+    .header { background: linear-gradient(135deg, #1B365D, #2d4a7c); padding: 30px; text-align: center; color: white; }
+    .content { padding: 30px; background: #f8fafc; }
+    .note { background: white; border-left: 4px solid #00b4d8; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+    .btn { display: inline-block; background: #00b4d8; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+  </style></head><body>
+    <div class="header"><h1>📤 Wij hebben uw bestand(en) nodig</h1></div>
+    <div class="content">
+      <p>Beste ${order.customer_name},</p>
+      <p>Voor uw bestelling <strong>${order.order_number}</strong> hebben wij aanvullende bestanden van u nodig.</p>
+      ${note ? `<div class="note"><p style="margin:0;"><strong>Notitie:</strong><br>${note.replace(/\n/g, "<br>")}</p></div>` : ""}
+      <p>Open uw bestelling en gebruik de upload-knop om de bestanden te delen.</p>
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${orderLink}" class="btn">Bestelling openen & uploaden</a>
       </div>
     </div>
     <div class="footer">
