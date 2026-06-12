@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2, Truck, Receipt } from "lucide-react";
+import { Save, Loader2, ArrowLeft, FileText, Download, Send, Trash2, CheckCircle, Link2, Truck, Receipt, Upload, MailQuestion, XCircle, Eye } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { OrderChat } from "@/components/OrderChat";
 import { DeliveryScheduler } from "@/components/DeliveryScheduler";
 import { PlateTracker } from "@/components/PlateTracker";
+import { ModelViewer } from "@/components/ModelViewer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +32,9 @@ interface Order {
   delivery_email: string;
   shipping_carrier: string; tracking_code: string; shipping_cost: number;
   plate_runs_required: number; plate_runs_completed: any;
+  customer_upload_requested?: boolean;
+  customer_upload_request_note?: string | null;
+  customer_upload_requested_at?: string | null;
 }
 
 interface OrderFile { id: string; storage_path: string; original_filename: string; file_size: number; mime_type: string; }
@@ -55,6 +59,12 @@ export default function AdminOrderEdit() {
   const [invoiceKvk, setInvoiceKvk] = useState("");
   const [invoiceBtw, setInvoiceBtw] = useState("");
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [showRequestUpload, setShowRequestUpload] = useState(false);
+  const [uploadRequestNote, setUploadRequestNote] = useState("");
+  const [savingUploadRequest, setSavingUploadRequest] = useState(false);
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
   const [finalPrice, setFinalPrice] = useState("");
   const [tikkieLink, setTikkieLink] = useState("");
@@ -102,6 +112,7 @@ export default function AdminOrderEdit() {
         setTrackingCode(o.tracking_code || "");
         setShippingCost(o.shipping_cost?.toString() || "");
         setOriginalFinalPrice(o.final_price);
+        setUploadRequestNote((o as any).customer_upload_request_note || "");
       }
       const { data: filesData } = await supabase.from("order_files").select("*").eq("order_id", orderId);
       setFiles((filesData as OrderFile[]) || []);
