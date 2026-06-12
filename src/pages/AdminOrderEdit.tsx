@@ -329,19 +329,147 @@ export default function AdminOrderEdit() {
 
             {/* Files */}
             <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-              <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="font-bold text-primary">Bestanden ({files.length})</h3>
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent text-accent-foreground rounded-md text-sm cursor-pointer hover:opacity-90">
+                    {uploadingFiles ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Upload bestand(en)
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      disabled={uploadingFiles}
+                      onChange={async (e) => {
+                        const filesIn = Array.from(e.target.files || []);
+                        if (!filesIn.length) return;
+                        setUploadingFiles(true);
+                        try {
+                          for (const f of filesIn) {
+                            const path = `${order.order_number}/files/admin-${Date.now()}-${f.name}`;
+                            const { error: upErr } = await supabase.storage.from("orders").upload(path, f, { upsert: true });
+                            if (upErr) throw upErr;
+                            const { data: row, error: insErr } = await supabase.from("order_files").insert({
+                              order_id: order.id,
+                              storage_path: path,
+                              original_filename: f.name,
+                              file_size: f.size,
+                              mime_type: f.type || "application/octet-stream",
+                            }).select().single();
+                            if (insErr) throw insErr;
+                            setFiles((prev) => [...prev, row as OrderFile]);
+                          }
+                          toast({ title: `${filesIn.length} bestand(en) geüpload ✅` });
+                        } catch (err: any) {
+                          toast({ title: "Upload mislukt", description: err.message, variant: "destructive" });
+                        } finally {
+                          setUploadingFiles(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Customer upload request */}
+              <div className="mb-4 p-3 rounded-lg border border-border bg-muted/30">
+                {order.customer_upload_requested ? (
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm">
+                      <p className="font-medium text-primary flex items-center gap-2"><MailQuestion className="w-4 h-4" /> Upload-verzoek actief</p>
+                      {order.customer_upload_request_note && (
+                        <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{order.customer_upload_request_note}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm" variant="outline"
+                      disabled={savingUploadRequest}
+                      onClick={async () => {
+                        setSavingUploadRequest(true);
+                        try {
+                          const { error } = await supabase.from("orders").update({
+                            customer_upload_requested: false,
+                            customer_upload_request_note: null,
+                            customer_upload_requested_at: null,
+                          }).eq("id", order.id);
+                          if (error) throw error;
+                          setOrder({ ...order, customer_upload_requested: false, customer_upload_request_note: null });
+                          toast({ title: "Verzoek geannuleerd" });
+                        } catch (err: any) {
+                          toast({ title: "Fout", description: err.message, variant: "destructive" });
+                        } finally { setSavingUploadRequest(false); }
+                      }}
+                    >
+                      <XCircle className="w-4 h-4" /> Verzoek annuleren
+                    </Button>
+                  </div>
+                ) : showRequestUpload ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Notitie aan klant (optioneel)</Label>
+                    <Textarea value={uploadRequestNote} onChange={(e) => setUploadRequestNote(e.target.value)} rows={2} placeholder="Bijv. 'Upload aub uw STL-bestand zodat we kunnen starten.'" />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={savingUploadRequest}
+                        onClick={async () => {
+                          setSavingUploadRequest(true);
+                          try {
+                            const { error } = await supabase.from("orders").update({
+                              customer_upload_requested: true,
+                              customer_upload_request_note: uploadRequestNote || null,
+                              customer_upload_requested_at: new Date().toISOString(),
+                            }).eq("id", order.id);
+                            if (error) throw error;
+                            setOrder({ ...order, customer_upload_requested: true, customer_upload_request_note: uploadRequestNote || null });
+                            setShowRequestUpload(false);
+                            try {
+                              await supabase.functions.invoke("send-order-email", {
+                                body: { type: "customer_upload_request", orderId: order.id, note: uploadRequestNote },
+                              });
+                            } catch {}
+                            toast({ title: "Verzoek verstuurd ✅" });
+                          } catch (err: any) {
+                            toast({ title: "Fout", description: err.message, variant: "destructive" });
+                          } finally { setSavingUploadRequest(false); }
+                        }}
+                      >
+                        {savingUploadRequest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Versturen
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setShowRequestUpload(false)}>Annuleren</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setShowRequestUpload(true)}>
+                    <MailQuestion className="w-4 h-4" /> Vraag klant om bestanden te uploaden
+                  </Button>
+                )}
+              </div>
+
               <div className="space-y-2">
                 {files.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-accent" />
-                      <span className="text-sm">{file.original_filename}</span>
-                      <span className="text-xs text-muted-foreground">({(file.file_size / 1024 / 1024).toFixed(1)} MB)</span>
+                  <div key={file.id} className="p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-accent flex-shrink-0" />
+                        <span className="text-sm truncate">{file.original_filename}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">({(file.file_size / 1024 / 1024).toFixed(1)} MB)</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {/\.(stl|obj)$/i.test(file.original_filename) && (
+                          <Button variant="ghost" size="sm" onClick={() => setPreviewFileId(previewFileId === file.id ? null : file.id)}>
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}><Download className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteFile(file.id, file.storage_path)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}><Download className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteFile(file.id, file.storage_path)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
+                    {previewFileId === file.id && (
+                      <div className="mt-3">
+                        <ModelViewer storagePath={file.storage_path} filename={file.original_filename} height={260} />
+                      </div>
+                    )}
                   </div>
                 ))}
                 {files.length === 0 && <p className="text-sm text-muted-foreground">Geen bestanden geüpload.</p>}
