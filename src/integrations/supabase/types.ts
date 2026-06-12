@@ -310,6 +310,9 @@ export type Database = {
           customer_email: string
           customer_name: string
           customer_order_token: string
+          customer_upload_request_note: string | null
+          customer_upload_requested: boolean
+          customer_upload_requested_at: string | null
           customer_visible_notes: string | null
           delivery_email: string | null
           file_links: string | null
@@ -356,6 +359,9 @@ export type Database = {
           customer_email: string
           customer_name: string
           customer_order_token?: string
+          customer_upload_request_note?: string | null
+          customer_upload_requested?: boolean
+          customer_upload_requested_at?: string | null
           customer_visible_notes?: string | null
           delivery_email?: string | null
           file_links?: string | null
@@ -402,6 +408,9 @@ export type Database = {
           customer_email?: string
           customer_name?: string
           customer_order_token?: string
+          customer_upload_request_note?: string | null
+          customer_upload_requested?: boolean
+          customer_upload_requested_at?: string | null
           customer_visible_notes?: string | null
           delivery_email?: string | null
           file_links?: string | null

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag } from "lucide-react";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag, Tag, ShoppingCart, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,24 +19,7 @@ import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 import { ProductTile } from "@/components/ProductTile";
 import { ProductDetailDialog } from "@/components/ProductDetailDialog";
 import { OrderAuthGate } from "@/components/OrderAuthGate";
-
-interface UploadedFile {
-  file: File;
-  material: string;
-  color: string;
-  quantity: number;
-  volumeCm3?: number;
-  estimatedGrams?: number;
-  dimensions?: { width: number; height: number; depth: number };
-  parsing?: boolean;
-}
-
-interface FileLink {
-  url: string;
-  material: string;
-  color: string;
-  quantity: number;
-}
+import { ModelViewer } from "@/components/ModelViewer";
 
 interface ProductItem {
   id: string;
@@ -51,15 +34,51 @@ interface ProductItem {
   custom_text_max_length: number;
 }
 
-interface CartItem {
-  productId: string;
-  name: string;
-  quantity: number;
-  price: number;
+type FileLine = {
+  kind: "file";
+  id: string;
+  file: File;
   material: string;
   color: string;
+  quantity: number;
+  estimatedGrams?: number;
+  volumeCm3?: number;
+  dimensions?: { width: number; height: number; depth: number };
+  parsing?: boolean;
+};
+
+type LinkLine = {
+  kind: "link";
+  id: string;
+  url: string;
+  material: string;
+  color: string;
+  quantity: number;
+};
+
+type PrebuiltLine = {
+  kind: "prebuilt";
+  id: string;
+  productId: string;
+  name: string;
+  material: string;
+  color: string;
+  quantity: number;
+  price: number; // total for this line
+  unitPrice: number;
   customText?: string;
-}
+};
+
+type CustomLine = {
+  kind: "custom";
+  id: string;
+  description: string;
+  photos: File[];
+};
+
+type CartLine = FileLine | LinkLine | PrebuiltLine | CustomLine;
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
 
 export default function NewOrder() {
   const { toast } = useToast();
@@ -67,20 +86,26 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"link" | "file" | "custom" | "prebuilt">("link");
   const [products, setProducts] = useState<ProductItem[]>([]);
-  const [prebuiltCart, setPrebuiltCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [activeTab, setActiveTab] = useState<"link" | "file" | "prebuilt" | "custom">("link");
 
-  // Files
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  // Unified cart
+  const [cart, setCart] = useState<CartLine[]>([]);
 
-  // Links
-  const [fileLinks, setFileLinks] = useState<FileLink[]>([]);
+  // Draft inputs per tab (before adding to cart)
+  const [draftLink, setDraftLink] = useState<{ url: string; material: string; color: string; quantity: number }>({
+    url: "", material: "", color: "", quantity: 1,
+  });
+  const [draftFiles, setDraftFiles] = useState<FileLine[]>([]);
+  const [draftCustom, setDraftCustom] = useState<{ description: string; photos: File[] }>({
+    description: "", photos: [],
+  });
 
-  // Custom order state
-  const [customPhotos, setCustomPhotos] = useState<File[]>([]);
-  const [customDescription, setCustomDescription] = useState("");
+  // Discount
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountApplied, setDiscountApplied] = useState<{ type: string; value: number; code: string } | null>(null);
+  const [checkingDiscount, setCheckingDiscount] = useState(false);
 
   // Form
   const [formData, setFormData] = useState({
@@ -98,8 +123,7 @@ export default function NewOrder() {
     agreeTerms: false,
   });
 
-  // Auto-fill when profile loads
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setFormData((prev) => ({
         ...prev,
@@ -114,214 +138,223 @@ export default function NewOrder() {
         country: profile.country || prev.country,
       }));
     }
-  });
+  }, [profile]);
 
-  // Fetch products
   useEffect(() => {
     supabase.from("products").select("*").eq("active", true).then(({ data }) => {
       setProducts((data as ProductItem[]) || []);
     });
   }, []);
 
-  const addToPrebuiltCart = (product: ProductItem, material: string, color: string, quantity: number, customText?: string) => {
-    setPrebuiltCart(prev => [...prev, {
-      productId: product.id, name: product.name, quantity,
-      price: product.price * quantity, material, color, customText,
-    }]);
-    toast({ title: `${product.name} toegevoegd` });
-  };
+  const getColorsForMaterial = (materialId: string) =>
+    MATERIALS.find((m) => m.id === materialId)?.colors || [];
 
-  const removeFromCart = (index: number) => setPrebuiltCart(prev => prev.filter((_, i) => i !== index));
-  const prebuiltTotal = prebuiltCart.reduce((t, i) => t + i.price, 0);
-
+  // ===== File draft handling =====
   const ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf", ".step", ".stp"];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
-    const validExt = files.filter((f) => {
-      const ext = f.name.toLowerCase().substring(f.name.lastIndexOf("."));
-      return ALLOWED_EXTENSIONS.includes(ext);
-    });
-    const invalidExt = files.filter((f) => {
-      const ext = f.name.toLowerCase().substring(f.name.lastIndexOf("."));
-      return !ALLOWED_EXTENSIONS.includes(ext);
-    });
-    if (invalidExt.length > 0) {
+    const validExt = files.filter((f) => ALLOWED_EXTENSIONS.includes(f.name.toLowerCase().slice(f.name.lastIndexOf("."))));
+    const invalidExt = files.filter((f) => !ALLOWED_EXTENSIONS.includes(f.name.toLowerCase().slice(f.name.lastIndexOf("."))));
+    if (invalidExt.length) {
       toast({
         title: "Ongeldig bestandstype",
-        description: `Alleen STL, OBJ, 3MF en STEP bestanden zijn toegestaan. ${invalidExt.map((f) => f.name).join(", ")} is overgeslagen.`,
+        description: `Alleen STL, OBJ, 3MF, STEP. ${invalidExt.map((f) => f.name).join(", ")} overgeslagen.`,
         variant: "destructive",
       });
     }
-
-    const newFiles: UploadedFile[] = validExt
-      .filter((f) => f.size <= MAX_FILE_SIZE)
-      .map((file) => ({ file, material: "", color: "", quantity: 1, parsing: true }));
-
     const tooLarge = validExt.filter((f) => f.size > MAX_FILE_SIZE);
-    if (tooLarge.length > 0) {
+    if (tooLarge.length) {
       toast({
         title: "Bestand(en) te groot (max 10MB)",
-        description: `${tooLarge.map((f) => f.name).join(", ")} — stuur grotere bestanden via e-mail naar gijsoverweel@gmail.com`,
+        description: `${tooLarge.map((f) => f.name).join(", ")} — stuur deze via e-mail naar gijsoverweel@gmail.com`,
         variant: "destructive",
       });
     }
-    
-    const startIndex = uploadedFiles.length;
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
-    
-    for (let i = 0; i < newFiles.length; i++) {
-      const uf = newFiles[i];
-      parse3DFile(uf.file).then((result) => {
-        setUploadedFiles((prev) => {
-          const updated = [...prev];
-          const idx = startIndex + i;
-          if (updated[idx]) {
-            if (result) {
-              const grams = estimatePrintWeight(result.volumeCm3);
-              updated[idx] = {
-                ...updated[idx],
-                volumeCm3: result.volumeCm3,
-                estimatedGrams: grams,
-                dimensions: result.boundingBox,
-                parsing: false,
-              };
-            } else {
-              updated[idx] = {
-                ...updated[idx],
-                estimatedGrams: Math.max(10, Math.round(uf.file.size / 1024)),
-                parsing: false,
-              };
-            }
-          }
-          return updated;
-        });
+    const acceptable = validExt.filter((f) => f.size <= MAX_FILE_SIZE);
+    const newLines: FileLine[] = acceptable.map((file) => ({
+      kind: "file", id: uid(), file, material: "", color: "", quantity: 1, parsing: true,
+    }));
+    setDraftFiles((prev) => [...prev, ...newLines]);
+    newLines.forEach((nl) => {
+      parse3DFile(nl.file).then((result) => {
+        setDraftFiles((prev) => prev.map((d) =>
+          d.id !== nl.id ? d : result
+            ? { ...d, volumeCm3: result.volumeCm3, estimatedGrams: estimatePrintWeight(result.volumeCm3), dimensions: result.boundingBox, parsing: false }
+            : { ...d, estimatedGrams: Math.max(10, Math.round(nl.file.size / 1024)), parsing: false }
+        ));
+      }).catch(() => {
+        setDraftFiles((prev) => prev.map((d) => d.id === nl.id ? { ...d, parsing: false, estimatedGrams: Math.max(10, Math.round(nl.file.size / 1024)) } : d));
       });
-    }
-    
+    });
     e.target.value = "";
   };
 
-  const removeFile = (index: number) => {
-    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+  const updateDraftFile = (id: string, field: keyof FileLine, value: any) => {
+    setDraftFiles((prev) => prev.map((d) => {
+      if (d.id !== id) return d;
+      const next: any = { ...d, [field]: value };
+      if (field === "material") next.color = "";
+      return next;
+    }));
   };
 
-  const updateFile = (index: number, field: keyof UploadedFile, value: any) => {
-    const updated = [...uploadedFiles];
-    updated[index] = { ...updated[index], [field]: value };
-    if (field === "material") updated[index].color = "";
-    setUploadedFiles(updated);
-  };
+  const removeDraftFile = (id: string) => setDraftFiles((prev) => prev.filter((d) => d.id !== id));
 
-  // Link helpers
-  const addLink = () => {
-    setFileLinks([...fileLinks, { url: "", material: "", color: "", quantity: 1 }]);
-  };
-
-  const removeLink = (index: number) => {
-    setFileLinks(fileLinks.filter((_, i) => i !== index));
-  };
-
-  const updateLink = (index: number, field: keyof FileLink, value: any) => {
-    const updated = [...fileLinks];
-    updated[index] = { ...updated[index], [field]: value };
-    if (field === "material") updated[index].color = "";
-    setFileLinks(updated);
-  };
-
-  const getColorsForMaterial = (materialId: string) => {
-    return MATERIALS.find((m) => m.id === materialId)?.colors || [];
-  };
-
-  const calculatePerPiecePrice = (uf: UploadedFile) => {
-    const mat = MATERIALS.find((m) => m.id === uf.material);
-    if (!mat || !uf.estimatedGrams) return 0;
-    return uf.estimatedGrams * mat.pricePerGram;
-  };
-
-  const calculateEstimate = () => {
-    let total = 0;
-    for (const uf of uploadedFiles) {
-      const perPiece = calculatePerPiecePrice(uf);
-      total += perPiece * uf.quantity;
+  const addDraftFilesToCart = () => {
+    const ready = draftFiles.filter((f) => f.material && f.color && !f.parsing);
+    const notReady = draftFiles.filter((f) => !ready.includes(f));
+    if (ready.length === 0) {
+      toast({ title: "Vul materiaal en kleur in", variant: "destructive" });
+      return;
     }
-    return Math.max(total, 5);
+    setCart((c) => [...c, ...ready]);
+    setDraftFiles(notReady);
+    toast({ title: `${ready.length} bestand(en) toegevoegd aan winkelmandje` });
   };
 
-  const estimatedPrice = calculateEstimate();
-  const isParsing = uploadedFiles.some((f) => f.parsing);
+  // ===== Link draft =====
+  const addDraftLinkToCart = () => {
+    if (!draftLink.url || !draftLink.material || !draftLink.color) {
+      toast({ title: "Vul URL, materiaal en kleur in", variant: "destructive" });
+      return;
+    }
+    setCart((c) => [...c, { kind: "link", id: uid(), ...draftLink }]);
+    setDraftLink({ url: "", material: "", color: "", quantity: 1 });
+    toast({ title: "Downloadlink toegevoegd aan winkelmandje" });
+  };
 
-  const hasCustomOrder = customDescription.trim().length > 0;
+  // ===== Prebuilt =====
+  const addPrebuiltToCart = (product: ProductItem, material: string, color: string, quantity: number, customText?: string) => {
+    setCart((c) => [...c, {
+      kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
+      material, color, quantity, unitPrice: product.price, price: product.price * quantity, customText,
+    }]);
+    toast({ title: `${product.name} toegevoegd` });
+    setSelectedProduct(null);
+  };
 
-  // Custom photo helpers
+  // ===== Custom draft =====
   const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const imageFiles = files.filter(f => f.type.startsWith("image/"));
-    if (imageFiles.length === 0) return;
-    const remaining = 3 - customPhotos.length;
-    const toAdd = imageFiles.slice(0, remaining);
-    if (toAdd.length < imageFiles.length) {
-      toast({ title: "Maximaal 3 foto's", description: "U kunt maximaal 3 foto's uploaden.", variant: "destructive" });
-    }
-    setCustomPhotos(prev => [...prev, ...toAdd]);
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
+    setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...files].slice(0, 5) }));
     e.target.value = "";
   };
 
-  const removeCustomPhoto = (index: number) => {
-    setCustomPhotos(prev => prev.filter((_, i) => i !== index));
+  const addCustomToCart = () => {
+    if (!draftCustom.description.trim()) {
+      toast({ title: "Beschrijving is verplicht", variant: "destructive" });
+      return;
+    }
+    setCart((c) => [...c, { kind: "custom", id: uid(), description: draftCustom.description, photos: draftCustom.photos }]);
+    setDraftCustom({ description: "", photos: [] });
+    toast({ title: "Custom opdracht toegevoegd" });
   };
-  
-  const allFilesConfigured = uploadMode === "file" 
-    ? uploadedFiles.length > 0 && uploadedFiles.every((f) => f.material && f.color)
-    : uploadMode === "link"
-    ? fileLinks.length > 0 && fileLinks.every((l) => l.url && l.material && l.color)
-    : uploadMode === "prebuilt"
-    ? prebuiltCart.length > 0
-    : hasCustomOrder;
-  
-  const canProceed = allFilesConfigured;
-  const canSubmit = formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms && canProceed;
+
+  const removeCartLine = (id: string) => setCart((c) => c.filter((l) => l.id !== id));
+
+  // ===== Totals =====
+  const calcFilePrice = (f: FileLine) => {
+    const mat = MATERIALS.find((m) => m.id === f.material);
+    if (!mat || !f.estimatedGrams) return 0;
+    return f.estimatedGrams * mat.pricePerGram * f.quantity;
+  };
+
+  const estimatedSubtotal = cart.reduce((sum, line) => {
+    if (line.kind === "file") return sum + calcFilePrice(line);
+    if (line.kind === "prebuilt") return sum + line.price;
+    return sum; // link & custom: op offerte
+  }, 0);
+
+  const discountAmount = (() => {
+    if (!discountApplied) return 0;
+    if (discountApplied.type === "percentage") return estimatedSubtotal * (discountApplied.value / 100);
+    return Math.min(estimatedSubtotal, discountApplied.value);
+  })();
+
+  const estimatedTotal = Math.max(0, estimatedSubtotal - discountAmount);
+  const hasOnlyQuoteItems = cart.length > 0 && cart.every((l) => l.kind === "link" || l.kind === "custom");
+
+  const applyDiscountCode = async () => {
+    if (!discountCode.trim()) return;
+    setCheckingDiscount(true);
+    try {
+      const { data } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .eq("code", discountCode.toUpperCase().trim())
+        .eq("active", true)
+        .maybeSingle();
+      if (!data) { toast({ title: "Ongeldige kortingscode", variant: "destructive" }); return; }
+      if (data.expires_at && new Date(data.expires_at) < new Date()) { toast({ title: "Kortingscode is verlopen", variant: "destructive" }); return; }
+      if (data.max_uses !== null && data.times_used >= data.max_uses) { toast({ title: "Kortingscode al maximaal gebruikt", variant: "destructive" }); return; }
+      setDiscountApplied({ type: data.discount_type, value: Number(data.discount_value), code: data.code });
+      toast({ title: `Kortingscode "${data.code}" toegepast! 🎉` });
+    } catch {
+      toast({ title: "Fout bij controleren code", variant: "destructive" });
+    } finally { setCheckingDiscount(false); }
+  };
+
+  // ===== Submit =====
+  const canProceed = cart.length > 0;
+  const canSubmit = canProceed && formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setIsSubmitting(true);
-
     try {
       const { data: orderNumData, error: orderNumError } = await supabase.rpc("generate_order_number");
       if (orderNumError) throw orderNumError;
       const orderNumber = orderNumData as string;
 
-      let materialNames = "";
-      let colorNames = "";
-      let totalQuantity = 1;
-      let fileLinksText = "";
+      // Build textual summary into file_links + notes
+      const linkLines = cart.filter((l): l is LinkLine => l.kind === "link");
+      const fileLines = cart.filter((l): l is FileLine => l.kind === "file");
+      const prebuiltLines = cart.filter((l): l is PrebuiltLine => l.kind === "prebuilt");
+      const customLines = cart.filter((l): l is CustomLine => l.kind === "custom");
 
-      if (uploadMode === "custom") {
-        const timestamp = Date.now();
-        const customPhotoUrls: string[] = [];
-        for (const photo of customPhotos) {
-          const storagePath = `custom-orders/${timestamp}/${photo.name}`;
-          const { error: uploadError } = await supabase.storage
-            .from("orders")
-            .upload(storagePath, photo, { upsert: true });
-          if (!uploadError) {
-            customPhotoUrls.push(storagePath);
-          }
+      // Upload custom photos to storage
+      const customSections: string[] = [];
+      for (const cl of customLines) {
+        const urls: string[] = [];
+        for (const photo of cl.photos) {
+          const storagePath = `custom-orders/${orderNumber}/${cl.id}-${photo.name}`;
+          const { error } = await supabase.storage.from("orders").upload(storagePath, photo, { upsert: true });
+          if (!error) urls.push(storagePath);
         }
-        fileLinksText = `CUSTOM OPDRACHT\nBeschrijving: ${customDescription}\nFoto's: ${customPhotoUrls.join(", ")}`;
-      } else if (uploadMode === "prebuilt") {
-        materialNames = prebuiltCart.map(i => i.material).join(", ");
-        colorNames = prebuiltCart.map(i => i.color).join(", ");
-        totalQuantity = prebuiltCart.reduce((s, i) => s + i.quantity, 0);
-        fileLinksText = `KANT-EN-KLARE ARTIKELEN\n${prebuiltCart.map(i => `${i.name} x${i.quantity} - ${i.material} ${i.color}${i.customText ? ` (${i.customText})` : ""} - €${i.price.toFixed(2)}`).join("\n")}`;
-      } else {
-        const items = uploadMode === "file" ? uploadedFiles : fileLinks;
-        materialNames = items.map((f) => MATERIALS.find((m) => m.id === f.material)?.name).join(", ");
-        colorNames = items.map((f) => getColorsForMaterial(f.material).find((c) => c.id === f.color)?.name).join(", ");
-        totalQuantity = items.reduce((sum, f) => sum + f.quantity, 0);
-        fileLinksText = uploadMode === "link" ? fileLinks.map((l) => l.url).join("\n") : "";
+        customSections.push(`CUSTOM OPDRACHT\nBeschrijving: ${cl.description}${urls.length ? `\nFoto's: ${urls.join(", ")}` : ""}`);
       }
+
+      const sections: string[] = [];
+      if (linkLines.length) {
+        sections.push("DOWNLOADLINKS:\n" + linkLines.map((l) => {
+          const mat = MATERIALS.find((m) => m.id === l.material)?.name || l.material;
+          const col = getColorsForMaterial(l.material).find((c) => c.id === l.color)?.name || l.color;
+          return `- ${l.url} (${mat} ${col} x${l.quantity})`;
+        }).join("\n"));
+      }
+      if (prebuiltLines.length) {
+        sections.push("KANT-EN-KLARE ARTIKELEN:\n" + prebuiltLines.map((p) =>
+          `- ${p.name} x${p.quantity} – ${p.material} ${p.color}${p.customText ? ` ("${p.customText}")` : ""} – €${p.price.toFixed(2)}`
+        ).join("\n"));
+      }
+      if (customSections.length) sections.push(customSections.join("\n\n"));
+      if (discountApplied) sections.push(`KORTING: ${discountApplied.code} (${discountApplied.type === "percentage" ? `${discountApplied.value}%` : `€${discountApplied.value.toFixed(2)}`})`);
+
+      // Aggregated material / color / quantity for legacy columns
+      const materialNames = cart.map((l) => {
+        if (l.kind === "file" || l.kind === "link") return MATERIALS.find((m) => m.id === l.material)?.name || l.material;
+        if (l.kind === "prebuilt") return l.material;
+        return "Custom";
+      }).filter(Boolean).join(", ");
+      const colorNames = cart.map((l) => {
+        if (l.kind === "file" || l.kind === "link") return getColorsForMaterial(l.material).find((c) => c.id === l.color)?.name || l.color;
+        if (l.kind === "prebuilt") return l.color;
+        return "—";
+      }).filter(Boolean).join(", ");
+      const totalQuantity = cart.reduce((s, l) => s + ((l as any).quantity || 1), 0);
+
+      const orderMethod = cart.length === 1 ? cart[0].kind : "mixed";
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -337,14 +370,14 @@ export default function NewOrder() {
           postal_code: formData.postal_code,
           city: formData.city,
           country: formData.country,
-          material: materialNames,
-          color: colorNames,
+          material: materialNames || "—",
+          color: colorNames || "—",
           quantity: totalQuantity,
-          notes: uploadMode === "custom" ? `[CUSTOM OPDRACHT] ${customDescription}\n\n${formData.notes}` : uploadMode === "prebuilt" ? `[KANT-EN-KLAAR]\n${formData.notes}` : formData.notes,
+          notes: formData.notes,
           print_preferences: formData.print_preferences,
-          instant_quote_price: uploadMode === "file" ? estimatedPrice : uploadMode === "prebuilt" ? prebuiltTotal : 0,
-          file_links: fileLinksText,
-          order_method: uploadMode,
+          instant_quote_price: estimatedTotal,
+          file_links: sections.join("\n\n"),
+          order_method: orderMethod,
           status: "submitted",
         })
         .select()
@@ -352,36 +385,30 @@ export default function NewOrder() {
 
       if (orderError) throw orderError;
 
-      // Upload files if file mode
-      if (uploadMode === "file") {
-        const failedFiles: string[] = [];
-        for (const uf of uploadedFiles) {
-          const storagePath = `${orderNumber}/files/${uf.file.name}`;
-          const { error: uploadError } = await supabase.storage
-            .from("orders")
-            .upload(storagePath, uf.file, { upsert: true });
+      // Upload file lines
+      const failedFiles: string[] = [];
+      for (const fl of fileLines) {
+        const storagePath = `${orderNumber}/files/${fl.file.name}`;
+        const { error: upErr } = await supabase.storage.from("orders").upload(storagePath, fl.file, { upsert: true });
+        if (upErr) { failedFiles.push(fl.file.name); continue; }
+        await supabase.from("order_files").insert({
+          order_id: order.id,
+          storage_path: storagePath,
+          original_filename: fl.file.name,
+          file_size: fl.file.size,
+          mime_type: fl.file.type || "application/octet-stream",
+        });
+      }
+      if (failedFiles.length) {
+        toast({
+          title: "Sommige bestanden konden niet worden geüpload",
+          description: `${failedFiles.join(", ")} — stuur deze via e-mail naar gijsoverweel@gmail.com`,
+          variant: "destructive",
+        });
+      }
 
-          if (uploadError) {
-            failedFiles.push(uf.file.name);
-            continue;
-          }
-
-          await supabase.from("order_files").insert({
-            order_id: order.id,
-            storage_path: storagePath,
-            original_filename: uf.file.name,
-            file_size: uf.file.size,
-            mime_type: uf.file.type || "application/octet-stream",
-          });
-        }
-
-        if (failedFiles.length > 0) {
-          toast({
-            title: "Sommige bestanden konden niet worden geüpload",
-            description: `${failedFiles.join(", ")} — stuur deze bestanden via e-mail naar gijsoverweel@gmail.com`,
-            variant: "destructive",
-          });
-        }
+      if (discountApplied) {
+        try { await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code }); } catch {}
       }
 
       await supabase.functions.invoke("send-order-email", {
@@ -396,181 +423,105 @@ export default function NewOrder() {
     }
   };
 
+  // ===== Render helpers for cart sidebar =====
+  const cartLineLabel = (line: CartLine) => {
+    if (line.kind === "file") return line.file.name;
+    if (line.kind === "link") return `Link: ${line.url.slice(0, 30)}${line.url.length > 30 ? "…" : ""}`;
+    if (line.kind === "prebuilt") return line.name;
+    return "Custom opdracht";
+  };
+
+  const cartLinePrice = (line: CartLine): string => {
+    if (line.kind === "prebuilt") return `€${line.price.toFixed(2)}`;
+    if (line.kind === "file") {
+      const p = calcFilePrice(line);
+      return p > 0 ? `~€${p.toFixed(2)}` : "op offerte";
+    }
+    return "op offerte";
+  };
+
   return (
     <OrderAuthGate>
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="pt-20 pb-16">
-        <div className="container mx-auto px-4 py-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Start uw bestelling</h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Deel uw 3D-bestanden via een downloadlink of upload ze direct. Configureer uw print en ontvang direct een indicatieprijs.
-            </p>
-          </motion.div>
-
-          {/* Disclaimer */}
-          <div className="max-w-4xl mx-auto mb-8 space-y-3">
-            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en is nooit de definitieve prijs. De definitieve prijs wordt na controle door de admin vastgesteld. Minimale bestelwaarde is €5,- totaal.
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-20 pb-16">
+          <div className="container mx-auto px-4 py-8">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Start uw bestelling</h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Combineer downloadlinks, bestanden, kant-en-klare artikelen en custom opdrachten in één bestelling.
               </p>
+            </motion.div>
+
+            <div className="max-w-4xl mx-auto mb-8">
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en nooit de definitieve prijs. De definitieve prijs wordt na controle vastgesteld. Minimale bestelwaarde is €5,- totaal.
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Progress */}
-          <div className="flex justify-center mb-12">
-            <div className="flex items-center gap-4">
-              {[1, 2].map((s) => (
-                <div key={s} className="flex items-center">
-                  <motion.div
-                    animate={{ backgroundColor: step >= s ? "hsl(var(--accent))" : "hsl(var(--muted))", scale: step === s ? 1.1 : 1 }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
-                    style={{ color: step >= s ? "hsl(var(--accent-foreground))" : "hsl(var(--muted-foreground))" }}
-                  >
-                    {step > s ? <Check className="w-5 h-5" /> : s}
-                  </motion.div>
-                  {s < 2 && <div className={`w-16 md:w-24 h-1 mx-2 rounded-full transition-colors ${step > s ? "bg-accent" : "bg-muted"}`} />}
-                </div>
-              ))}
+            {/* Progress */}
+            <div className="flex justify-center mb-12">
+              <div className="flex items-center gap-4">
+                {[1, 2].map((s) => (
+                  <div key={s} className="flex items-center">
+                    <motion.div
+                      animate={{ backgroundColor: step >= s ? "hsl(var(--accent))" : "hsl(var(--muted))", scale: step === s ? 1.1 : 1 }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                      style={{ color: step >= s ? "hsl(var(--accent-foreground))" : "hsl(var(--muted-foreground))" }}
+                    >
+                      {step > s ? <Check className="w-5 h-5" /> : s}
+                    </motion.div>
+                    {s < 2 && <div className={`w-16 md:w-24 h-1 mx-2 rounded-full transition-colors ${step > s ? "bg-accent" : "bg-muted"}`} />}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <div className="lg:col-span-2">
-              <AnimatePresence mode="wait">
-                {step === 1 && (
-                  <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                    
-                    {/* Upload mode toggle */}
-                     <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-                       <h2 className="text-lg font-bold mb-3">Hoe wilt u bestellen?</h2>
-                       <p className="text-sm text-muted-foreground mb-4">
-                         Onze voorkeur gaat uit naar een <strong>downloadlink</strong> (bijv. Google Drive, WeTransfer, Dropbox). Bestanden uploaden en custom opdrachten kan ook.
-                       </p>
-                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                         <Button variant={uploadMode === "link" ? "default" : "outline"} onClick={() => setUploadMode("link")} className="flex-1">
-                           <Link2 className="w-4 h-4" /> Downloadlink
-                         </Button>
-                         <Button variant={uploadMode === "file" ? "default" : "outline"} onClick={() => setUploadMode("file")} className="flex-1">
-                           <Upload className="w-4 h-4" /> Bestand uploaden
-                         </Button>
-                         <Button variant={uploadMode === "prebuilt" ? "default" : "outline"} onClick={() => setUploadMode("prebuilt")} className="flex-1">
-                           <ShoppingBag className="w-4 h-4" /> Kant-en-klaar
-                         </Button>
-                         <Button variant={uploadMode === "custom" ? "default" : "outline"} onClick={() => setUploadMode("custom")} className="flex-1">
-                           <Pencil className="w-4 h-4" /> Custom opdracht
-                         </Button>
-                       </div>
-                     </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              <div className="lg:col-span-2">
+                <AnimatePresence mode="wait">
+                  {step === 1 && (
+                    <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+                      <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                        <h2 className="text-lg font-bold mb-1">Voeg items toe aan uw bestelling</h2>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          U kunt items uit verschillende categorieën combineren in één winkelmandje.
+                        </p>
+                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full h-auto">
+                            <TabsTrigger value="link"><Link2 className="w-4 h-4 mr-1" /> Link</TabsTrigger>
+                            <TabsTrigger value="file"><Upload className="w-4 h-4 mr-1" /> Bestand</TabsTrigger>
+                            <TabsTrigger value="prebuilt"><ShoppingBag className="w-4 h-4 mr-1" /> Kant-en-klaar</TabsTrigger>
+                            <TabsTrigger value="custom"><Pencil className="w-4 h-4 mr-1" /> Custom</TabsTrigger>
+                          </TabsList>
 
-                    {/* Prebuilt products */}
-                    {uploadMode === "prebuilt" && (
-                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                          <ShoppingBag className="w-6 h-6 text-accent" /> Kant-en-klare artikelen
-                        </h2>
-                        {products.length === 0 ? (
-                          <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
-                        ) : (
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {products.map(product => (
-                              <ProductTile
-                                key={product.id}
-                                product={product}
-                                onClick={() => setSelectedProduct(product)}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        <ProductDetailDialog
-                          product={selectedProduct}
-                          open={!!selectedProduct}
-                          onOpenChange={(o) => !o && setSelectedProduct(null)}
-                          onAdd={addToPrebuiltCart}
-                        />
-                        {prebuiltCart.length > 0 && (
-                          <div className="mt-6 border-t border-border pt-4">
-                            <h3 className="font-semibold mb-3">Winkelwagen</h3>
-                            {prebuiltCart.map((item, i) => (
-                              <div key={i} className="flex justify-between items-center py-2 border-b border-border">
-                                <div>
-                                  <p className="text-sm font-medium">{item.name} x{item.quantity}</p>
-                                  <p className="text-xs text-muted-foreground">{item.material} · {item.color}{item.customText ? ` · "${item.customText}"` : ""}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold text-accent">€{item.price.toFixed(2)}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removeFromCart(i)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
-                                </div>
-                              </div>
-                            ))}
-                            <div className="flex justify-between mt-3">
-                              <span className="font-semibold">Totaal</span>
-                              <span className="text-lg font-bold text-accent">€{prebuiltTotal.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Link mode */}
-                    {uploadMode === "link" && (
-                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                          <Link2 className="w-6 h-6 text-accent" />
-                          Downloadlinks
-                        </h2>
-
-                        {/* Link disclaimers */}
-                        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 space-y-2">
-                          <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">📋 Let op bij het delen via een link:</p>
-                          <ul className="text-sm text-blue-700 dark:text-blue-300 list-disc list-inside space-y-1">
-                            <li>Zorg dat de link <strong>openbaar toegankelijk</strong> is</li>
-                            <li>De link moet <strong>direct downloaden</strong> mogelijk maken</li>
-                            <li>Gebruik services zoals Google Drive, WeTransfer, Dropbox, OneDrive of <strong>3DGo</strong></li>
-                            <li>Services zoals <strong>Thingiverse, Printables en 3DGo</strong> worden ondersteund, mits het bestand gratis te downloaden is</li>
-                            <li>Ondersteunde formaten: <strong>STL, OBJ, 3MF, STEP</strong></li>
-                            <li>Controleer of de link <strong>niet verloopt</strong> voordat wij het bestand hebben gedownload</li>
-                            <li>Bij Google Drive: stel de link in op "Iedereen met de link kan bekijken"</li>
-                          </ul>
-                        </div>
-
-                        {fileLinks.map((link, index) => (
-                          <div key={index} className="border border-border rounded-xl p-4 mb-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="font-medium text-sm">Link {index + 1}</span>
-                              <Button variant="ghost" size="sm" onClick={() => removeLink(index)}>
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
+                          {/* LINK TAB */}
+                          <TabsContent value="link" className="mt-6 space-y-4">
+                            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-200">
+                              Onze voorkeur: een <strong>openbare downloadlink</strong> (Google Drive, WeTransfer, Dropbox, Printables, 3DGo). Ondersteund: STL, OBJ, 3MF, STEP.
                             </div>
                             <div className="space-y-3">
                               <div>
                                 <Label className="text-xs">Downloadlink *</Label>
-                                <Input
-                                  value={link.url}
-                                  onChange={(e) => updateLink(index, "url", e.target.value)}
-                                  placeholder="https://drive.google.com/... of https://wetransfer.com/..."
-                                />
+                                <Input value={draftLink.url} onChange={(e) => setDraftLink({ ...draftLink, url: e.target.value })} placeholder="https://..." />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <Label className="text-xs">Materiaal</Label>
-                                  <Select value={link.material} onValueChange={(v) => updateLink(index, "material", v)}>
+                                  <Select value={draftLink.material} onValueChange={(v) => setDraftLink({ ...draftLink, material: v, color: "" })}>
                                     <SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger>
-                                    <SelectContent>
-                                      {MATERIALS.map((m) => (
-                                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
+                                    <SelectContent>{MATERIALS.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
                                   </Select>
                                 </div>
                                 <div>
                                   <Label className="text-xs">Kleur</Label>
-                                  <Select value={link.color} onValueChange={(v) => updateLink(index, "color", v)} disabled={!link.material}>
+                                  <Select value={draftLink.color} onValueChange={(v) => setDraftLink({ ...draftLink, color: v })} disabled={!draftLink.material}>
                                     <SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger>
                                     <SelectContent>
-                                      {getColorsForMaterial(link.material).map((c) => (
+                                      {getColorsForMaterial(draftLink.material).map((c) => (
                                         <SelectItem key={c.id} value={c.id}>
                                           <div className="flex items-center gap-2">
                                             <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: c.hex }} />
@@ -583,431 +534,313 @@ export default function NewOrder() {
                                 </div>
                                 <div>
                                   <Label className="text-xs">Aantal</Label>
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    value={link.quantity}
-                                    onChange={(e) => updateLink(index, "quantity", parseInt(e.target.value) || 1)}
-                                  />
+                                  <Input type="number" min={1} value={draftLink.quantity} onChange={(e) => setDraftLink({ ...draftLink, quantity: parseInt(e.target.value) || 1 })} />
                                 </div>
                               </div>
+                              <Button onClick={addDraftLinkToCart} className="w-full"><Plus className="w-4 h-4" /> Toevoegen aan winkelmandje</Button>
                             </div>
-                          </div>
-                        ))}
+                          </TabsContent>
 
-                        <Button variant="outline" onClick={addLink} className="w-full">
-                          <Plus className="w-4 h-4" /> Link toevoegen
+                          {/* FILE TAB */}
+                          <TabsContent value="file" className="mt-6 space-y-4">
+                            <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-accent/50 transition-colors">
+                              <input type="file" accept={ACCEPTED_FILE_TYPES} multiple onChange={handleFileUpload} className="hidden" id="file-upload" />
+                              <label htmlFor="file-upload" className="cursor-pointer">
+                                <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                                <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
+                                <p className="text-xs text-muted-foreground mt-1">STL, OBJ, 3MF, STEP — max 10MB per bestand</p>
+                              </label>
+                            </div>
+                            {draftFiles.length > 0 && (
+                              <div className="space-y-4">
+                                {draftFiles.map((uf) => (
+                                  <div key={uf.id} className="border border-border rounded-xl p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <FileText className="w-5 h-5 text-accent flex-shrink-0" />
+                                        <span className="font-medium text-sm truncate">{uf.file.name}</span>
+                                        <span className="text-xs text-muted-foreground flex-shrink-0">({(uf.file.size / 1024 / 1024).toFixed(1)} MB)</span>
+                                        {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
+                                      </div>
+                                      <Button variant="ghost" size="sm" onClick={() => removeDraftFile(uf.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                      <ModelViewer file={uf.file} height={180} />
+                                      <div className="space-y-2 text-xs text-muted-foreground">
+                                        {uf.volumeCm3 != null && <div>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</div>}
+                                        {uf.estimatedGrams && <div>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</div>}
+                                        {uf.dimensions && <div>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</div>}
+                                        {uf.material && uf.estimatedGrams && (
+                                          <div className="text-accent font-medium">💰 €{calcFilePrice(uf).toFixed(2)} totaal</div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      <div>
+                                        <Label className="text-xs">Materiaal</Label>
+                                        <Select value={uf.material} onValueChange={(v) => updateDraftFile(uf.id, "material", v)}>
+                                          <SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger>
+                                          <SelectContent>{MATERIALS.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Kleur</Label>
+                                        <Select value={uf.color} onValueChange={(v) => updateDraftFile(uf.id, "color", v)} disabled={!uf.material}>
+                                          <SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger>
+                                          <SelectContent>
+                                            {getColorsForMaterial(uf.material).map((c) => (
+                                              <SelectItem key={c.id} value={c.id}>
+                                                <div className="flex items-center gap-2">
+                                                  <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: c.hex }} />
+                                                  {c.name}
+                                                </div>
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Aantal</Label>
+                                        <Input type="number" min={1} value={uf.quantity} onChange={(e) => updateDraftFile(uf.id, "quantity", parseInt(e.target.value) || 1)} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                                <Button onClick={addDraftFilesToCart} className="w-full"><Plus className="w-4 h-4" /> Bestanden toevoegen aan winkelmandje</Button>
+                              </div>
+                            )}
+                          </TabsContent>
+
+                          {/* PREBUILT TAB */}
+                          <TabsContent value="prebuilt" className="mt-6">
+                            {products.length === 0 ? (
+                              <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
+                            ) : (
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {products.map((p) => (
+                                  <ProductTile key={p.id} product={p} onClick={() => setSelectedProduct(p)} />
+                                ))}
+                              </div>
+                            )}
+                            <ProductDetailDialog
+                              product={selectedProduct}
+                              open={!!selectedProduct}
+                              onOpenChange={(o) => !o && setSelectedProduct(null)}
+                              onAdd={addPrebuiltToCart}
+                            />
+                          </TabsContent>
+
+                          {/* CUSTOM TAB */}
+                          <TabsContent value="custom" className="mt-6 space-y-4">
+                            <div className="space-y-2">
+                              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200">
+                                ⚠️ <strong>Ontwerpkosten:</strong> Ook bij niet-printen worden ontwerpkosten in rekening gebracht. Doorlooptijd kan langer zijn.
+                              </div>
+                              <div>
+                                <Label className="text-sm mb-2 block">Foto's (optioneel)</Label>
+                                <div className="flex flex-wrap gap-3 mb-2">
+                                  {draftCustom.photos.map((photo, index) => (
+                                    <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
+                                      <img src={URL.createObjectURL(photo)} alt="" className="w-full h-full object-cover" />
+                                      <button
+                                        onClick={() => setDraftCustom((p) => ({ ...p, photos: p.photos.filter((_, i) => i !== index) }))}
+                                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                                    <Camera className="w-5 h-5 text-muted-foreground" />
+                                    <span className="text-[10px] text-muted-foreground mt-1">Foto</span>
+                                    <input type="file" accept="image/*" onChange={handleCustomPhotoUpload} className="hidden" multiple />
+                                  </label>
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-sm mb-1 block">Beschrijving *</Label>
+                                <Textarea
+                                  value={draftCustom.description}
+                                  onChange={(e) => setDraftCustom((p) => ({ ...p, description: e.target.value }))}
+                                  placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen."
+                                  rows={5}
+                                />
+                              </div>
+                              <Button onClick={addCustomToCart} className="w-full"><Plus className="w-4 h-4" /> Toevoegen aan winkelmandje</Button>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button onClick={() => setStep(2)} disabled={!canProceed} size="lg">
+                          Verder naar gegevens
                         </Button>
                       </div>
-                    )}
+                    </motion.div>
+                  )}
 
-                    {/* File mode */}
-                    {uploadMode === "file" && (
-                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                          <Upload className="w-6 h-6 text-accent" />
-                          Upload 3D-bestanden
+                  {step === 2 && (
+                    <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card space-y-6">
+                        <h2 className="text-xl font-bold flex items-center gap-3">
+                          <Info className="w-6 h-6 text-accent" />
+                          Uw gegevens
                         </h2>
 
-                        <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-accent/50 transition-colors">
-                          <input
-                            type="file"
-                            accept={ACCEPTED_FILE_TYPES}
-                            multiple
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="file-upload"
-                          />
-                          <label htmlFor="file-upload" className="cursor-pointer">
-                            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
-                            <p className="text-sm text-muted-foreground mt-2">STL, OBJ, 3MF, STEP (max 10MB per bestand)</p>
-                            <p className="text-xs text-muted-foreground mt-1">Groter dan 10MB? Stuur het bestand via e-mail naar <a href="mailto:gijsoverweel@gmail.com" className="text-accent underline">gijsoverweel@gmail.com</a></p>
-                          </label>
-                        </div>
-
-                        {uploadedFiles.length > 0 && (
-                          <div className="mt-6 space-y-4">
-                            {uploadedFiles.map((uf, index) => (
-                              <div key={index} className="border border-border rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-accent" />
-                                    <span className="font-medium text-sm truncate max-w-[200px]">{uf.file.name}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      ({(uf.file.size / 1024 / 1024).toFixed(1)} MB)
-                                    </span>
-                                    {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                                  </div>
-                                  <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
-                                    <Trash2 className="w-4 h-4 text-destructive" />
-                                  </Button>
-                                </div>
-                                
-                                {!uf.parsing && uf.estimatedGrams && (
-                                  <div className="mb-3 space-y-1">
-                                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                      {uf.volumeCm3 != null && (
-                                        <span>📐 Volume: {uf.volumeCm3.toFixed(1)} cm³</span>
-                                      )}
-                                      <span>⚖️ ~{uf.estimatedGrams.toFixed(0)}g (20% infill)</span>
-                                      {uf.dimensions && (
-                                        <span>📏 {uf.dimensions.width.toFixed(0)}×{uf.dimensions.height.toFixed(0)}×{uf.dimensions.depth.toFixed(0)} mm</span>
-                                      )}
-                                    </div>
-                                    {uf.material && (
-                                      <div className="text-xs font-medium">
-                                        {(() => {
-                                          const perPiece = calculatePerPiecePrice(uf);
-                                          return (
-                                            <span className="text-accent">
-                                              💰 Kosten per stuk: €{perPiece.toFixed(2)}
-                                            </span>
-                                          );
-                                        })()}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  <div>
-                                    <Label className="text-xs">Materiaal</Label>
-                                    <Select value={uf.material} onValueChange={(v) => updateFile(index, "material", v)}>
-                                      <SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger>
-                                      <SelectContent>
-                                        {MATERIALS.map((m) => (
-                                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div>
-                                    <Label className="text-xs">Kleur</Label>
-                                    <Select value={uf.color} onValueChange={(v) => updateFile(index, "color", v)} disabled={!uf.material}>
-                                      <SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger>
-                                      <SelectContent>
-                                        {getColorsForMaterial(uf.material).map((c) => (
-                                          <SelectItem key={c.id} value={c.id}>
-                                            <div className="flex items-center gap-2">
-                                              <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: c.hex }} />
-                                              {c.name}
-                                            </div>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div>
-                                    <Label className="text-xs">Aantal</Label>
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      value={uf.quantity}
-                                      onChange={(e) => updateFile(index, "quantity", parseInt(e.target.value) || 1)}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Naam *</Label>
+                            <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Custom opdracht */}
-                    {uploadMode === "custom" && (
-                      <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                          <Pencil className="w-6 h-6 text-accent" />
-                          Custom opdracht
-                        </h2>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Heeft u een idee maar nog geen 3D-bestand? Upload foto's van uw idee en beschrijf wat u wilt. Wij ontwerpen het voor u!
-                        </p>
-
-                        {/* Disclaimers */}
-                        <div className="space-y-2 mb-6">
-                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                            <p className="text-xs text-amber-800 dark:text-amber-200">
-                              ⚠️ <strong>Ontwerpkosten:</strong> Er zijn ontwerpkosten van toepassing. Ook als u besluit om niet te printen, zullen de ontwerpkosten betaald moeten worden.
-                            </p>
+                          <div>
+                            <Label>E-mail *</Label>
+                            <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
                           </div>
-                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                            <p className="text-xs text-amber-800 dark:text-amber-200">
-                              ⏳ <strong>Doorlooptijd:</strong> Het ontwerpen kan lang duren. Houd hier rekening mee bij uw bestelling.
-                            </p>
+                          <div>
+                            <Label>Telefoon</Label>
+                            <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
                           </div>
-                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                            <p className="text-xs text-amber-800 dark:text-amber-200">
-                              ❌ <strong>Afwijzing:</strong> Het is mogelijk dat uw opdracht afgewezen wordt wegens een te ingewikkeld ontwerp.
-                            </p>
+                          <div>
+                            <Label>Bedrijfsnaam</Label>
+                            <Input value={formData.company_name} onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} />
                           </div>
-                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                            <p className="text-xs text-amber-800 dark:text-amber-200">
-                              📐 <strong>Afmetingen:</strong> Als op de afbeelding geen maten staan, zullen deze gegokt worden.
-                            </p>
+                          <div className="md:col-span-2">
+                            <Label>Factuuradres *</Label>
+                            <Input value={formData.billing_address} onChange={(e) => setFormData({ ...formData, billing_address: e.target.value })} required />
+                          </div>
+                          <div className="md:col-span-2">
+                            <Label>Verzendadres</Label>
+                            <Input value={formData.shipping_address} onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })} placeholder="Laat leeg als gelijk aan factuuradres" />
+                          </div>
+                          <div>
+                            <Label>Postcode *</Label>
+                            <Input value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} required />
+                          </div>
+                          <div>
+                            <Label>Stad *</Label>
+                            <Input value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required />
+                          </div>
+                          <div>
+                            <Label>Land</Label>
+                            <Input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
                           </div>
                         </div>
 
-                        {/* Photo upload */}
-                        <div className="mb-4">
-                          <Label className="text-sm mb-2 block">Foto's (optioneel, max 3)</Label>
-                          <div className="flex flex-wrap gap-3 mb-3">
-                            {customPhotos.map((photo, index) => (
-                              <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-border group">
-                                <img
-                                  src={URL.createObjectURL(photo)}
-                                  alt={`Foto ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  onClick={() => removeCustomPhoto(index)}
-                                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-                            {customPhotos.length < 3 && (
-                              <label className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
-                                <Camera className="w-6 h-6 text-muted-foreground mb-1" />
-                                <span className="text-xs text-muted-foreground">Foto</span>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={handleCustomPhotoUpload}
-                                  className="hidden"
-                                  multiple
-                                />
-                              </label>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{customPhotos.length}/3 foto's geüpload</p>
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                          <Label className="text-sm mb-1 block">Beschrijving van uw idee *</Label>
-                          <Textarea
-                            value={customDescription}
-                            onChange={(e) => setCustomDescription(e.target.value)}
-                            placeholder="Beschrijf zo gedetailleerd mogelijk wat u wilt laten ontwerpen en printen. Denk aan afmetingen, vorm, functionaliteit, etc."
-                            rows={4}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                     {/* Notes */}
-                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card">
-                      <h2 className="text-xl font-bold mb-4">Extra informatie</h2>
-                      <div className="space-y-4">
                         <div>
                           <Label>Opmerkingen</Label>
-                          <Textarea
-                            value={formData.notes}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            placeholder="Speciale wensen, instructies, etc."
-                            rows={3}
-                          />
+                          <Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2} placeholder="Speciale wensen, instructies, etc." />
                         </div>
                         <div>
                           <Label>Print voorkeuren</Label>
-                          <Textarea
-                            value={formData.print_preferences}
-                            onChange={(e) => setFormData({ ...formData, print_preferences: e.target.value })}
-                            placeholder="Infill percentage, layer hoogte, etc. (optioneel)"
-                            rows={2}
-                          />
+                          <Textarea value={formData.print_preferences} onChange={(e) => setFormData({ ...formData, print_preferences: e.target.value })} rows={2} placeholder="Infill, layer hoogte, etc." />
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="flex justify-end">
-                      <Button onClick={() => setStep(2)} disabled={!canProceed} size="lg">
-                        Verder naar gegevens
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {step === 2 && (
-                  <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                    <div className="bg-card rounded-2xl p-8 shadow-overweel-card space-y-6">
-                      <h2 className="text-xl font-bold flex items-center gap-3">
-                        <Info className="w-6 h-6 text-accent" />
-                        Uw gegevens
-                      </h2>
-
-                      {!user && (
-                        <div className="bg-accent/10 border border-accent/30 rounded-lg p-4 text-sm">
-                          <p className="text-primary">
-                            💡 <a href="/login" className="text-accent underline font-medium">Log in</a> of{" "}
-                            <a href="/register" className="text-accent underline font-medium">maak een account</a> om uw gegevens automatisch in te vullen bij toekomstige bestellingen.
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Naam *</Label>
-                          <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-                        </div>
-                        <div>
-                          <Label>E-mail *</Label>
-                          <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
-                        </div>
-                        <div>
-                          <Label>Telefoon</Label>
-                          <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-                        </div>
-                        <div>
-                          <Label>Bedrijfsnaam</Label>
-                          <Input value={formData.company_name} onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} />
-                        </div>
-                        <div className="md:col-span-2">
-                          <Label>Factuuradres *</Label>
-                          <Input value={formData.billing_address} onChange={(e) => setFormData({ ...formData, billing_address: e.target.value })} required />
-                        </div>
-                        <div className="md:col-span-2">
-                          <Label>Verzendadres</Label>
-                          <Input value={formData.shipping_address} onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })} placeholder="Laat leeg als gelijk aan factuuradres" />
-                        </div>
-                        <div>
-                          <Label>Postcode *</Label>
-                          <Input value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} required />
-                        </div>
-                        <div>
-                          <Label>Stad *</Label>
-                          <Input value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required />
-                        </div>
-                        <div>
-                          <Label>Land</Label>
-                          <Input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-2 pt-4">
-                        <Checkbox
-                          id="terms"
-                          checked={formData.agreeTerms}
-                          onCheckedChange={(checked) => setFormData({ ...formData, agreeTerms: checked === true })}
-                        />
-                        <label htmlFor="terms" className="text-sm text-muted-foreground">
-                          Ik ga akkoord met de{" "}
-                          <a href="/voorwaarden" target="_blank" className="text-accent underline">
-                            algemene voorwaarden
-                          </a>
-                        </label>
-                      </div>
-
-                      <div className="flex justify-between pt-4">
-                        <Button variant="outline" onClick={() => setStep(1)}>Terug</Button>
-                        <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} size="lg">
-                          {isSubmitting ? (
-                            <><Loader2 className="w-4 h-4 animate-spin" /> Bestelling plaatsen...</>
+                        {/* Discount code */}
+                        <div className="border-t border-border pt-4">
+                          <Label className="flex items-center gap-2 mb-2"><Tag className="w-4 h-4" /> Kortingscode</Label>
+                          {discountApplied ? (
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                              <p className="text-sm text-green-800 dark:text-green-200">
+                                ✅ <strong>{discountApplied.code}</strong> — {discountApplied.type === "percentage" ? `${discountApplied.value}%` : `€${discountApplied.value.toFixed(2)}`} korting
+                              </p>
+                              <Button size="sm" variant="ghost" onClick={() => { setDiscountApplied(null); setDiscountCode(""); }}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
                           ) : (
-                            "Bestelling plaatsen"
+                            <div className="flex gap-2">
+                              <Input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} placeholder="Voer kortingscode in" />
+                              <Button variant="outline" onClick={applyDiscountCode} disabled={checkingDiscount || !discountCode.trim()}>
+                                {checkingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Toepassen"}
+                              </Button>
+                            </div>
                           )}
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Sidebar - Quote */}
-            <div className="lg:col-span-1">
-              <div className="sticky top-24">
-                <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
-                  <h3 className="font-bold text-primary mb-4">Overzicht</h3>
-
-                  {uploadMode === "custom" ? (
-                    hasCustomOrder ? (
-                      <div className="space-y-3">
-                        <div className="text-sm border-b border-border pb-2">
-                          <p className="font-medium flex items-center gap-1">
-                            <Pencil className="w-3 h-3 text-accent" /> Custom opdracht
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{customDescription}</p>
-                          <p className="text-xs text-muted-foreground">{customPhotos.length} foto('s)</p>
                         </div>
-                        <div className="border-t border-border pt-3">
-                          <p className="text-xs text-muted-foreground">Prijs wordt na controle vastgesteld (incl. ontwerpkosten).</p>
+
+                        <div className="flex items-start gap-2 pt-2">
+                          <Checkbox id="terms" checked={formData.agreeTerms} onCheckedChange={(c) => setFormData({ ...formData, agreeTerms: c === true })} />
+                          <label htmlFor="terms" className="text-sm text-muted-foreground">
+                            Ik ga akkoord met de <a href="/voorwaarden" target="_blank" className="text-accent underline">algemene voorwaarden</a>
+                          </label>
+                        </div>
+
+                        <div className="flex justify-between pt-4">
+                          <Button variant="outline" onClick={() => setStep(1)}>Terug</Button>
+                          <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} size="lg">
+                            {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Bestelling plaatsen...</> : "Bestelling plaatsen"}
+                          </Button>
                         </div>
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Upload foto's en voeg een beschrijving toe.</p>
-                    )
-                  ) : uploadMode === "link" ? (
-                    fileLinks.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Voeg downloadlinks toe om te beginnen.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Sidebar — unified cart */}
+              <div className="lg:col-span-1">
+                <div className="sticky top-24">
+                  <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
+                    <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5" /> Winkelmandje ({cart.length})
+                    </h3>
+                    {cart.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Uw winkelmandje is leeg. Voeg items toe via de tabs.</p>
                     ) : (
                       <div className="space-y-3">
-                        {fileLinks.map((l, i) => (
-                          <div key={i} className="text-sm border-b border-border pb-2">
-                            <p className="font-medium truncate max-w-[200px]">Link {i + 1}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {MATERIALS.find((m) => m.id === l.material)?.name || "—"} · {l.quantity}x
-                            </p>
+                        {cart.map((line) => (
+                          <div key={line.id} className="border-b border-border pb-2 last:border-b-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{cartLineLabel(line)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {line.kind === "file" && `${(line as FileLine).quantity}× · ${MATERIALS.find(m => m.id === (line as FileLine).material)?.name || ""}`}
+                                  {line.kind === "link" && `${(line as LinkLine).quantity}× · ${MATERIALS.find(m => m.id === (line as LinkLine).material)?.name || ""}`}
+                                  {line.kind === "prebuilt" && `${(line as PrebuiltLine).quantity}× · ${(line as PrebuiltLine).material} ${(line as PrebuiltLine).color}`}
+                                  {line.kind === "custom" && `${(line as CustomLine).photos.length} foto('s)`}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <span className="text-sm font-semibold text-accent">{cartLinePrice(line)}</span>
+                                <Button variant="ghost" size="sm" onClick={() => removeCartLine(line.id)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                              </div>
+                            </div>
                           </div>
                         ))}
-                        <div className="border-t border-border pt-3">
-                          <p className="text-xs text-muted-foreground">Prijs wordt na controle vastgesteld.</p>
-                        </div>
-                      </div>
-                    )
-                  ) : (
-                    uploadedFiles.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Upload bestanden om een indicatieprijs te zien.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {uploadedFiles.map((uf, i) => {
-                          const perPiece = calculatePerPiecePrice(uf);
-                          return (
-                            <div key={i} className="text-sm border-b border-border pb-2">
-                              <div className="flex justify-between">
-                                <p className="font-medium truncate max-w-[150px]">{uf.file.name}</p>
-                                {uf.parsing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {MATERIALS.find((m) => m.id === uf.material)?.name || "—"} · {uf.quantity}x
-                                {uf.estimatedGrams ? ` · ~${uf.estimatedGrams.toFixed(0)}g` : ""}
-                              </p>
-                              {uf.material && uf.estimatedGrams && (
-                                <p className="text-xs font-medium text-accent">
-                                  €{perPiece.toFixed(2)}/stuk × {uf.quantity} = €{(perPiece * uf.quantity).toFixed(2)}
-                                </p>
-                              )}
+
+                        <div className="border-t border-border pt-3 space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Subtotaal</span>
+                            <span className="font-medium">€{estimatedSubtotal.toFixed(2)}</span>
+                          </div>
+                          {discountApplied && (
+                            <div className="flex justify-between text-sm text-green-700">
+                              <span>Korting ({discountApplied.code})</span>
+                              <span>−€{discountAmount.toFixed(2)}</span>
                             </div>
-                          );
-                        })}
-                        <div className="border-t border-border pt-3">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-primary">Indicatieprijs</span>
-                            <span className="text-xl font-bold text-accent">
-                              €{estimatedPrice.toFixed(2)}
-                            </span>
+                          )}
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="font-semibold text-primary">{hasOnlyQuoteItems ? "Op offerte" : "Indicatie"}</span>
+                            <span className="text-xl font-bold text-accent">€{estimatedTotal.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
-                    )
-                  )}
-
-                  <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      ⚠️ Deze indicatieprijs is slechts een schatting en is nooit de definitieve prijs. Minimale bestelwaarde is €5,- totaal.
-                    </p>
+                    )}
+                    <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        ⚠️ Indicatie is een schatting. Definitieve prijs wordt na controle vastgesteld. Min. €5,-.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
+        </main>
+        <Footer />
+      </div>
     </OrderAuthGate>
   );
 }
