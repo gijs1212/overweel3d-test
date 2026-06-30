@@ -82,6 +82,8 @@ export default function AdminOrderEdit() {
   const [trackingCode, setTrackingCode] = useState("");
   const [shippingCost, setShippingCost] = useState("");
   const [originalFinalPrice, setOriginalFinalPrice] = useState<number | null>(null);
+  const [filamentWeightG, setFilamentWeightG] = useState("");
+  const [filamentPricePerKg, setFilamentPricePerKg] = useState("");
 
   const fetchAppointments = async () => {
     if (!orderId) return;
@@ -113,6 +115,8 @@ export default function AdminOrderEdit() {
         setShippingCost(o.shipping_cost?.toString() || "");
         setOriginalFinalPrice(o.final_price);
         setUploadRequestNote((o as any).customer_upload_request_note || "");
+        setFilamentWeightG(((o as any).filament_weight_g ?? "").toString());
+        setFilamentPricePerKg(((o as any).filament_price_per_kg ?? "").toString());
       }
       const { data: filesData } = await supabase.from("order_files").select("*").eq("order_id", orderId);
       setFiles((filesData as OrderFile[]) || []);
@@ -150,6 +154,8 @@ export default function AdminOrderEdit() {
         shipping_carrier: shippingCarrier === "none" ? null : shippingCarrier,
         tracking_code: trackingCode,
         shipping_cost: shippingCost ? parseFloat(shippingCost) : 0,
+        filament_weight_g: filamentWeightG ? parseFloat(filamentWeightG) : null,
+        filament_price_per_kg: filamentPricePerKg ? parseFloat(filamentPricePerKg) : null,
         saved: false,
       }).eq("id", order.id);
       if (error) throw error;
