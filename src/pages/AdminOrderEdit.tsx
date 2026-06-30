@@ -579,6 +579,31 @@ export default function AdminOrderEdit() {
                   </div>
                 )}
 
+                {/* Filament calculator (admin-only, niet zichtbaar voor klant) */}
+                <div className="md:col-span-2 border-t border-border pt-4">
+                  <h4 className="font-semibold text-primary mb-1 flex items-center gap-2">🧮 Filament prijsberekening</h4>
+                  <p className="text-xs text-muted-foreground mb-3">Intern — niet zichtbaar voor de klant. Hulpmiddel om een prijs te bepalen.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Gewicht (gram)</Label>
+                      <Input type="number" step="0.1" value={filamentWeightG} onChange={(e) => setFilamentWeightG(e.target.value)} placeholder="bijv. 120" />
+                    </div>
+                    <div>
+                      <Label>Prijs filament (€/kg)</Label>
+                      <Input type="number" step="0.01" value={filamentPricePerKg} onChange={(e) => setFilamentPricePerKg(e.target.value)} placeholder="bijv. 22.50" />
+                    </div>
+                    <div className="flex items-end">
+                      {filamentWeightG && filamentPricePerKg ? (
+                        <div className="w-full p-2 rounded-md bg-muted text-sm">
+                          💰 Filamentkosten: <strong>€{((parseFloat(filamentWeightG) / 1000) * parseFloat(filamentPricePerKg)).toFixed(2)}</strong>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Vul beide velden in voor berekening.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="md:col-span-2">
                   <Label>Notities voor klant (zichtbaar)</Label>
                   <Textarea value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} rows={3} placeholder="Zichtbaar voor de klant." />
