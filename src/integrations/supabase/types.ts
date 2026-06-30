@@ -315,6 +315,8 @@ export type Database = {
           customer_upload_requested_at: string | null
           customer_visible_notes: string | null
           delivery_email: string | null
+          filament_price_per_kg: number | null
+          filament_weight_g: number | null
           file_links: string | null
           final_price: number | null
           id: string
@@ -364,6 +366,8 @@ export type Database = {
           customer_upload_requested_at?: string | null
           customer_visible_notes?: string | null
           delivery_email?: string | null
+          filament_price_per_kg?: number | null
+          filament_weight_g?: number | null
           file_links?: string | null
           final_price?: number | null
           id?: string
@@ -413,6 +417,8 @@ export type Database = {
           customer_upload_requested_at?: string | null
           customer_visible_notes?: string | null
           delivery_email?: string | null
+          filament_price_per_kg?: number | null
+          filament_weight_g?: number | null
           file_links?: string | null
           final_price?: number | null
           id?: string

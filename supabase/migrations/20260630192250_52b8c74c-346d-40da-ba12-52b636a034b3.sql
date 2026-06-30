@@ -1,0 +1,1 @@
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS filament_weight_g numeric, ADD COLUMN IF NOT EXISTS filament_price_per_kg numeric;
