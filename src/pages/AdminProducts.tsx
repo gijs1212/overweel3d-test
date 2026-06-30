@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS } from "@/lib/constants";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
+import heic2any from "heic2any";
 
 function SignedImg({ path, className }: { path: string; className?: string }) {
   const [url, setUrl] = useState("");
@@ -69,9 +70,27 @@ export default function AdminProducts() {
   const uniqueColors = allColors.filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith("image/"));
-    if (files.length === 0) return;
-    setPhotoFiles(prev => [...prev, ...files]);
+    const incoming = Array.from(e.target.files || []);
+    if (incoming.length === 0) return;
+    const converted: File[] = [];
+    for (const f of incoming) {
+      const isHeic = /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif";
+      if (isHeic) {
+        try {
+          const blob = await heic2any({ blob: f, toType: "image/jpeg", quality: 0.9 });
+          const b = Array.isArray(blob) ? blob[0] : blob;
+          const newName = f.name.replace(/\.(heic|heif)$/i, ".jpg");
+          converted.push(new File([b], newName, { type: "image/jpeg" }));
+        } catch (err) {
+          toast({ title: `HEIC conversie mislukt voor ${f.name}`, description: "Probeer een JPG/PNG.", variant: "destructive" });
+        }
+      } else if (f.type.startsWith("image/")) {
+        converted.push(f);
+      } else {
+        toast({ title: `${f.name} overgeslagen`, description: "Alleen afbeeldingen toegestaan.", variant: "destructive" });
+      }
+    }
+    if (converted.length) setPhotoFiles(prev => [...prev, ...converted]);
     e.target.value = "";
   };
 

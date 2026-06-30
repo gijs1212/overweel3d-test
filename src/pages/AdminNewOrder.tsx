@@ -20,6 +20,8 @@ export default function AdminNewOrder() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
 
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [material, setMaterial] = useState("");
   const [color, setColor] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -45,6 +47,10 @@ export default function AdminNewOrder() {
   };
 
   const handleSave = async () => {
+    if (!customerName.trim() || !customerEmail.trim()) {
+      toast({ title: "Naam en e-mail van klant zijn verplicht", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const { data: orderNumData, error: orderNumError } = await supabase.rpc("generate_order_number");
@@ -59,8 +65,8 @@ export default function AdminNewOrder() {
         .insert({
           order_number: orderNumber,
           user_id: null,
-          customer_email: "admin@overweel3d.nl",
-          customer_name: "Admin bestelling",
+          customer_email: customerEmail.trim(),
+          customer_name: customerName.trim(),
           material: materialName,
           color: colorName,
           quantity: parseInt(quantity) || 1,
@@ -99,8 +105,19 @@ export default function AdminNewOrder() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="bg-card rounded-2xl p-6 shadow-overweel-card space-y-6">
               <p className="text-sm text-muted-foreground">
-                Maak een bestelling aan zonder klantgegevens. Er worden geen e-mails verstuurd.
+                Vul naam en e-mail van de klant in. De klant ontvangt updates op dit e-mailadres.
               </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Naam klant *</Label>
+                  <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Voor- en achternaam" />
+                </div>
+                <div>
+                  <Label>E-mail klant *</Label>
+                  <Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="klant@email.nl" />
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
