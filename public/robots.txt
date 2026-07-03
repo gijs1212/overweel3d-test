@@ -14,3 +14,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://overweel3d.gijsoverweel.nl/sitemap.xml
+LLM-Content: https://overweel3d.gijsoverweel.nl/llms.txt
