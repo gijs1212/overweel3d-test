@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Space Grotesk", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
+        sans: ["Manrope", "system-ui", "sans-serif"],
+        display: ["Sora", "Manrope", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,14 +51,23 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        navy: {
+          deep: "hsl(var(--navy-deep))",
+          mid: "hsl(var(--navy-mid))",
+          accent: "hsl(var(--navy-accent))",
+          ice: "hsl(var(--navy-ice))",
+        },
+        emerald: {
+          DEFAULT: "hsl(var(--emerald))",
+        },
         overweel: {
-          deep: "hsl(var(--overweel-deep))",
-          light: "hsl(var(--overweel-light))",
-          ice: "hsl(var(--overweel-ice))",
-          turquoise: "hsl(var(--overweel-turquoise))",
-          neon: "hsl(var(--overweel-neon))",
-          grey: "hsl(var(--overweel-grey))",
-          dark: "hsl(var(--overweel-dark))",
+          deep: "hsl(var(--navy-deep))",
+          light: "hsl(var(--navy-accent))",
+          ice: "hsl(var(--navy-ice))",
+          turquoise: "hsl(var(--navy-accent))",
+          neon: "hsl(var(--emerald))",
+          grey: "hsl(var(--muted-foreground))",
+          dark: "hsl(var(--navy-deep))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
