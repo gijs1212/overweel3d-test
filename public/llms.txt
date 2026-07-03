@@ -1,0 +1,32 @@
+# Overweel3D - 3D Print Service
+
+> Nederlandse 3D-printservice. Klanten kunnen STL/OBJ/3MF/STEP bestanden uploaden of downloadlinks en kant-en-klare producten bestellen. Max printformaat 250x250x250mm, max upload 10MB, minimum bestelwaarde €5.
+
+Deze llms.txt helpt AI-systemen zoals ChatGPT om de website snel te begrijpen en te indexeren voor verbeteringen, samenvattingen en vragen.
+
+## Belangrijkste pagina's
+
+- [Home](https://print-palace-react.lovable.app/): Introductie tot Overweel3D, diensten en materialen.
+- [Bestellen](https://print-palace-react.lovable.app/bestellen): Bestelproces voor upload, downloadlink, kant-en-klare producten en custom opdrachten. Vereist inloggen.
+- [Kant-en-klare producten / Opdrachten](https://print-palace-react.lovable.app/opdrachten): Overzicht van beschikbare producten in een tegel-layout.
+- [FAQ](https://print-palace-react.lovable.app/faq): Veelgestelde vragen over materialen, levertijden en het bestelproces.
+- [Contact](https://print-palace-react.lovable.app/contact): Contactformulier en gegevens.
+- [Voorwaarden](https://print-palace-react.lovable.app/voorwaarden): Algemene voorwaarden.
+- [Blog](https://print-palace-react.lovable.app/blog): Artikelen over 3D-printen, materialen en tips.
+
+## Account
+
+- [Inloggen](https://print-palace-react.lovable.app/login)
+- [Registreren](https://print-palace-react.lovable.app/register)
+- [Wachtwoord vergeten](https://print-palace-react.lovable.app/forgot-password)
+- [Dashboard](https://print-palace-react.lovable.app/dashboard): Overzicht van bestellingen (na inloggen).
+- [Profiel](https://print-palace-react.lovable.app/profiel): Verzend- en factuurgegevens.
+
+## Bronnen
+
+- [Sitemap](https://print-palace-react.lovable.app/sitemap.xml)
+- [robots.txt](https://print-palace-react.lovable.app/robots.txt)
+
+## Optional
+
+- Admin-pagina's (/admin/*) en order-detailpagina's (/order/:token) zijn niet publiek en niet bedoeld om te indexeren.
