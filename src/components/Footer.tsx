@@ -4,7 +4,7 @@ import { Logo } from "./Logo";
 
 export function Footer() {
   return (
-    <footer className="bg-primary text-primary-foreground">
+    <footer className="bg-navy-deep text-white border-t border-navy-mid">
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           {/* Brand */}
@@ -79,12 +79,12 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-primary-foreground/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-primary-foreground/50 text-sm">
+        <div className="border-t border-navy-mid mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-navy-ice/60 text-sm">
             © 2026 Overweel3D. Alle rechten voorbehouden.
           </p>
-          <p className="text-primary-foreground/50 text-sm">
-            PS: Het geheime codewoord is <span className="text-accent font-mono">PLAFTASTIC</span> 🤫
+          <p className="text-navy-ice/60 text-sm">
+            Vragen? <a href="mailto:gijsoverweel@gmail.com" className="text-emerald hover:underline">gijsoverweel@gmail.com</a>
           </p>
         </div>
       </div>

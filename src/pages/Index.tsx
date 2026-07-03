@@ -4,13 +4,15 @@ import { Steps } from "@/components/Steps";
 import { Materials } from "@/components/Materials";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
+import { WhyBento } from "@/components/WhyBento";
 
 const Index = () => {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh bg-navy-deep">
       <Navbar />
       <main>
         <Hero />
+        <WhyBento />
         <Steps />
         <Materials />
         <CTASection />
