@@ -84,6 +84,7 @@ export default function AdminOrderEdit() {
   const [originalFinalPrice, setOriginalFinalPrice] = useState<number | null>(null);
   const [filamentWeightG, setFilamentWeightG] = useState("");
   const [filamentPricePerKg, setFilamentPricePerKg] = useState("");
+  const [filamentMarginPct, setFilamentMarginPct] = useState("50");
 
   const fetchAppointments = async () => {
     if (!orderId) return;
@@ -592,13 +593,25 @@ export default function AdminOrderEdit() {
                       <Label>Prijs filament (€/kg)</Label>
                       <Input type="number" step="0.01" value={filamentPricePerKg} onChange={(e) => setFilamentPricePerKg(e.target.value)} placeholder="bijv. 22.50" />
                     </div>
-                    <div className="flex items-end">
+                    <div>
+                      <Label>Marge (%)</Label>
+                      <Input type="number" step="1" value={filamentMarginPct} onChange={(e) => setFilamentMarginPct(e.target.value)} placeholder="bijv. 50" />
+                    </div>
+                    <div className="md:col-span-3">
                       {filamentWeightG && filamentPricePerKg ? (
-                        <div className="w-full p-2 rounded-md bg-muted text-sm">
-                          💰 Filamentkosten: <strong>€{((parseFloat(filamentWeightG) / 1000) * parseFloat(filamentPricePerKg)).toFixed(2)}</strong>
-                        </div>
+                        (() => {
+                          const cost = (parseFloat(filamentWeightG) / 1000) * parseFloat(filamentPricePerKg);
+                          const margin = parseFloat(filamentMarginPct || "0") || 0;
+                          const withMargin = cost * (1 + margin / 100);
+                          return (
+                            <div className="w-full p-3 rounded-md bg-muted text-sm space-y-1">
+                              <div>💰 Filamentkosten: <strong>€{cost.toFixed(2)}</strong></div>
+                              <div>🏷️ Verkoopprijs incl. {margin}% marge: <strong>€{withMargin.toFixed(2)}</strong></div>
+                            </div>
+                          );
+                        })()
                       ) : (
-                        <p className="text-xs text-muted-foreground">Vul beide velden in voor berekening.</p>
+                        <p className="text-xs text-muted-foreground">Vul gewicht en prijs in voor berekening.</p>
                       )}
                     </div>
                   </div>
