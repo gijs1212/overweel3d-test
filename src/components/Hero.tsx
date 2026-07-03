@@ -1,120 +1,87 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { Link2, ArrowRight, Sparkles } from "lucide-react";
+import { Upload, ArrowRight, Sparkles, Check } from "lucide-react";
+
+const badges = [
+  "Persoonlijke service",
+  "Professionele kwaliteit",
+  "Maatwerk",
+  "Heldere communicatie",
+];
 
 export function Hero() {
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-hero-gradient" />
-      
-      {/* Glow Effects */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-overweel-turquoise/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-overweel-light/20 rounded-full blur-3xl" />
+    <section className="relative overflow-hidden bg-navy-deep text-white pt-32 pb-24">
+      {/* Ambient glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_0%,hsl(var(--navy-mid))_0%,transparent_70%)] opacity-70 pointer-events-none" />
 
-      {/* Grid Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `
-            linear-gradient(90deg, white 1px, transparent 1px),
-            linear-gradient(180deg, white 1px, transparent 1px)
-          `,
-          backgroundSize: '60px 60px'
-        }} />
-      </div>
-
-      {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 py-20 md:py-32">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
+      <div className="container mx-auto px-6 relative z-10">
+        <div className="max-w-3xl">
+          <motion.span
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-8"
+            transition={{ duration: 0.3 }}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-navy-mid text-navy-accent text-xs font-bold uppercase tracking-widest mb-6"
           >
-            <Sparkles className="w-4 h-4 text-accent" />
-            <span>Professionele 3D-prints via uw eigen link</span>
-          </motion.div>
+            <Sparkles className="w-3.5 h-3.5" />
+            Overweel3D Premium Service
+          </motion.span>
 
-          {/* Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight"
+            transition={{ duration: 0.4, delay: 0.05 }}
+            className="font-display text-5xl lg:text-7xl font-bold leading-[1.05] tracking-tight mb-8"
           >
-            Breng uw idee tot leven.{" "}
-            <span className="text-gradient">Wij printen het voor u.</span>
+            Van idee naar <span className="text-navy-accent">hoogwaardige</span> 3D-print.
           </motion.h1>
 
-          {/* Subtitle */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl mx-auto"
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="text-navy-ice/90 text-lg lg:text-xl font-medium leading-relaxed mb-10 max-w-2xl"
           >
-            Deel de link naar uw gewenste 3D-bestanden, kies uw materiaal en kleur en ontvang 
-            uw unieke print zo snel mogelijk. Simpel, transparant en met liefde gemaakt.
+            Laat uw ontwerp professioneel produceren met moderne 3D-printtechnologie.
+            Van prototypes en reserveonderdelen tot uniek maatwerk voor particulieren en bedrijven.
           </motion.p>
 
-          {/* CTA Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            transition={{ duration: 0.4, delay: 0.25 }}
+            className="flex flex-wrap gap-4"
           >
             <Link to="/bestellen">
-              <Button variant="hero" size="xl">
-                <Link2 className="w-5 h-5" />
-                Start uw bestelling
+              <Button size="xl" className="bg-navy-accent hover:bg-navy-accent/90 text-white font-semibold rounded-xl shadow-lg shadow-navy-accent/30">
+                <Upload className="w-5 h-5" />
+                Upload ontwerp
               </Button>
             </Link>
-            <Link to="/faq">
-              <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10 hover:text-white">
-                Hoe werkt het?
+            <Link to="/opdrachten">
+              <Button size="xl" variant="outline" className="border-2 border-navy-mid text-white hover:bg-navy-mid hover:text-white rounded-xl">
+                Bekijk projecten
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
           </motion.div>
 
-          {/* Trust Indicators */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-            className="mt-16 flex flex-wrap items-center justify-center gap-8 text-primary-foreground/50 text-sm"
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-10 mt-10 border-t border-navy-mid text-navy-ice/70 text-sm font-medium"
           >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-accent" />
-              <span>100% tevredenheidsgarantie</span>
-            </div>
+            {badges.map((b) => (
+              <div key={b} className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald" />
+                <span>{b}</span>
+              </div>
+            ))}
           </motion.div>
         </div>
       </div>
-
-      {/* Scroll Indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2"
-      >
-        <motion.div
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2"
-        >
-          <motion.div
-            animate={{ opacity: [1, 0.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="w-1 h-2 bg-white/50 rounded-full"
-          />
-        </motion.div>
-      </motion.div>
     </section>
   );
 }

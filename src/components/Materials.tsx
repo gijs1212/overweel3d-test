@@ -1,57 +1,49 @@
 import { motion } from "framer-motion";
-import { Check, Info } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Check } from "lucide-react";
 
 const materials = [
   {
     name: "PLA",
-    description: "Biologisch afbreekbaar, makkelijk te printen",
-    pros: ["Milieuvriendelijk", "Geen warping", "Mooie afwerking"],
-    price: "vanaf €0,03/gram",
-    popular: true,
-    colors: ["#FFFFFF", "#000000", "#0066FF", "#00CC00", "#228B22", "#FF0000", "#FFDD00", "#808080"],
-    colorNames: ["Wit", "Zwart", "Blauw", "Groen", "Bladgroen", "Rood", "Geel", "Grijs"],
+    tag: "Ecologisch",
+    description:
+      "Biologisch afbreekbaar en ideaal voor gedetailleerde prototypes, decoratieve modellen en visuele weergaves.",
+    pros: ["Breed kleurenpalet", "Zeer maatvast", "Prettig te printen"],
   },
   {
     name: "PETG",
-    description: "Sterk en hittebestendig, ideaal voor functionele onderdelen",
-    pros: ["Waterbestendig", "Hittebestendig", "Flexibel"],
-    price: "vanaf €0,04/gram",
-    popular: false,
-    colors: ["#FFFFFF", "#000000", "#FF0000"],
-    colorNames: ["Wit", "Zwart", "Rood"],
+    tag: "Sterk",
+    description:
+      "De balans tussen kracht en flexibiliteit. Chemisch resistent, slagvast en geschikt voor functionele onderdelen — ook buiten.",
+    pros: ["Slagvast", "Waterbestendig", "UV-bestendig"],
   },
   {
     name: "TPU",
-    description: "Flexibel rubber-achtig materiaal",
-    pros: ["Flexibel", "Schokabsorberend", "Duurzaam"],
-    price: "vanaf €0,04/gram",
-    popular: false,
-    colors: ["#000000"],
-    colorNames: ["Zwart"],
+    tag: "Flexibel",
+    description:
+      "Rubberachtig materiaal voor schokabsorptie, pakkingen en onderdelen die moeten meebewegen.",
+    pros: ["Hoge elasticiteit", "Slijtvast", "Schokabsorberend"],
   },
 ];
 
 export function Materials() {
   return (
-    <section className="py-24 bg-secondary/50">
-      <div className="container mx-auto px-4">
+    <section id="materialen" className="py-24 bg-navy-deep text-white">
+      <div className="container mx-auto px-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="max-w-2xl mb-16"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4">
-            Kies je materiaal
+          <span className="inline-block px-3 py-1 rounded-full bg-navy-mid text-navy-accent text-xs font-bold uppercase tracking-widest mb-4">
+            Materialen
+          </span>
+          <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
+            De juiste keuze voor elke toepassing.
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Van standaard PLA tot flexibele TPU – wij hebben het materiaal dat 
-            bij uw project past.
+          <p className="text-navy-ice/80">
+            Wij werken met PLA, PETG en TPU. Twijfelt u welke het beste past?
+            Wij adviseren u graag op basis van uw toepassing.
           </p>
         </motion.div>
 
@@ -59,72 +51,44 @@ export function Materials() {
           {materials.map((material, index) => (
             <motion.div
               key={material.name}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-              className="relative bg-card rounded-2xl p-6 shadow-overweel-card hover:shadow-overweel-lg transition-all duration-300 group"
+              transition={{ delay: index * 0.08, duration: 0.35 }}
+              className="p-8 bg-navy-mid rounded-3xl border border-navy-accent/20 hover:border-navy-accent/50 hover:-translate-y-1 transition-all duration-300"
             >
-              {/* Popular badge */}
-              {material.popular && (
-                <div className="absolute -top-3 left-4 px-3 py-1 bg-accent text-accent-foreground text-xs font-semibold rounded-full">
-                  Populair
+              <div className="flex justify-between items-start mb-6">
+                <span className="px-3 py-1 bg-navy-accent/25 text-navy-ice text-xs font-bold rounded-full">
+                  {material.tag}
+                </span>
+                <div className="font-display font-bold text-3xl text-emerald">
+                  {material.name}
                 </div>
-              )}
-
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-primary">{material.name}</h3>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="w-4 h-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs">{material.description}</p>
-                  </TooltipContent>
-                </Tooltip>
               </div>
-
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-sm text-navy-ice/75 mb-6 leading-relaxed">
                 {material.description}
               </p>
-
-              {/* Pros */}
-              <ul className="space-y-2 mb-6">
+              <ul className="space-y-3 text-sm">
                 {material.pros.map((pro) => (
-                  <li key={pro} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-green-500" />
+                  <li key={pro} className="flex items-center gap-2 text-navy-ice/90">
+                    <Check className="w-4 h-4 text-emerald flex-shrink-0" />
                     <span>{pro}</span>
                   </li>
                 ))}
               </ul>
-
-              {/* Colors */}
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-2">Beschikbare kleuren:</p>
-                <div className="flex flex-wrap gap-2">
-                  {material.colors.map((color, idx) => (
-                    <Tooltip key={color}>
-                      <TooltipTrigger>
-                        <div
-                          className="w-6 h-6 rounded-full border-2 border-border shadow-sm"
-                          style={{ backgroundColor: color }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{material.colorNames[idx]}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price */}
-              <div className="pt-4 border-t border-border">
-                <p className="text-lg font-bold text-accent">{material.price}</p>
-              </div>
             </motion.div>
           ))}
         </div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          className="mt-12 text-center text-navy-ice/70 max-w-2xl mx-auto"
+        >
+          Iedere opdracht is uniek. Daarom ontvangt u altijd vrijblijvend een offerte
+          op basis van onder andere materiaal, printtijd, afwerking en eventuele nabewerking.
+        </motion.p>
       </div>
     </section>
   );
