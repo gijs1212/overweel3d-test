@@ -91,6 +91,9 @@ export default function AdminDashboard() {
               <Link to="/admin/discounts">
                 <Button variant="outline"><Tag className="w-4 h-4" /> Kortingscodes</Button>
               </Link>
+              <Link to="/admin/colors">
+                <Button variant="outline">🎨 Kleuren</Button>
+              </Link>
               <Link to="/admin/new-order">
                 <Button><Plus className="w-4 h-4" /> Bestelling aanmaken</Button>
               </Link>
