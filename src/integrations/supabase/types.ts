@@ -209,6 +209,45 @@ export type Database = {
           },
         ]
       }
+      filament_colors: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          hex: string
+          id: string
+          material: string
+          name: string
+          photos: string[]
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          hex?: string
+          id?: string
+          material: string
+          name: string
+          photos?: string[]
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          hex?: string
+          id?: string
+          material?: string
+          name?: string
+          photos?: string[]
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_events: {
         Row: {
           created_at: string | null
@@ -478,6 +517,48 @@ export type Database = {
           vat_number?: string | null
         }
         Relationships: []
+      }
+      product_color_availability: {
+        Row: {
+          available: boolean
+          color_id: string
+          created_at: string
+          id: string
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          color_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          color_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_color_availability_color_id_fkey"
+            columns: ["color_id"]
+            isOneToOne: false
+            referencedRelation: "filament_colors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_color_availability_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
