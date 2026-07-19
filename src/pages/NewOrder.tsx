@@ -288,6 +288,10 @@ export default function NewOrder() {
       if (!data) { toast({ title: "Ongeldige kortingscode", variant: "destructive" }); return; }
       if (data.expires_at && new Date(data.expires_at) < new Date()) { toast({ title: "Kortingscode is verlopen", variant: "destructive" }); return; }
       if (data.max_uses !== null && data.times_used >= data.max_uses) { toast({ title: "Kortingscode al maximaal gebruikt", variant: "destructive" }); return; }
+      if (data.assigned_to_email && data.assigned_to_email.toLowerCase() !== (formData.email || "").toLowerCase()) {
+        toast({ title: "Deze code is persoonlijk", description: "Deze kortingscode is niet geldig voor dit e-mailadres.", variant: "destructive" });
+        return;
+      }
       setDiscountApplied({ type: data.discount_type, value: Number(data.discount_value), code: data.code });
       toast({ title: `Kortingscode "${data.code}" toegepast! 🎉` });
     } catch {
@@ -409,6 +413,11 @@ export default function NewOrder() {
 
       if (discountApplied) {
         try { await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code }); } catch {}
+        try {
+          await supabase.functions.invoke("process-referral-reward", {
+            body: { order_id: order.id, discount_code: discountApplied.code },
+          });
+        } catch {}
       }
 
       await supabase.functions.invoke("send-order-email", {

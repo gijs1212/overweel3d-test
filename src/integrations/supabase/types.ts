@@ -112,41 +112,67 @@ export type Database = {
       discount_codes: {
         Row: {
           active: boolean
+          assigned_to_email: string | null
           code: string
           created_at: string
           discount_type: string
           discount_value: number
           expires_at: string | null
           id: string
+          is_referral: boolean
           max_uses: number | null
+          owner_email: string | null
+          owner_name: string | null
+          parent_code_id: string | null
+          reward_percentage: number | null
           times_used: number
           updated_at: string
         }
         Insert: {
           active?: boolean
+          assigned_to_email?: string | null
           code: string
           created_at?: string
           discount_type?: string
           discount_value?: number
           expires_at?: string | null
           id?: string
+          is_referral?: boolean
           max_uses?: number | null
+          owner_email?: string | null
+          owner_name?: string | null
+          parent_code_id?: string | null
+          reward_percentage?: number | null
           times_used?: number
           updated_at?: string
         }
         Update: {
           active?: boolean
+          assigned_to_email?: string | null
           code?: string
           created_at?: string
           discount_type?: string
           discount_value?: number
           expires_at?: string | null
           id?: string
+          is_referral?: boolean
           max_uses?: number | null
+          owner_email?: string | null
+          owner_name?: string | null
+          parent_code_id?: string | null
+          reward_percentage?: number | null
           times_used?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "discount_codes_parent_code_id_fkey"
+            columns: ["parent_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       exported_orders: {
         Row: {
