@@ -27,6 +27,8 @@ import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import AdminContentMarketing from "./pages/AdminContentMarketing";
 import AdminDiscountCodes from "./pages/AdminDiscountCodes";
+import AdminColors from "./pages/AdminColors";
+import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
