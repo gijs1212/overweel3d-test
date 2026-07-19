@@ -60,6 +60,8 @@ const App = () => (
             <Route path="/admin/products" element={<AdminProducts />} />
             <Route path="/admin/content" element={<AdminContentMarketing />} />
             <Route path="/admin/discounts" element={<AdminDiscountCodes />} />
+            <Route path="/admin/colors" element={<AdminColors />} />
+            <Route path="/kleuren" element={<Kleuren />} />
             <Route path="/blog" element={<Blog />} />
 
             <Route path="/blog/:slug" element={<BlogPost />} />
