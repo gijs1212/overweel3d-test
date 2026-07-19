@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Save, Trash2, Loader2, Tag, ToggleLeft, ToggleRight } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Plus, Save, Trash2, Loader2, Tag, ToggleLeft, ToggleRight, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,12 @@ interface DiscountCode {
   expires_at: string | null;
   active: boolean;
   created_at: string;
+  is_referral?: boolean;
+  owner_email?: string | null;
+  owner_name?: string | null;
+  reward_percentage?: number | null;
+  assigned_to_email?: string | null;
+  parent_code_id?: string | null;
 }
 
 export default function AdminDiscountCodes() {
@@ -37,6 +44,10 @@ export default function AdminDiscountCodes() {
     discount_value: 10,
     max_uses: "" as string,
     expires_at: "",
+    is_referral: false,
+    owner_email: "",
+    owner_name: "",
+    reward_percentage: 10,
   });
 
   useEffect(() => { fetchCodes(); }, []);
@@ -52,6 +63,10 @@ export default function AdminDiscountCodes() {
       toast({ title: "Vul een code in", variant: "destructive" });
       return;
     }
+    if (form.is_referral && !form.owner_email.trim()) {
+      toast({ title: "Vul een e-mail van de eigenaar in", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -60,10 +75,14 @@ export default function AdminDiscountCodes() {
         discount_value: form.discount_value,
         max_uses: form.max_uses ? parseInt(form.max_uses) : null,
         expires_at: form.expires_at || null,
+        is_referral: form.is_referral,
+        owner_email: form.is_referral ? form.owner_email.trim().toLowerCase() : null,
+        owner_name: form.is_referral ? form.owner_name.trim() || null : null,
+        reward_percentage: form.is_referral ? form.reward_percentage : null,
       };
       await supabase.from("discount_codes").insert(payload);
       toast({ title: "Kortingscode aangemaakt ✅" });
-      setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "" });
+      setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, owner_email: "", owner_name: "", reward_percentage: 10 });
       fetchCodes();
     } catch (e: any) {
       toast({ title: "Fout", description: e.message, variant: "destructive" });
@@ -97,6 +116,12 @@ export default function AdminDiscountCodes() {
           {/* Create form */}
           <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50 mb-8">
             <h3 className="font-bold text-primary mb-4">Nieuwe kortingscode</h3>
+            <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-muted/50">
+              <Switch id="is_referral" checked={form.is_referral} onCheckedChange={(v) => setForm({ ...form, is_referral: v })} />
+              <Label htmlFor="is_referral" className="cursor-pointer flex items-center gap-2">
+                <Users className="w-4 h-4" /> Referral code (eigenaar ontvangt beloning per gebruik)
+              </Label>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <Label>Code *</Label>
@@ -131,6 +156,23 @@ export default function AdminDiscountCodes() {
                 </Button>
               </div>
             </div>
+            {form.is_referral && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                <div>
+                  <Label>E-mail eigenaar *</Label>
+                  <Input type="email" value={form.owner_email} onChange={e => setForm({ ...form, owner_email: e.target.value })} placeholder="naam@voorbeeld.nl" />
+                </div>
+                <div>
+                  <Label>Naam eigenaar (optioneel)</Label>
+                  <Input value={form.owner_name} onChange={e => setForm({ ...form, owner_name: e.target.value })} placeholder="Voor de mail-aanhef" />
+                </div>
+                <div>
+                  <Label>Beloningspercentage (%)</Label>
+                  <Input type="number" step="0.1" value={form.reward_percentage} onChange={e => setForm({ ...form, reward_percentage: parseFloat(e.target.value) || 0 })} />
+                  <p className="text-xs text-muted-foreground mt-1">Eigenaar krijgt dit % van het bestelbedrag als kortingscode per e-mail.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Codes list */}
@@ -152,12 +194,21 @@ export default function AdminDiscountCodes() {
                         <span className="text-sm bg-muted px-2 py-0.5 rounded">
                           {c.discount_type === "percentage" ? `${c.discount_value}%` : `€${Number(c.discount_value).toFixed(2)}`}
                         </span>
+                        {c.is_referral && (
+                          <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
+                            <Users className="w-3 h-3" /> Referral · {c.reward_percentage}%
+                          </span>
+                        )}
+                        {c.assigned_to_email && (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded">Persoonlijk: {c.assigned_to_email}</span>
+                        )}
                         {isExpired && <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">Verlopen</span>}
                         {isMaxed && <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">Max bereikt</span>}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1 flex gap-4">
                         <span>Gebruikt: {c.times_used}{c.max_uses !== null ? `/${c.max_uses}` : "x"}</span>
                         {c.expires_at && <span>Verloopt: {new Date(c.expires_at).toLocaleDateString("nl-NL")}</span>}
+                        {c.is_referral && c.owner_email && <span>Eigenaar: {c.owner_email}</span>}
                       </div>
                     </div>
                     <div className="flex gap-1">
