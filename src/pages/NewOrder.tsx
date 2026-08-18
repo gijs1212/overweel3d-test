@@ -149,6 +149,25 @@ export default function NewOrder() {
   const getColorsForMaterial = (materialId: string) =>
     MATERIALS.find((m) => m.id === materialId)?.colors || [];
 
+  const MULTICOLOR_ID = "multicolor";
+  const MULTICOLOR_LABEL = "Multicolor (meerdere kleuren)";
+  const colorLabel = (materialId: string, colorId: string) =>
+    colorId === MULTICOLOR_ID
+      ? MULTICOLOR_LABEL
+      : getColorsForMaterial(materialId).find((c) => c.id === colorId)?.name || colorId;
+
+  const MulticolorOption = () => (
+    <SelectItem value={MULTICOLOR_ID}>
+      <div className="flex items-center gap-2">
+        <div
+          className="w-4 h-4 rounded-full border"
+          style={{ background: "conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#a855f7,#ef4444)" }}
+        />
+        {MULTICOLOR_LABEL}
+      </div>
+    </SelectItem>
+  );
+
   // ===== File draft handling =====
   const ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf", ".step", ".stp"];
 
@@ -333,7 +352,7 @@ export default function NewOrder() {
       if (linkLines.length) {
         sections.push("DOWNLOADLINKS:\n" + linkLines.map((l) => {
           const mat = MATERIALS.find((m) => m.id === l.material)?.name || l.material;
-          const col = getColorsForMaterial(l.material).find((c) => c.id === l.color)?.name || l.color;
+          const col = colorLabel(l.material, l.color);
           return `- ${l.url} (${mat} ${col} x${l.quantity})`;
         }).join("\n"));
       }
@@ -352,7 +371,7 @@ export default function NewOrder() {
         return "Custom";
       }).filter(Boolean).join(", ");
       const colorNames = cart.map((l) => {
-        if (l.kind === "file" || l.kind === "link") return getColorsForMaterial(l.material).find((c) => c.id === l.color)?.name || l.color;
+        if (l.kind === "file" || l.kind === "link") return colorLabel(l.material, l.color);
         if (l.kind === "prebuilt") return l.color;
         return "—";
       }).filter(Boolean).join(", ");
@@ -538,6 +557,7 @@ export default function NewOrder() {
                                           </div>
                                         </SelectItem>
                                       ))}
+                                      <MulticolorOption />
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -607,6 +627,7 @@ export default function NewOrder() {
                                                 </div>
                                               </SelectItem>
                                             ))}
+                                            <MulticolorOption />
                                           </SelectContent>
                                         </Select>
                                       </div>
