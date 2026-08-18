@@ -18,7 +18,7 @@ interface PlateTrackerProps {
     runsRequiredPerPlate: number[];
     plateRunsCompleted: number[];
     platesCompleted: number;
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 interface Parse3MFResult {
