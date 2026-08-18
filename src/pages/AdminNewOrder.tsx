@@ -58,7 +58,9 @@ export default function AdminNewOrder() {
       const orderNumber = orderNumData as string;
 
       const materialName = MATERIALS.find((m) => m.id === material)?.name || material;
-      const colorName = getColorsForMaterial(material).find((c) => c.id === color)?.name || color;
+      const colorName = color === "multicolor"
+        ? "Multicolor (meerdere kleuren)"
+        : getColorsForMaterial(material).find((c) => c.id === color)?.name || color;
 
       const { data: order, error } = await supabase
         .from("orders")
@@ -144,6 +146,12 @@ export default function AdminNewOrder() {
                           </div>
                         </SelectItem>
                       ))}
+                      <SelectItem value="multicolor">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border" style={{ background: "conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#a855f7,#ef4444)" }} />
+                          Multicolor (meerdere kleuren)
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

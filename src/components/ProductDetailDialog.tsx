@@ -57,7 +57,9 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
   const handleAdd = () => {
     if (!material || !color) return;
     const matName = MATERIALS.find(m => m.id === material)?.name || material;
-    const colorName = availableColors.find(c => c.id === color)?.name || color;
+    const colorName = color === "multicolor"
+      ? "Multicolor (meerdere kleuren)"
+      : availableColors.find(c => c.id === color)?.name || color;
     onAdd(product, matName, colorName, quantity, product.custom_text_enabled ? customText : undefined);
     onOpenChange(false);
   };
@@ -124,6 +126,12 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
                       </div>
                     </SelectItem>
                   ))}
+                  <SelectItem value="multicolor">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full border" style={{ background: "conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#a855f7,#ef4444)" }} />
+                      Multicolor (meerdere kleuren)
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
