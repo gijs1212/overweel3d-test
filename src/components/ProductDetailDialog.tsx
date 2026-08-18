@@ -124,6 +124,12 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
                       </div>
                     </SelectItem>
                   ))}
+                  <SelectItem value="multicolor">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full border" style={{ background: "conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#a855f7,#ef4444)" }} />
+                      Multicolor (meerdere kleuren)
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
