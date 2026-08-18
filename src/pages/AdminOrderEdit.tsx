@@ -184,7 +184,7 @@ export default function AdminOrderEdit() {
   };
 
   const handleNotifyCustomer = async () => {
-
+    if (!order) return;
     if (!order) return;
     setNotifying(true);
     try {
