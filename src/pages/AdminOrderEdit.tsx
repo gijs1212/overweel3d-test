@@ -183,6 +183,56 @@ export default function AdminOrderEdit() {
     } finally { setSaving(false); }
   };
 
+  const savePlateProgress = async (data: {
+    partsTotal: number;
+    partsPerPlate: number;
+    defaultRunsRequired: number;
+    runsRequiredPerPlate: number[];
+    plateRunsCompleted: number[];
+    platesCompleted: number;
+  }) => {
+    setPartsTotal(data.partsTotal);
+    setPartsPerPlate(data.partsPerPlate);
+    setDefaultRunsRequired(data.defaultRunsRequired);
+    setRunsRequiredPerPlate(data.runsRequiredPerPlate);
+    setPlateRunsCompleted(data.plateRunsCompleted);
+    setPlatesCompleted(data.platesCompleted);
+
+    if (!order) return;
+    try {
+      const { error } = await supabase.from("orders").update({
+        parts_total: data.partsTotal,
+        parts_per_plate: data.partsPerPlate,
+        plates_completed: data.platesCompleted,
+        plate_runs_required: data.defaultRunsRequired,
+        plate_runs_required_per_plate: data.runsRequiredPerPlate,
+        plate_runs_completed: data.plateRunsCompleted,
+      }).eq("id", order.id);
+      if (error) throw error;
+
+      const totalPlates = data.partsPerPlate > 0 ? Math.ceil(data.partsTotal / data.partsPerPlate) : 0;
+      await supabase.from("order_events").insert({
+        order_id: order.id,
+        event_type: "production_progress",
+        event_description: `Productievoortgang bijgewerkt: ${data.platesCompleted}/${totalPlates} platen gereed.`,
+        visible_to_customer: true,
+      });
+
+      setOrder({
+        ...order,
+        parts_total: data.partsTotal,
+        parts_per_plate: data.partsPerPlate,
+        plates_completed: data.platesCompleted,
+        plate_runs_required: data.defaultRunsRequired,
+        plate_runs_completed: data.plateRunsCompleted,
+      });
+
+      toast({ title: "Productievoortgang opgeslagen ✅", description: "Zichtbaar als melding voor de klant, geen e-mail verzonden." });
+    } catch (error: any) {
+      toast({ title: "Fout bij opslaan voortgang", description: error.message, variant: "destructive" });
+    }
+  };
+
   const handleNotifyCustomer = async () => {
     if (!order) return;
     setNotifying(true);
@@ -561,14 +611,7 @@ export default function AdminOrderEdit() {
                     defaultRunsRequired={defaultRunsRequired}
                     runsRequiredPerPlate={runsRequiredPerPlate}
                     plateRunsCompleted={plateRunsCompleted}
-                    onUpdate={(data) => {
-                      setPartsTotal(data.partsTotal);
-                      setPartsPerPlate(data.partsPerPlate);
-                      setDefaultRunsRequired(data.defaultRunsRequired);
-                      setRunsRequiredPerPlate(data.runsRequiredPerPlate);
-                      setPlateRunsCompleted(data.plateRunsCompleted);
-                      setPlatesCompleted(data.platesCompleted);
-                    }}
+                    onUpdate={savePlateProgress}
                   />
                 </div>
 

@@ -18,7 +18,7 @@ interface PlateTrackerProps {
     runsRequiredPerPlate: number[];
     plateRunsCompleted: number[];
     platesCompleted: number;
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 interface Parse3MFResult {
@@ -228,6 +228,7 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
   const [localCompleted, setLocalCompleted] = useState<number[]>(plateRunsCompleted);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     setLocalPartsTotal(String(partsTotal));
@@ -308,15 +309,20 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
   const actualPartsCompleted = Math.min(totalPartsCompleted, parseInt(localPartsTotal) || 0);
   const fullyCompletedPlates = localCompleted.filter((c, i) => c >= getRunsRequired(i)).length;
 
-  const handleApply = () => {
-    onUpdate({
-      partsTotal: parseInt(localPartsTotal) || 0,
-      partsPerPlate: parseInt(localPartsPerPlate) || 1,
-      defaultRunsRequired: defaultRuns,
-      runsRequiredPerPlate: localRunsPerPlate,
-      plateRunsCompleted: localCompleted,
-      platesCompleted: fullyCompletedPlates,
-    });
+  const handleApply = async () => {
+    setApplying(true);
+    try {
+      await onUpdate({
+        partsTotal: parseInt(localPartsTotal) || 0,
+        partsPerPlate: parseInt(localPartsPerPlate) || 1,
+        defaultRunsRequired: defaultRuns,
+        runsRequiredPerPlate: localRunsPerPlate,
+        plateRunsCompleted: localCompleted,
+        platesCompleted: fullyCompletedPlates,
+      });
+    } finally {
+      setApplying(false);
+    }
   };
 
   const applyDefaultToAll = () => {
@@ -363,7 +369,9 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
           </div>
         </div>
         <div className="flex items-end">
-          <Button onClick={handleApply} size="sm" className="w-full">Toepassen</Button>
+          <Button onClick={handleApply} size="sm" className="w-full" disabled={applying}>
+            {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Toepassen
+          </Button>
         </div>
       </div>
 
