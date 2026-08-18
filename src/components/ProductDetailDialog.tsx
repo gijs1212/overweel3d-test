@@ -57,7 +57,9 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: Prod
   const handleAdd = () => {
     if (!material || !color) return;
     const matName = MATERIALS.find(m => m.id === material)?.name || material;
-    const colorName = availableColors.find(c => c.id === color)?.name || color;
+    const colorName = color === "multicolor"
+      ? "Multicolor (meerdere kleuren)"
+      : availableColors.find(c => c.id === color)?.name || color;
     onAdd(product, matName, colorName, quantity, product.custom_text_enabled ? customText : undefined);
     onOpenChange(false);
   };
