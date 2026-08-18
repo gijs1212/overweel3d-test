@@ -561,14 +561,7 @@ export default function AdminOrderEdit() {
                     defaultRunsRequired={defaultRunsRequired}
                     runsRequiredPerPlate={runsRequiredPerPlate}
                     plateRunsCompleted={plateRunsCompleted}
-                    onUpdate={(data) => {
-                      setPartsTotal(data.partsTotal);
-                      setPartsPerPlate(data.partsPerPlate);
-                      setDefaultRunsRequired(data.defaultRunsRequired);
-                      setRunsRequiredPerPlate(data.runsRequiredPerPlate);
-                      setPlateRunsCompleted(data.plateRunsCompleted);
-                      setPlatesCompleted(data.platesCompleted);
-                    }}
+                    onUpdate={savePlateProgress}
                   />
                 </div>
 
