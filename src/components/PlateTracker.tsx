@@ -95,14 +95,17 @@ async function parse3MFForPlateInfo(file: File): Promise<Parse3MFResult | { erro
       }
     }
 
-    // Also check for plate gcode/thumbnail files (Bambu pattern: Metadata/plate_1.gcode)
-    const plateGcodeFiles = fileNames.filter(f =>
-      /metadata\/plate_(\d+)\.(gcode|json|png)$/i.test(f)
-    );
-    if (plateGcodeFiles.length > 0 && plateGcodeFiles.length > plateCount) {
-      plateCount = plateGcodeFiles.length;
-      bambuDetails += `${plateGcodeFiles.length} plate gcode bestanden gevonden. `;
+    // Also check for plate files (Bambu pattern: Metadata/plate_1.gcode / plate_1.png)
+    const plateNumbers = new Set<number>();
+    fileNames.forEach((f) => {
+      const m = f.match(/metadata\/plate_(\d+)(_small)?\.(gcode|json|png)$/i);
+      if (m) plateNumbers.add(parseInt(m[1]));
+    });
+    if (plateNumbers.size > plateCount) {
+      plateCount = plateNumbers.size;
+      bambuDetails += `${plateNumbers.size} platen gevonden via plaatbestanden. `;
     }
+
 
     // Parse the main 3D model XML
     const modelEntry = allFiles.find(f =>
