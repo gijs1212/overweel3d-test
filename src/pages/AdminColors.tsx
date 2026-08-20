@@ -65,6 +65,7 @@ export default function AdminColors() {
   const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
   const [productAvail, setProductAvail] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -82,6 +83,7 @@ export default function AdminColors() {
   };
 
   const openNew = () => {
+    setShowForm(true);
     setEditing(null);
     setForm({ ...emptyForm });
     setExistingPhotos([]);
@@ -90,6 +92,7 @@ export default function AdminColors() {
   };
 
   const openEdit = (c: FilamentColor) => {
+    setShowForm(true);
     setEditing(c);
     setForm({
       name: c.name,
@@ -109,6 +112,7 @@ export default function AdminColors() {
   };
 
   const cancel = () => {
+    setShowForm(false);
     setEditing(null);
     setForm({ ...emptyForm });
     setExistingPhotos([]);
@@ -220,12 +224,12 @@ export default function AdminColors() {
               <Palette className="w-6 h-6" /> Kleuren beheren
             </h1>
             <div className="ml-auto">
-              {!editing && <Button onClick={openNew}><Plus className="w-4 h-4" /> Nieuwe kleur</Button>}
+              {!showForm && <Button onClick={openNew}><Plus className="w-4 h-4" /> Nieuwe kleur</Button>}
             </div>
           </div>
 
           {/* Form */}
-          {(editing || newPhotoFiles.length > 0 || form.name || existingPhotos.length > 0) && (
+          {showForm && (
             <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50 mb-8">
               <h3 className="font-bold text-primary mb-4">{editing ? "Kleur bewerken" : "Nieuwe kleur"}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

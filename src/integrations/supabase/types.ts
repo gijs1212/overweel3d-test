@@ -248,6 +248,36 @@ export type Database = {
         }
         Relationships: []
       }
+      newsletter_subscribers: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_events: {
         Row: {
           created_at: string | null
@@ -387,6 +417,9 @@ export type Database = {
           id: string
           instant_quote_price: number | null
           internal_notes: string | null
+          link_first_viewed_at: string | null
+          link_last_viewed_at: string | null
+          link_view_count: number
           material: string | null
           notes: string | null
           order_method: string
@@ -438,6 +471,9 @@ export type Database = {
           id?: string
           instant_quote_price?: number | null
           internal_notes?: string | null
+          link_first_viewed_at?: string | null
+          link_last_viewed_at?: string | null
+          link_view_count?: number
           material?: string | null
           notes?: string | null
           order_method?: string
@@ -489,6 +525,9 @@ export type Database = {
           id?: string
           instant_quote_price?: number | null
           internal_notes?: string | null
+          link_first_viewed_at?: string | null
+          link_last_viewed_at?: string | null
+          link_view_count?: number
           material?: string | null
           notes?: string | null
           order_method?: string
@@ -515,6 +554,33 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
+        }
+        Relationships: []
+      }
+      product_categories: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -563,15 +629,19 @@ export type Database = {
       products: {
         Row: {
           active: boolean
+          category_id: string | null
           colors: string[]
           created_at: string
+          custom_fields: Json
           custom_text_enabled: boolean
           custom_text_label: string
           custom_text_max_length: number
           customer_photo_required: boolean
           description: string
           id: string
+          material_fixed: boolean
           materials: string[]
+          multicolor_allowed: boolean
           name: string
           photos: string[]
           price: number
@@ -579,15 +649,19 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category_id?: string | null
           colors?: string[]
           created_at?: string
+          custom_fields?: Json
           custom_text_enabled?: boolean
           custom_text_label?: string
           custom_text_max_length?: number
           customer_photo_required?: boolean
           description?: string
           id?: string
+          material_fixed?: boolean
           materials?: string[]
+          multicolor_allowed?: boolean
           name: string
           photos?: string[]
           price?: number
@@ -595,21 +669,33 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category_id?: string | null
           colors?: string[]
           created_at?: string
+          custom_fields?: Json
           custom_text_enabled?: boolean
           custom_text_label?: string
           custom_text_max_length?: number
           customer_photo_required?: boolean
           description?: string
           id?: string
+          material_fixed?: boolean
           materials?: string[]
+          multicolor_allowed?: boolean
           name?: string
           photos?: string[]
           price?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
