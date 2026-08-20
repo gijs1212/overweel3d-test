@@ -121,7 +121,7 @@ async function parse3MFForPlateInfo(file: File): Promise<Parse3MFResult | { erro
       return { error: "Geen 3D-objecten gevonden in het model. Het bestand bevat mogelijk geen mesh data. Controleer of het bestand correct is opgeslagen vanuit Bambu Studio." };
     }
 
-    const details = `${bambuDetails}${objectCount} unieke objecten, ${itemCount || objectCount} items op de plaat.`;
+    const details = `${bambuDetails}${plateCount} plaat/platen gedetecteerd · ${objectCount} unieke objecten, ${itemCount || objectCount} items.`;
 
     return {
       objectCount,
@@ -222,7 +222,9 @@ async function extractFileContent(bytes: Uint8Array, entry: ZipEntry): Promise<s
 export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, runsRequiredPerPlate, plateRunsCompleted, onUpdate }: PlateTrackerProps) {
   const { toast } = useToast();
   const [localPartsTotal, setLocalPartsTotal] = useState(String(partsTotal));
-  const [localPartsPerPlate, setLocalPartsPerPlate] = useState(String(partsPerPlate));
+  const [localPlateCount, setLocalPlateCount] = useState(
+    String(Math.max(1, partsPerPlate > 0 ? Math.ceil((partsTotal || 0) / partsPerPlate) : 1))
+  );
   const [localDefaultRuns, setLocalDefaultRuns] = useState(String(defaultRunsRequired));
   const [localRunsPerPlate, setLocalRunsPerPlate] = useState<number[]>(runsRequiredPerPlate);
   const [localCompleted, setLocalCompleted] = useState<number[]>(plateRunsCompleted);
@@ -232,13 +234,14 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
 
   useEffect(() => {
     setLocalPartsTotal(String(partsTotal));
-    setLocalPartsPerPlate(String(partsPerPlate));
+    setLocalPlateCount(String(Math.max(1, partsPerPlate > 0 ? Math.ceil((partsTotal || 0) / partsPerPlate) : 1)));
     setLocalDefaultRuns(String(defaultRunsRequired));
     setLocalRunsPerPlate(runsRequiredPerPlate);
     setLocalCompleted(plateRunsCompleted);
   }, [partsTotal, partsPerPlate, defaultRunsRequired, runsRequiredPerPlate, plateRunsCompleted]);
 
-  const totalPlates = Math.ceil((parseInt(localPartsTotal) || 0) / (parseInt(localPartsPerPlate) || 1));
+  const totalPlates = Math.max(0, parseInt(localPlateCount) || 0);
+  const partsPerPlateDerived = totalPlates > 0 ? Math.ceil((parseInt(localPartsTotal) || 0) / totalPlates) : 1;
   const defaultRuns = parseInt(localDefaultRuns) || 1;
 
   const getRunsRequired = (plateIndex: number) => {
@@ -265,7 +268,7 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
         setParseError(result.error);
         toast({ title: "3MF fout", description: result.error, variant: "destructive" });
       } else {
-        setLocalPartsPerPlate(String(result.itemCount));
+        setLocalPlateCount(String(Math.max(1, result.plateCount)));
         setParseError(null);
         toast({
           title: `3MF verwerkt ✅`,
@@ -302,7 +305,7 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
   const totalCompletedRuns = localCompleted.reduce((s, c) => s + c, 0);
   const totalRequiredRuns = Array.from({ length: totalPlates }, (_, i) => getRunsRequired(i)).reduce((s, r) => s + r, 0);
   const totalPartsCompleted = localCompleted.reduce((sum, runs, i) => {
-    const ppp = parseInt(localPartsPerPlate) || 1;
+    const ppp = partsPerPlateDerived;
     const req = getRunsRequired(i);
     return sum + Math.min(runs, req) * ppp;
   }, 0);
@@ -314,7 +317,7 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
     try {
       await onUpdate({
         partsTotal: parseInt(localPartsTotal) || 0,
-        partsPerPlate: parseInt(localPartsPerPlate) || 1,
+        partsPerPlate: partsPerPlateDerived,
         defaultRunsRequired: defaultRuns,
         runsRequiredPerPlate: localRunsPerPlate,
         plateRunsCompleted: localCompleted,
@@ -356,8 +359,9 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
           <Input type="number" value={localPartsTotal} onChange={e => setLocalPartsTotal(e.target.value)} min="0" />
         </div>
         <div>
-          <Label className="text-xs">Per plaat</Label>
-          <Input type="number" value={localPartsPerPlate} onChange={e => setLocalPartsPerPlate(e.target.value)} min="1" />
+          <Label className="text-xs">Aantal platen</Label>
+          <Input type="number" value={localPlateCount} onChange={e => setLocalPlateCount(e.target.value)} min="1" />
+          <p className="text-[10px] text-muted-foreground mt-1">≈ {partsPerPlateDerived} onderdelen per plaat</p>
         </div>
         <div>
           <Label className="text-xs">Standaard runs per plaat</Label>
