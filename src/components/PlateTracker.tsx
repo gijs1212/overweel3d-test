@@ -84,9 +84,20 @@ async function parse3MFForPlateInfo(file: File): Promise<Parse3MFResult | { erro
       }
     }
 
-    // Also check for plate gcode files (Bambu pattern: Metadata/plate_1.gcode)
+    // Bambu slice_info.config also lists one <plate> per build plate
+    const sliceInfoEntry = allFiles.find(f => f.name.toLowerCase().includes("slice_info.config"));
+    if (sliceInfoEntry) {
+      const content = await extractFileContent(bytes, sliceInfoEntry);
+      const matches = content?.match(/<plate>/gi);
+      if (matches && matches.length > plateCount) {
+        plateCount = matches.length;
+        bambuDetails += `${matches.length} platen in slice_info.config. `;
+      }
+    }
+
+    // Also check for plate gcode/thumbnail files (Bambu pattern: Metadata/plate_1.gcode)
     const plateGcodeFiles = fileNames.filter(f =>
-      /metadata\/plate_\d+/i.test(f)
+      /metadata\/plate_(\d+)\.(gcode|json|png)$/i.test(f)
     );
     if (plateGcodeFiles.length > 0 && plateGcodeFiles.length > plateCount) {
       plateCount = plateGcodeFiles.length;
