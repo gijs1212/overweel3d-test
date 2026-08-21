@@ -17,6 +17,7 @@ import { MATERIALS } from "@/lib/constants";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { materialLabel, normalizeMaterialId } from "@/lib/productCatalog";
 import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { sendAutomaticNewsletters, type AutomaticNewsletterEvent } from "@/lib/automaticNewsletter";
 
 function SignedImg({ path, className }: { path: string; className?: string }) {
   const [url, setUrl] = useState("");
@@ -94,6 +95,20 @@ export default function AdminColors() {
       return;
     }
     setColors((current) => current.map((item) => item.id === color.id ? { ...item, active } : item));
+    const materialHasOtherActiveColor = colors.some((item) => item.id !== color.id && item.active
+      && normalizeMaterialId(item.material) === normalizeMaterialId(color.material));
+    const newsletterEvents: AutomaticNewsletterEvent[] = [{
+      templateKind: "color", changeType: active ? "new" : "removed", itemName: color.name,
+      details: `${materialLabel(color.material)} · ${active ? "weer beschikbaar" : "tijdelijk niet beschikbaar"}`,
+      itemUrl: `${window.location.origin}/kleuren`,
+    }];
+    if (!materialHasOtherActiveColor) newsletterEvents.push({
+      templateKind: "material", changeType: active ? "new" : "removed", itemName: materialLabel(color.material),
+      details: active ? "Dit materiaal is weer beschikbaar." : "Dit materiaal is tijdelijk niet beschikbaar.",
+      itemUrl: `${window.location.origin}/kleuren`,
+    });
+    const newsletter = await sendAutomaticNewsletters(newsletterEvents);
+    if (newsletter.errors.length) toast({ title: "Beschikbaarheid gewijzigd, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
     toast({
       title: active ? `${color.name} is weer beschikbaar` : `${color.name} is tijdelijk onbeschikbaar`,
       description: active ? "De kleur staat weer in alle kleurkeuzes." : "De kleur is direct uit alle klant- en adminbestelkeuzes gehaald.",
@@ -240,6 +255,23 @@ export default function AdminColors() {
         if (error) throw new Error(`Kleur opgeslagen, maar oude foto's verwijderen mislukte: ${error.message}`);
       }
 
+      const availabilityChanged = editing && editing.active !== payload.active;
+      if (!editing || availabilityChanged) {
+        const changeType = !editing || payload.active ? "new" : "removed";
+        const materialHasOtherActiveColor = colors.some((item) => item.id !== editing?.id && item.active
+          && normalizeMaterialId(item.material) === normalizeMaterialId(payload.material));
+        const newsletterEvents: AutomaticNewsletterEvent[] = [{
+          templateKind: "color", changeType, itemName: payload.name,
+          details: `${materialLabel(payload.material)}${payload.description ? ` · ${payload.description}` : ""}`,
+          itemUrl: `${window.location.origin}/kleuren`,
+        }];
+        if (payload.active && !materialHasOtherActiveColor) newsletterEvents.push({
+          templateKind: "material", changeType: "new", itemName: materialLabel(payload.material),
+          details: "Dit materiaal is toegevoegd aan het beschikbare assortiment.", itemUrl: `${window.location.origin}/kleuren`,
+        });
+        const newsletter = await sendAutomaticNewsletters(newsletterEvents);
+        if (newsletter.errors.length) toast({ title: "Kleur opgeslagen, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
+      }
       toast({ title: editing ? "Kleur bijgewerkt ✅" : "Kleur toegevoegd ✅" });
       cancel();
       fetchAll();
@@ -261,6 +293,14 @@ export default function AdminColors() {
       if (storageError) toast({ title: "Kleur verwijderd", description: "Enkele foto's konden niet uit storage worden verwijderd.", variant: "destructive" });
       else toast({ title: "Kleur en foto's verwijderd" });
     } else toast({ title: "Kleur verwijderd" });
+    if (color) {
+      const materialHasOtherActiveColor = colors.some((item) => item.id !== color.id && item.active
+        && normalizeMaterialId(item.material) === normalizeMaterialId(color.material));
+      const newsletterEvents: AutomaticNewsletterEvent[] = [{ templateKind: "color", changeType: "removed", itemName: color.name, details: materialLabel(color.material), itemUrl: `${window.location.origin}/kleuren` }];
+      if (color.active && !materialHasOtherActiveColor) newsletterEvents.push({ templateKind: "material", changeType: "removed", itemName: materialLabel(color.material), details: "Dit materiaal is niet langer beschikbaar.", itemUrl: `${window.location.origin}/kleuren` });
+      const newsletter = await sendAutomaticNewsletters(newsletterEvents);
+      if (newsletter.errors.length) toast({ title: "Kleur verwijderd, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
+    }
     fetchAll();
   };
 

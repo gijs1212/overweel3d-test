@@ -17,6 +17,7 @@ import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } f
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS } from "@/lib/constants";
+import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
 import {
   CatalogProduct,
   colorMatchesMaterial,
@@ -274,6 +275,12 @@ export default function AdminProducts() {
         const { error } = await supabase.storage.from("orders").remove(managedRemovedPaths);
         if (error) throw new Error(`Product opgeslagen, maar oude afbeeldingen verwijderen mislukte: ${error.message}`);
       }
+      const previousProduct = products.find((product) => product.id === editingId);
+      const availabilityChanged = previousProduct && previousProduct.active !== form.active;
+      if ((createdProduct && form.active) || availabilityChanged) {
+        const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: form.active ? "new" : "removed", itemName: form.name.trim(), details: form.description.trim(), itemUrl: `${window.location.origin}/opdrachten` }]);
+        if (newsletter.errors.length) toast({ title: "Product opgeslagen, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
+      }
       toast({ title: editingId ? "Product bijgewerkt" : "Product aangemaakt", description: "Alle productinstellingen zijn opgeslagen." });
       resetEditor(); await fetchCatalog();
     } catch (error) {
@@ -292,12 +299,18 @@ export default function AdminProducts() {
       if (storageError) toast({ title: "Product verwijderd", description: "Enkele opslagbestanden konden niet worden verwijderd.", variant: "destructive" });
       else toast({ title: "Product en afbeeldingen verwijderd" });
     } else toast({ title: "Product verwijderd" });
+    const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: "removed", itemName: product.name, details: product.description, itemUrl: `${window.location.origin}/opdrachten` }]);
+    if (newsletter.errors.length) toast({ title: "Product verwijderd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
     fetchCatalog();
   };
   const toggleProductActive = async (product: CatalogProduct) => {
     const { error } = await supabase.from("products").update({ active: !product.active }).eq("id", product.id);
     if (error) toast({ title: "Wijzigen mislukt", description: error.message, variant: "destructive" });
-    else { toast({ title: product.active ? "Product verborgen" : "Product zichtbaar gemaakt" }); fetchCatalog(); }
+    else {
+      const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: product.active ? "removed" : "new", itemName: product.name, details: product.description, itemUrl: `${window.location.origin}/opdrachten` }]);
+      if (newsletter.errors.length) toast({ title: "Product gewijzigd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
+      toast({ title: product.active ? "Product verborgen" : "Product zichtbaar gemaakt" }); fetchCatalog();
+    }
   };
 
   const resetCategoryForm = () => { setEditingCategoryId(null); setCategoryName(""); setCategoryDescription(""); setCategorySortOrder(0); setCategoryActive(true); };
