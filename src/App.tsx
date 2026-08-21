@@ -30,6 +30,7 @@ import AdminDiscountCodes from "./pages/AdminDiscountCodes";
 import AdminColors from "./pages/AdminColors";
 import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
+import CookieBanner from "./components/CookieBanner";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
           </Routes>
         </AuthProvider>
       </BrowserRouter>
+      <CookieBanner />
     </TooltipProvider>
   </QueryClientProvider>
 );

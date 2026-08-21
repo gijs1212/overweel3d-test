@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Mail, MapPin, Clock } from "lucide-react";
 import { Logo } from "./Logo";
+import { openCookieSettings } from "@/lib/cookieConsent";
 
 export function Footer() {
   return (
@@ -83,9 +84,18 @@ export function Footer() {
           <p className="text-navy-ice/60 text-sm">
             © 2026 Overweel3D. Alle rechten voorbehouden.
           </p>
-          <p className="text-navy-ice/60 text-sm">
-            Vragen? <a href="mailto:gijsoverweel@gmail.com" className="text-emerald hover:underline">gijsoverweel@gmail.com</a>
-          </p>
+          <div className="flex flex-col items-center gap-2 text-sm sm:flex-row sm:gap-4">
+            <button
+              type="button"
+              onClick={openCookieSettings}
+              className="text-navy-ice/60 underline-offset-4 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+            >
+              Cookie-instellingen
+            </button>
+            <p className="text-navy-ice/60">
+              Vragen? <a href="mailto:gijsoverweel@gmail.com" className="text-emerald hover:underline">gijsoverweel@gmail.com</a>
+            </p>
+          </div>
         </div>
       </div>
     </footer>
