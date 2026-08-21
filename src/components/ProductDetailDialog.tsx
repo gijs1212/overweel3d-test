@@ -15,18 +15,20 @@ import {
   colorMatchesMaterial,
   FilamentColor,
   materialLabel,
+  isVideoProductMedia,
   orderedProductImages,
+  productColorSlotTitle,
   ProductOption,
   ProductOptionAnswer,
   validateCatalogColorSelection,
 } from "@/lib/productCatalog";
 import { isHeicFile, prepareImageFileForUpload } from "@/lib/imageUploads";
-import { getProductPhotoUrls } from "@/lib/productPhotos";
+import { getProductPhotoUrl } from "@/lib/productPhotos";
 
 export interface PrebuiltOptions {
   materialId: string;
   material: string;
-  colors: Array<{ id: string; name: string; hex: string }>;
+  colors: Array<{ id: string; name: string; hex: string; slotIndex?: number; slotLabel?: string }>;
   quantity: number;
   optionAnswers: ProductOptionAnswer[];
   optionFiles: Array<{ optionId: string; label: string; files: File[] }>;
@@ -45,7 +47,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [activePhoto, setActivePhoto] = useState(0);
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [mediaItems, setMediaItems] = useState<Array<{ path: string; mediaType: "image" | "video"; url: string }>>([]);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [files, setFiles] = useState<Record<string, File[]>>({});
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,12 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
     setValues({});
     setFiles({});
     setError(null);
-    getProductPhotoUrls(orderedProductImages(product).map((image) => image.storage_path)).then(setPhotoUrls);
+    const productMedia = orderedProductImages(product);
+    Promise.all(productMedia.map(async (media) => ({
+      path: media.storage_path,
+      mediaType: isVideoProductMedia(media.storage_path, media.media_type) ? "video" as const : "image" as const,
+      url: await getProductPhotoUrl(media.storage_path),
+    }))).then(setMediaItems);
   }, [product]);
 
   useEffect(() => {
@@ -103,19 +110,12 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
 
   if (!product) return null;
 
-  const toggleColor = (colorId: string) => {
+  const setColorSlot = (index: number, colorId: string) => {
     setError(null);
-    if (product.color_selection_mode !== "multiple") {
-      setSelectedColorIds([colorId]);
-      return;
-    }
     setSelectedColorIds((current) => {
-      if (current.includes(colorId)) return current.filter((id) => id !== colorId);
-      if (current.length >= product.max_colors) {
-        setError(`U kunt maximaal ${product.max_colors} kleuren kiezen.`);
-        return current;
-      }
-      return [...current, colorId];
+      const next = Array.from({ length: product.max_colors }, (_, slotIndex) => current[slotIndex] || "");
+      next[index] = colorId;
+      return next;
     });
   };
 
@@ -132,7 +132,9 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
 
   const validate = () => {
     if (!material) return "Kies een materiaal.";
-    const colorError = validateCatalogColorSelection(product, selectedColorIds, materialColors.map((color) => color.id));
+    const chosenColorIds = selectedColorIds.filter(Boolean);
+    if (product.color_selection_mode === "multiple" && product.color_required && !selectedColorIds[0]) return `${productColorSlotTitle(product, 0)} is verplicht.`;
+    const colorError = validateCatalogColorSelection(product, chosenColorIds, materialColors.map((color) => color.id));
     if (colorError) return colorError;
     for (const option of options) {
       if (!option.required) continue;
@@ -146,12 +148,21 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   const handleAdd = () => {
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
-    const selectedColors = selectedColorIds.map((id) => materialColors.find((color) => color.id === id)).filter(Boolean) as FilamentColor[];
+    const selectedColors = selectedColorIds.flatMap((id, index) => {
+      const color = materialColors.find((item) => item.id === id);
+      return color ? [{
+        id: color.id,
+        name: color.name,
+        hex: color.hex,
+        slotIndex: index,
+        slotLabel: product.color_selection_mode === "multiple" ? productColorSlotTitle(product, index) : undefined,
+      }] : [];
+    });
     const optionAnswers = buildProductOptionAnswers(options, values);
     onAdd(product, {
       materialId: material,
       material: materialLabel(material),
-      colors: selectedColors.map((color) => ({ id: color.id, name: color.name, hex: color.hex })),
+      colors: selectedColors,
       quantity: Math.max(1, Math.floor(quantity)),
       optionAnswers,
       optionFiles: options.filter((option) => option.type === "photo" && files[option.id]?.length).map((option) => ({ optionId: option.id, label: option.label, files: files[option.id] })),
@@ -173,14 +184,18 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-2xl">{product.name}</DialogTitle></DialogHeader>
     <div className="grid md:grid-cols-2 gap-6">
-      <div><div className="aspect-square bg-muted rounded-lg overflow-hidden">{photoUrls[activePhoto] ? <img src={photoUrls[activePhoto]} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Geen foto</div>}</div>{photoUrls.length > 1 && <div className="flex gap-2 mt-2 overflow-x-auto">{photoUrls.map((url, index) => <button type="button" key={url} onClick={() => setActivePhoto(index)} className={`w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${index === activePhoto ? "border-accent" : "border-border"}`}><img src={url} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" /></button>)}</div>}</div>
+      <div><div className="aspect-square bg-muted rounded-lg overflow-hidden">{mediaItems[activePhoto]?.url ? mediaItems[activePhoto].mediaType === "video" ? <video src={mediaItems[activePhoto].url} aria-label={product.name} controls playsInline preload="metadata" className="w-full h-full object-contain" /> : <img src={mediaItems[activePhoto].url} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Geen media</div>}</div>{mediaItems.length > 1 && <div className="flex gap-2 mt-2 overflow-x-auto">{mediaItems.map((media, index) => <button type="button" key={media.path} onClick={() => setActivePhoto(index)} className={`relative w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${index === activePhoto ? "border-accent" : "border-border"}`}>{media.mediaType === "video" ? <video src={media.url} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={media.url} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />}</button>)}</div>}</div>
       <div className="space-y-4"><div className="text-2xl font-bold text-accent">€{Number(product.price).toFixed(2)}</div>{product.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>}
         <div><Label>Materiaal *</Label>{product.material_mode === "fixed" ? <div className="mt-1 rounded-lg border bg-muted/40 p-3"><p className="font-medium">{materialLabel(material)}</p><p className="text-xs text-muted-foreground">Vast materiaal voor dit product</p></div> : <Select value={material} onValueChange={setMaterial}><SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger><SelectContent>{materials.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>}</div>
-        <div><Label>{product.color_selection_mode === "multiple" ? `Kleuren (max. ${product.max_colors})` : "Kleur"}{product.color_required ? " *" : ""}</Label>{!material ? <p className="text-xs text-muted-foreground mt-1">Kies eerst een materiaal.</p> : materialColors.length === 0 ? <p className="text-xs text-destructive mt-1">Voor dit materiaal zijn momenteel geen kleuren beschikbaar.</p> : product.color_selection_mode === "single" ? <Select value={selectedColorIds[0] || ""} onValueChange={(value) => setSelectedColorIds([value])}><SelectTrigger><SelectValue placeholder={product.color_required ? "Kies een kleur" : "Geen kleur gekozen"} /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select> : <div className="grid grid-cols-2 gap-2 mt-1">{materialColors.map((color) => { const selected = selectedColorIds.includes(color.id); return <button type="button" key={color.id} onClick={() => toggleColor(color.id)} className={`flex items-center gap-2 rounded-lg border p-2 text-sm ${selected ? "border-accent bg-accent/10" : ""}`}><span className="w-4 h-4 rounded-full border shrink-0" style={{ backgroundColor: color.hex }} />{color.name}{selected && <Check className="w-4 h-4 ml-auto text-accent" />}</button>; })}</div>}</div>
+        <div><Label>{product.color_selection_mode === "multiple" ? "Kleuren per onderdeel" : "Kleur"}{product.color_required ? " *" : ""}</Label>{!material ? <p className="text-xs text-muted-foreground mt-1">Kies eerst een materiaal.</p> : materialColors.length === 0 ? <p className="text-xs text-destructive mt-1">Voor dit materiaal zijn momenteel geen kleuren beschikbaar.</p> : product.color_selection_mode === "single" ? <Select value={selectedColorIds[0] || ""} onValueChange={(value) => setSelectedColorIds([value])}><SelectTrigger><SelectValue placeholder={product.color_required ? "Kies een kleur" : "Geen kleur gekozen"} /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select> : <div className="space-y-3 mt-2">{Array.from({ length: product.max_colors }, (_, index) => {
+          const noneValue = `none-${index}`;
+          const required = product.color_required && index === 0;
+          return <div key={index}><Label className="text-xs">{productColorSlotTitle(product, index)}{required ? " *" : ""}</Label><Select value={selectedColorIds[index] || noneValue} onValueChange={(value) => setColorSlot(index, value === noneValue ? "" : value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!required && <SelectItem value={noneValue}>Geen kleur</SelectItem>}{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select></div>;
+        })}</div>}</div>
         <div><Label>Aantal</Label><Input type="number" min={1} step={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))} /></div>
         {options.map((option) => <div key={option.id}><Label>{option.label}{option.required ? " *" : ""}</Label>{option.description && <p className="text-xs text-muted-foreground mb-1">{option.description}</p>}{renderOption(option)}{option.max_length && ["text", "textarea"].includes(option.type) && <p className="text-[10px] text-muted-foreground mt-1">{String(values[option.id] || "").length}/{option.max_length} tekens</p>}</div>)}
         {error && <p role="alert" className="text-sm text-destructive rounded-lg bg-destructive/10 p-3">{error}</p>}
-        <Button onClick={handleAdd} disabled={!material || (product.color_required && selectedColorIds.length === 0)} className="w-full" size="lg"><Plus className="w-4 h-4" /> Toevoegen aan winkelwagen</Button>
+        <Button onClick={handleAdd} disabled={!material || (product.color_required && !selectedColorIds[0])} className="w-full" size="lg"><Plus className="w-4 h-4" /> Toevoegen aan winkelwagen</Button>
       </div>
     </div>
   </DialogContent></Dialog>;

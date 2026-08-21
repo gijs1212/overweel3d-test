@@ -58,6 +58,7 @@ Deno.serve(async (req: Request) => {
       itemName?: string;
       details?: string;
       itemUrl?: string;
+      temporarilyUnavailable?: boolean;
       audience?: Audience;
       subject?: string;
       message?: string;
@@ -93,7 +94,14 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: "Vul de naam van de kleur, het materiaal of het artikel in." }, 400);
       }
       if (details.length > 5_000) return jsonResponse({ error: "De toelichting is te lang." }, 400);
-      const standard = buildStandardTemplate(templateKind, changeType, itemName, details, itemUrl);
+      const standard = buildStandardTemplate(
+        templateKind,
+        changeType,
+        itemName,
+        details,
+        itemUrl,
+        templateKind === "color" && changeType === "removed" && body.temporarilyUnavailable === true,
+      );
       subject = standard.subject;
       storedBody = standard.plainText;
       html = standard.html;
@@ -238,16 +246,22 @@ function buildStandardTemplate(
   itemName: string,
   details: string,
   itemUrl: string,
+  temporarilyUnavailable = false,
 ) {
   const labels = { color: "kleur", material: "materiaal", article: "artikel" } as const;
   const label = labels[kind];
   const isNew = change === "new";
-  const subject = isNew
-    ? `Nieuw ${label} bij Overweel3D: ${itemName}`
-    : `${capitalize(label)} niet meer beschikbaar: ${itemName}`;
-  const intro = isNew
-    ? `Goed nieuws: ${itemName} is nieuw toegevoegd aan ons aanbod.`
-    : `${itemName} verdwijnt uit ons aanbod en is niet langer beschikbaar.`;
+  const isTemporary = kind === "color" && change === "removed" && temporarilyUnavailable;
+  const subject = isTemporary
+    ? `Kleur tijdelijk niet beschikbaar: ${itemName}`
+    : isNew
+      ? `Nieuw ${label} bij Overweel3D: ${itemName}`
+      : `${capitalize(label)} niet meer beschikbaar: ${itemName}`;
+  const intro = isTemporary
+    ? `${itemName} is tijdelijk niet beschikbaar. Deze kleur komt waarschijnlijk later weer terug in ons aanbod.`
+    : isNew
+      ? `Goed nieuws: ${itemName} is nieuw toegevoegd aan ons aanbod.`
+      : `${itemName} verdwijnt uit ons aanbod en is niet langer beschikbaar.`;
   const detailHtml = details ? `<p>${textToHtml(details)}</p>` : "";
   const linkHtml = itemUrl
     ? `<p style="text-align:center;margin:28px 0"><a href="${escapeHtml(itemUrl)}" style="display:inline-block;background:#00b4d8;color:#fff;padding:13px 24px;border-radius:8px;text-decoration:none;font-weight:700">Bekijk op de website</a></p>`

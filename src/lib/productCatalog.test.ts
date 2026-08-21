@@ -6,7 +6,9 @@ import {
   buildProductOptionAnswers,
   colorMatchesMaterial,
   normalizeMaterialId,
+  isVideoProductMedia,
   orderedProductImages,
+  productColorSlotTitle,
   validateCatalogColorSelection,
   type CatalogProduct,
 } from "@/lib/productCatalog";
@@ -39,12 +41,18 @@ describe("productCatalog", () => {
     const normalized = orderedProductImages({
       photos: ["legacy.jpg"],
       product_images: [
-        { id: "a", product_id: "p", storage_path: "a.jpg", alt_text: "", sort_order: 0, is_primary: false },
-        { id: "b", product_id: "p", storage_path: "b.jpg", alt_text: "", sort_order: 5, is_primary: true },
+        { id: "a", product_id: "p", storage_path: "a.jpg", alt_text: "", media_type: "image", sort_order: 0, is_primary: false },
+        { id: "b", product_id: "p", storage_path: "b.jpg", alt_text: "", media_type: "image", sort_order: 5, is_primary: true },
       ],
     });
     expect(normalized.map((item) => item.storage_path)).toEqual(["b.jpg", "a.jpg"]);
     expect(orderedProductImages({ photos: ["first.jpg", "second.jpg"] })[0]).toMatchObject({ storage_path: "first.jpg", is_primary: true });
+  });
+
+  it("herkent geüploade productvideo's via type en bestandsextensie", () => {
+    expect(isVideoProductMedia("products/demo.mp4")).toBe(true);
+    expect(isVideoProductMedia("products/demo.bin", "video")).toBe(true);
+    expect(isVideoProductMedia("products/demo.jpg", "image")).toBe(false);
   });
 
   it("valideert optionele, verplichte en echte multicolorselecties", () => {
@@ -53,6 +61,12 @@ describe("productCatalog", () => {
     expect(validateCatalogColorSelection({ color_required: true, color_selection_mode: "multiple", max_colors: 2 }, ["red", "blue"], ["red", "blue"])).toBeNull();
     expect(validateCatalogColorSelection({ color_required: true, color_selection_mode: "multiple", max_colors: 2 }, ["red", "blue", "green"], ["red", "blue", "green"])).toContain("maximaal 2");
     expect(validateCatalogColorSelection({ color_required: false, color_selection_mode: "multiple", max_colors: 2 }, ["hidden"], ["red"])).toContain("niet beschikbaar");
+  });
+
+  it("geeft iedere multicolorpositie een beheerbaar label met een veilige standaard", () => {
+    expect(productColorSlotTitle({ color_slot_labels: ["Bloemblaadjes", "Steel"] }, 0)).toBe("Kleur 1 – Bloemblaadjes");
+    expect(productColorSlotTitle({ color_slot_labels: ["Bloemblaadjes", "  "] }, 1)).toBe("Kleur 2");
+    expect(productColorSlotTitle({ color_slot_labels: [] }, 2)).toBe("Kleur 3");
   });
 
   it("bouwt gelabelde momentopnames van meerdere dynamische antwoorden", () => {

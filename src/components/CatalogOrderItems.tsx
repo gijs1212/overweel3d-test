@@ -23,7 +23,7 @@ export function CatalogOrderItems({ items }: { items?: unknown }) {
     <div className="space-y-4">
       {catalogItems.map((item, index) => <article key={`${item.productId}-${index}`} className="rounded-xl border p-4">
         <div className="flex flex-wrap justify-between gap-2">
-          <div><h4 className="font-semibold text-primary">{item.productName}</h4><p className="text-sm text-muted-foreground">{item.quantity}× · {item.material} · {item.colors?.length ? item.colors.map((color) => color.name).join(" + ") : "Geen kleurkeuze"}</p></div>
+          <div><h4 className="font-semibold text-primary">{item.productName}</h4><p className="text-sm text-muted-foreground">{item.quantity}× · {item.material} · {item.colors?.length ? item.colors.map((color) => color.slotLabel ? `${color.slotLabel}: ${color.name}` : color.name).join(" · ") : "Geen kleurkeuze"}</p></div>
           <p className="font-semibold text-accent">€{Number(item.totalPrice || 0).toFixed(2)}</p>
         </div>
         {item.answers?.length > 0 && <dl className="mt-4 grid sm:grid-cols-2 gap-3">

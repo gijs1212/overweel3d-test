@@ -3,6 +3,7 @@ import { MATERIALS } from "@/lib/constants";
 export type MaterialMode = "fixed" | "selected" | "all";
 export type ColorSelectionMode = "single" | "multiple";
 export type ProductOptionType = "text" | "textarea" | "select" | "radio" | "checkbox" | "photo";
+export type ProductMediaType = "image" | "video";
 
 export interface ProductCategory {
   id: string;
@@ -17,6 +18,7 @@ export interface ProductImage {
   product_id: string;
   storage_path: string;
   alt_text: string;
+  media_type: ProductMediaType;
   sort_order: number;
   is_primary: boolean;
 }
@@ -66,6 +68,7 @@ export interface CatalogProduct {
   color_required: boolean;
   colors_configured: boolean;
   max_colors: number;
+  color_slot_labels: string[];
   multicolor_allowed: boolean;
   custom_text_enabled: boolean;
   custom_text_label: string;
@@ -89,7 +92,7 @@ export interface CatalogOrderItem {
   productId: string;
   productName: string;
   material: string;
-  colors: Array<{ id: string; name: string; hex?: string }>;
+  colors: Array<{ id: string; name: string; hex?: string; slotIndex?: number; slotLabel?: string }>;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -127,15 +130,27 @@ export const orderedProductImages = (product: Pick<CatalogProduct, "product_imag
     product_id: "",
     storage_path,
     alt_text: "",
+    media_type: isVideoProductMedia(storage_path) ? "video" as const : "image" as const,
     sort_order: index,
     is_primary: index === 0,
   }));
 };
 
+export const isVideoProductMedia = (path: string, mediaType?: ProductMediaType) =>
+  mediaType === "video" || /\.(mp4|webm|mov|m4v)(?:\?.*)?$/i.test(path);
+
 export const availableMaterialsForProduct = (product: CatalogProduct) => {
   if (product.material_mode === "all") return MATERIALS;
   const allowed = new Set((product.materials || []).map(normalizeMaterialId));
   return MATERIALS.filter((material) => allowed.has(material.id));
+};
+
+export const productColorSlotTitle = (
+  product: Pick<CatalogProduct, "color_slot_labels">,
+  index: number,
+) => {
+  const configuredLabel = product.color_slot_labels?.[index]?.trim();
+  return configuredLabel ? `Kleur ${index + 1} – ${configuredLabel}` : `Kleur ${index + 1}`;
 };
 
 export const validateCatalogColorSelection = (

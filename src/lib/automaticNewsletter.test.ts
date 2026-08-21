@@ -20,4 +20,20 @@ describe("automatic newsletters", () => {
     expect(mocks.invoke).toHaveBeenNthCalledWith(2, "send-marketing-email", { body: events[1] });
     expect(result).toEqual({ campaignsSent: 2, recipientsReached: 6, errors: [] });
   });
+
+  it("passes temporary color unavailability to the email template", async () => {
+    mocks.invoke.mockResolvedValue({ data: { success: true, sentCount: 1 }, error: null });
+    const event = {
+      templateKind: "color" as const,
+      changeType: "removed" as const,
+      itemName: "Jadewit",
+      details: "Deze kleur komt waarschijnlijk later weer terug.",
+      temporarilyUnavailable: true,
+    };
+
+    const result = await sendAutomaticNewsletters([event]);
+
+    expect(mocks.invoke).toHaveBeenCalledWith("send-marketing-email", { body: event });
+    expect(result).toEqual({ campaignsSent: 1, recipientsReached: 1, errors: [] });
+  });
 });

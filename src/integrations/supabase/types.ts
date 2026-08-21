@@ -746,6 +746,7 @@ export type Database = {
           created_at: string
           id: string
           is_primary: boolean
+          media_type: string
           product_id: string
           sort_order: number
           storage_path: string
@@ -756,6 +757,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_primary?: boolean
+          media_type?: string
           product_id: string
           sort_order?: number
           storage_path: string
@@ -766,6 +768,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_primary?: boolean
+          media_type?: string
           product_id?: string
           sort_order?: number
           storage_path?: string
@@ -840,6 +843,7 @@ export type Database = {
           category_id: string | null
           color_required: boolean
           color_selection_mode: string
+          color_slot_labels: string[]
           colors: string[]
           colors_configured: boolean
           created_at: string
@@ -865,6 +869,7 @@ export type Database = {
           category_id?: string | null
           color_required?: boolean
           color_selection_mode?: string
+          color_slot_labels?: string[]
           colors?: string[]
           colors_configured?: boolean
           created_at?: string
@@ -890,6 +895,7 @@ export type Database = {
           category_id?: string | null
           color_required?: boolean
           color_selection_mode?: string
+          color_slot_labels?: string[]
           colors?: string[]
           colors_configured?: boolean
           created_at?: string

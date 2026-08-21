@@ -63,7 +63,7 @@ type PrebuiltLine = {
   materialId: string;
   material: string;
   color: string;
-  colors: Array<{ id: string; name: string; hex: string }>;
+  colors: Array<{ id: string; name: string; hex: string; slotIndex?: number; slotLabel?: string }>;
   quantity: number;
   price: number; // total for this line
   unitPrice: number;
@@ -264,7 +264,9 @@ export default function NewOrder() {
 
   // ===== Prebuilt =====
   const addPrebuiltToCart = (product: ProductItem, options: PrebuiltOptions) => {
-    const color = options.colors.length ? options.colors.map((item) => item.name).join(" + ") : "Geen kleurkeuze";
+    const color = options.colors.length
+      ? options.colors.map((item) => item.slotLabel ? `${item.slotLabel}: ${item.name}` : item.name).join(" · ")
+      : "Geen kleurkeuze";
     setCart((c) => [...c, {
       kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
       materialId: options.materialId, material: options.material, color, colors: options.colors,

@@ -157,22 +157,8 @@ ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_catalog_items_array_c
 ALTER TABLE public.orders ADD CONSTRAINT orders_catalog_items_array_check
   CHECK (jsonb_typeof(catalog_items) = 'array');
 
--- Make the historical hard-coded palette available through the real colors table.
--- Existing rows win, so custom photos/descriptions are never overwritten.
-INSERT INTO public.filament_colors (name, material, hex, sort_order)
-SELECT seed.name, seed.material, seed.hex, seed.sort_order
-FROM (VALUES
-  ('Wit', 'PLA', '#FFFFFF', 10), ('Zwart', 'PLA', '#000000', 20),
-  ('Blauw', 'PLA', '#0066FF', 30), ('Groen', 'PLA', '#00CC00', 40),
-  ('Bladgroen', 'PLA', '#228B22', 50), ('Rood', 'PLA', '#FF0000', 60),
-  ('Geel', 'PLA', '#FFDD00', 70), ('Grijs', 'PLA', '#808080', 80),
-  ('Wit', 'PETG', '#FFFFFF', 10), ('Zwart', 'PETG', '#000000', 20),
-  ('Rood', 'PETG', '#FF0000', 30), ('Zwart', 'TPU', '#000000', 10)
-) AS seed(name, material, hex, sort_order)
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.filament_colors existing
-  WHERE lower(existing.name) = lower(seed.name) AND lower(existing.material) = lower(seed.material)
-);
+-- The catalogue uses the inventory palette populated by the dedicated filament
+-- migrations. Do not restore the historical hard-coded colors here.
 
 -- Resolve legacy color slugs to the database palette only when a product has no
 -- explicit availability configuration yet.

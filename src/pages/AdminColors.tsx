@@ -53,6 +53,15 @@ const emptyForm = {
   active: true,
 };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return "Onbekende databasefout.";
+}
+
 export default function AdminColors() {
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -99,12 +108,13 @@ export default function AdminColors() {
       && normalizeMaterialId(item.material) === normalizeMaterialId(color.material));
     const newsletterEvents: AutomaticNewsletterEvent[] = [{
       templateKind: "color", changeType: active ? "new" : "removed", itemName: color.name,
-      details: `${materialLabel(color.material)} · ${active ? "weer beschikbaar" : "tijdelijk niet beschikbaar"}`,
+      details: `${materialLabel(color.material)} · ${active ? "weer beschikbaar" : "tijdelijk niet beschikbaar; deze kleur komt waarschijnlijk later weer terug"}`,
       itemUrl: `${window.location.origin}/kleuren`,
+      temporarilyUnavailable: !active,
     }];
-    if (!materialHasOtherActiveColor) newsletterEvents.push({
-      templateKind: "material", changeType: active ? "new" : "removed", itemName: materialLabel(color.material),
-      details: active ? "Dit materiaal is weer beschikbaar." : "Dit materiaal is tijdelijk niet beschikbaar.",
+    if (active && !materialHasOtherActiveColor) newsletterEvents.push({
+      templateKind: "material", changeType: "new", itemName: materialLabel(color.material),
+      details: "Dit materiaal is weer beschikbaar.",
       itemUrl: `${window.location.origin}/kleuren`,
     });
     const newsletter = await sendAutomaticNewsletters(newsletterEvents);
@@ -241,11 +251,6 @@ export default function AdminColors() {
             })),
           );
           if (availabilityError) throw availabilityError;
-          const { error: configuredError } = await supabase
-            .from("products")
-            .update({ colors_configured: true })
-            .in("id", relevantProducts.map((product) => product.id));
-          if (configuredError) throw configuredError;
         }
       }
 
@@ -262,8 +267,11 @@ export default function AdminColors() {
           && normalizeMaterialId(item.material) === normalizeMaterialId(payload.material));
         const newsletterEvents: AutomaticNewsletterEvent[] = [{
           templateKind: "color", changeType, itemName: payload.name,
-          details: `${materialLabel(payload.material)}${payload.description ? ` · ${payload.description}` : ""}`,
+          details: payload.active
+            ? `${materialLabel(payload.material)}${payload.description ? ` · ${payload.description}` : ""}`
+            : `${materialLabel(payload.material)} · tijdelijk niet beschikbaar; deze kleur komt waarschijnlijk later weer terug`,
           itemUrl: `${window.location.origin}/kleuren`,
+          temporarilyUnavailable: !payload.active,
         }];
         if (payload.active && !materialHasOtherActiveColor) newsletterEvents.push({
           templateKind: "material", changeType: "new", itemName: materialLabel(payload.material),
@@ -271,6 +279,10 @@ export default function AdminColors() {
         });
         const newsletter = await sendAutomaticNewsletters(newsletterEvents);
         if (newsletter.errors.length) toast({ title: "Kleur opgeslagen, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
+        else toast({
+          title: "Nieuwsbrief verstuurd ✅",
+          description: `${newsletter.campaignsSent} melding${newsletter.campaignsSent === 1 ? "" : "en"} verstuurd naar ${newsletter.recipientsReached} ontvanger${newsletter.recipientsReached === 1 ? "" : "s"}.`,
+        });
       }
       toast({ title: editing ? "Kleur bijgewerkt ✅" : "Kleur toegevoegd ✅" });
       cancel();
@@ -279,7 +291,7 @@ export default function AdminColors() {
       if (uploadedPaths.length && !photosCommitted) {
         await supabase.storage.from("orders").remove(uploadedPaths);
       }
-      toast({ title: "Fout", description: error instanceof Error ? error.message : "Onbekende databasefout.", variant: "destructive" });
+      toast({ title: "Opslaan mislukt", description: getErrorMessage(error), variant: "destructive" });
     } finally { setSaving(false); }
   };
 

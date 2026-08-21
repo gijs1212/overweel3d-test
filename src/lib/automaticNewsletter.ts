@@ -10,6 +10,7 @@ export interface AutomaticNewsletterEvent {
   itemName: string;
   details?: string;
   itemUrl?: string;
+  temporarilyUnavailable?: boolean;
 }
 
 export interface AutomaticNewsletterResult {

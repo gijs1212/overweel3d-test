@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
-import { CatalogProduct, orderedProductImages } from "@/lib/productCatalog";
+import { CatalogProduct, isVideoProductMedia, orderedProductImages } from "@/lib/productCatalog";
 
 interface ProductTileProps {
   product: CatalogProduct;
@@ -9,7 +9,8 @@ interface ProductTileProps {
 
 export function ProductTile({ product, onClick }: ProductTileProps) {
   const [photoUrl, setPhotoUrl] = useState<string>("");
-  const primaryPath = orderedProductImages(product)[0]?.storage_path || "";
+  const primaryMedia = orderedProductImages(product)[0];
+  const primaryPath = primaryMedia?.storage_path || "";
 
   useEffect(() => {
     let active = true;
@@ -31,15 +32,17 @@ export function ProductTile({ product, onClick }: ProductTileProps) {
         aria-label={`Bekijk ${product.name}`}
       >
         {photoUrl ? (
-          <img
+          isVideoProductMedia(primaryPath, primaryMedia?.media_type) ? <video
             src={photoUrl}
-            alt={product.name}
-            loading="lazy"
+            aria-label={product.name}
+            muted
+            playsInline
+            preload="metadata"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+          /> : <img src={photoUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-            Geen foto
+            Geen media
           </div>
         )}
         <span className="absolute left-1/2 -translate-x-1/2 bottom-3 px-4 py-1.5 bg-white/95 backdrop-blur text-[11px] font-semibold tracking-widest text-primary rounded shadow-sm opacity-90 group-hover:opacity-100 group-hover:bg-white transition">

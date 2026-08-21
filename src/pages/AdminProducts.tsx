@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, Video, X } from "lucide-react";
 
 import { Footer } from "@/components/Footer";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -23,6 +23,7 @@ import {
   colorMatchesMaterial,
   FilamentColor,
   MaterialMode,
+  isVideoProductMedia,
   orderedProductImages,
   ProductCategory,
   ProductImage,
@@ -32,7 +33,7 @@ import {
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 
 type ProductForm = Omit<CatalogProduct, "id" | "product_categories" | "product_images" | "product_options">;
-type PendingImage = { key: string; file: File; previewUrl: string };
+type PendingImage = { key: string; file: File; previewUrl: string; media_type: "image" | "video" };
 type DeleteTarget = { type: "product"; value: CatalogProduct } | { type: "category"; value: ProductCategory };
 
 const optionTypes: Array<{ value: ProductOptionType; label: string }> = [
@@ -47,18 +48,21 @@ const optionTypes: Array<{ value: ProductOptionType; label: string }> = [
 const emptyForm: ProductForm = {
   name: "", description: "", price: 0, category_id: null, materials: [], colors: [], photos: [],
   material_mode: "selected", material_fixed: false, color_selection_mode: "single", color_required: true, colors_configured: false,
-  max_colors: 1, multicolor_allowed: false, custom_text_enabled: false, custom_text_label: "Aangepaste tekst",
+  max_colors: 1, color_slot_labels: [], multicolor_allowed: false, custom_text_enabled: false, custom_text_label: "Aangepaste tekst",
   custom_text_max_length: 50, customer_photo_required: false, active: true,
 };
 
-function SignedImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
+function SignedMedia({ path, alt, mediaType, className }: { path: string; alt: string; mediaType?: "image" | "video"; className?: string }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
     let current = true;
     getProductPhotoUrl(path).then((nextUrl) => current && setUrl(nextUrl));
     return () => { current = false; };
   }, [path]);
-  return url ? <img src={url} alt={alt} className={className} /> : <div className={`${className || ""} bg-muted animate-pulse`} />;
+  if (!url) return <div className={`${className || ""} bg-muted animate-pulse`} />;
+  return isVideoProductMedia(path, mediaType)
+    ? <video src={url} aria-label={alt} muted playsInline preload="metadata" className={className} />
+    : <img src={url} alt={alt} className={className} />;
 }
 
 const sanitizeFilename = (name: string) => name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-");
@@ -135,6 +139,7 @@ export default function AdminProducts() {
       material_mode: product.material_mode || (product.material_fixed ? "fixed" : product.materials.length ? "selected" : "all"),
       color_selection_mode: product.color_selection_mode || (product.multicolor_allowed ? "multiple" : "single"),
       max_colors: Math.max(1, product.max_colors || (product.multicolor_allowed ? 2 : 1)),
+      color_slot_labels: product.color_slot_labels || [],
       product_categories: undefined, product_images: undefined, product_options: undefined,
     } as ProductForm);
     setImages(productImages); setPendingImages([]); setRemovedPaths([]);
@@ -169,15 +174,20 @@ export default function AdminProducts() {
     const converted: File[] = [];
     for (const file of files) {
       const isHeic = isHeicFile(file);
-      if (!isHeic && !file.type.startsWith("image/")) { toast({ title: `${file.name} is geen afbeelding`, variant: "destructive" }); continue; }
-      if (file.size > 12 * 1024 * 1024) { toast({ title: `${file.name} is te groot`, description: "Maximaal 12 MB per afbeelding.", variant: "destructive" }); continue; }
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+      if (!isHeic && !file.type.startsWith("image/") && !isVideo) { toast({ title: `${file.name} is geen afbeelding of video`, variant: "destructive" }); continue; }
+      const maxBytes = isVideo ? 50 * 1024 * 1024 : 12 * 1024 * 1024;
+      if (file.size > maxBytes) { toast({ title: `${file.name} is te groot`, description: isVideo ? "Maximaal 50 MB per video." : "Maximaal 12 MB per afbeelding.", variant: "destructive" }); continue; }
       if (isHeic) {
         try {
           converted.push(await prepareImageFileForUpload(file));
         } catch { toast({ title: `HEIC-conversie mislukt voor ${file.name}`, variant: "destructive" }); }
       } else converted.push(file);
     }
-    const additions = converted.map((file) => ({ key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) }));
+    const additions = converted.map((file) => ({
+      key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file),
+      media_type: file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name) ? "video" as const : "image" as const,
+    }));
     setPendingImages((current) => [...current, ...additions]);
     if (!primaryKey && additions[0]) setPrimaryKey(additions[0].key);
   };
@@ -227,6 +237,9 @@ export default function AdminProducts() {
         color_selection_mode: form.color_selection_mode, color_required: form.color_required,
         colors_configured: true,
         max_colors: form.color_selection_mode === "single" ? 1 : form.max_colors,
+        color_slot_labels: form.color_selection_mode === "multiple"
+          ? Array.from({ length: form.max_colors }, (_, index) => (form.color_slot_labels[index] || "").trim())
+          : [],
         multicolor_allowed: form.color_selection_mode === "multiple", custom_text_enabled: form.custom_text_enabled,
         custom_text_label: form.custom_text_label, custom_text_max_length: form.custom_text_max_length,
         customer_photo_required: form.customer_photo_required, active: form.active,
@@ -237,21 +250,21 @@ export default function AdminProducts() {
         const { data, error } = await supabase.from("products").insert(payload).select("id").single(); if (error) throw error;
         productId = data.id; createdProduct = true;
       }
-      const uploaded: Array<{ key: string; path: string }> = [];
+      const uploaded: Array<{ key: string; path: string; media_type: "image" | "video" }> = [];
       for (const pending of pendingImages) {
         const path = `products/${productId}/${crypto.randomUUID()}-${sanitizeFilename(pending.file.name)}`;
         const { error } = await uploadFileWithHeicConversion("orders", path, pending.file, { cacheControl: "3600", upsert: false });
         if (error) throw new Error(`Upload van ${pending.file.name} mislukt: ${error.message}`);
-        uploadedPaths.push(path); uploaded.push({ key: pending.key, path });
+        uploadedPaths.push(path); uploaded.push({ key: pending.key, path, media_type: pending.media_type });
       }
       const allImageRows = [
-        ...images.map((image) => ({ key: image.id, path: image.storage_path, alt: image.alt_text })),
-        ...uploaded.map((image) => ({ key: image.key, path: image.path, alt: form.name.trim() })),
+        ...images.map((image) => ({ key: image.id, path: image.storage_path, alt: image.alt_text, media_type: image.media_type || (isVideoProductMedia(image.storage_path) ? "video" as const : "image" as const) })),
+        ...uploaded.map((image) => ({ key: image.key, path: image.path, alt: form.name.trim(), media_type: image.media_type })),
       ];
       const effectivePrimary = allImageRows.some((image) => image.key === primaryKey) ? primaryKey : allImageRows[0]?.key;
       const { error: deleteImagesError } = await supabase.from("product_images").delete().eq("product_id", productId); if (deleteImagesError) throw deleteImagesError;
       if (allImageRows.length) {
-        const { error } = await supabase.from("product_images").insert(allImageRows.map((image, index) => ({ product_id: productId!, storage_path: image.path, alt_text: image.alt || form.name.trim(), sort_order: index, is_primary: image.key === effectivePrimary })));
+        const { error } = await supabase.from("product_images").insert(allImageRows.map((image, index) => ({ product_id: productId!, storage_path: image.path, alt_text: image.alt || form.name.trim(), media_type: image.media_type, sort_order: index, is_primary: image.key === effectivePrimary })));
         if (error) throw error;
       }
       imagesCommitted = true;
@@ -370,15 +383,35 @@ export default function AdminProducts() {
           <div className="flex items-end gap-2 pb-2"><Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /><Label>Zichtbaar voor klanten</Label></div>
         </div>
 
-        <div><Label>Productafbeeldingen</Label><p className="text-xs text-muted-foreground mb-3">Upload meerdere foto's en klik op de ster om de hoofdafbeelding te kiezen.</p><div className="flex flex-wrap gap-3">
-          {images.map((image) => <div key={image.id} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.id ? "border-accent" : "border-border"}`}><SignedImage path={image.storage_path} alt={form.name} className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.id)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdfoto"><Star className={`w-4 h-4 ${primaryKey === image.id ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removeExistingImage(image)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Afbeelding verwijderen"><X className="w-4 h-4" /></button></div>)}
-          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.key ? "border-accent" : "border-border"}`}><img src={image.previewUrl} alt="Nieuwe productfoto" className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdfoto"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Afbeelding verwijderen"><X className="w-4 h-4" /></button></div>)}
-          <label className="w-28 h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-accent/60"><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">Foto's</span><input type="file" multiple accept="image/*,.heic,.heif" className="hidden" onChange={(event) => { handleImageInput(Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
+        <div><Label>Productmedia</Label><p className="text-xs text-muted-foreground mb-3">Upload afbeeldingen of video's en klik op de ster om de hoofdmedia te kiezen.</p><div className="flex flex-wrap gap-3">
+          {images.map((image) => <div key={image.id} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.id ? "border-accent" : "border-border"}`}><SignedMedia path={image.storage_path} mediaType={image.media_type} alt={form.name} className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.id)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.id ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removeExistingImage(image)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{isVideoProductMedia(image.storage_path, image.media_type) && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div>)}
+          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.key ? "border-accent" : "border-border"}`}>{image.media_type === "video" ? <video src={image.previewUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={image.previewUrl} alt="Nieuwe productmedia" className="w-full h-full object-cover" />}<button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{image.media_type === "video" && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div>)}
+          <label className="w-28 h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-accent/60"><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">Media</span><input type="file" multiple accept="image/*,.heic,.heif,video/mp4,video/webm,video/quicktime,.m4v" className="hidden" onChange={(event) => { handleImageInput(Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
         </div></div>
 
         <div className="grid lg:grid-cols-2 gap-6 border-t pt-6">
           <div><Label>Materiaalkeuze</Label><Select value={form.material_mode} onValueChange={(value) => setMaterialMode(value as MaterialMode)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Vast materiaal</SelectItem><SelectItem value="selected">Klant kiest uit geselecteerde materialen</SelectItem><SelectItem value="all">Klant kiest uit alle materialen</SelectItem></SelectContent></Select>{form.material_mode !== "all" && <div className="flex flex-wrap gap-2 mt-3">{MATERIALS.map((material) => <button type="button" key={material.id} onClick={() => toggleMaterial(material.id)} className={`px-3 py-1.5 text-sm rounded-full border ${form.materials.includes(material.id) ? "bg-accent text-accent-foreground border-accent" : ""}`}>{material.name}</button>)}</div>}{form.material_mode === "fixed" && <p className="text-xs text-muted-foreground mt-2">De klant ziet het gekozen materiaal, maar kan dit niet aanpassen.</p>}</div>
-          <div><div className="flex items-center gap-2"><Switch checked={form.color_required} onCheckedChange={(color_required) => setForm({ ...form, color_required })} /><Label>Minimaal één kleur verplicht</Label></div><div className="mt-3"><Label>Kleurkeuze</Label><Select value={form.color_selection_mode} onValueChange={(value) => setForm({ ...form, color_selection_mode: value as "single" | "multiple", max_colors: value === "single" ? 1 : Math.max(2, form.max_colors) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="single">Eén kleur</SelectItem><SelectItem value="multiple">Meerdere kleuren (multicolor)</SelectItem></SelectContent></Select></div>{form.color_selection_mode === "multiple" && <div className="mt-3"><Label>Maximaal aantal kleuren</Label><Input type="number" min={2} max={12} value={form.max_colors} onChange={(event) => setForm({ ...form, max_colors: Number(event.target.value) || 2 })} /></div>}</div>
+          <div>
+            <div className="flex items-center gap-2"><Switch checked={form.color_required} onCheckedChange={(color_required) => setForm({ ...form, color_required })} /><Label>Minimaal één kleur verplicht</Label></div>
+            <div className="mt-3"><Label>Kleurkeuze</Label><Select value={form.color_selection_mode} onValueChange={(value) => setForm({ ...form, color_selection_mode: value as "single" | "multiple", max_colors: value === "single" ? 1 : Math.max(2, form.max_colors) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="single">Eén kleur</SelectItem><SelectItem value="multiple">Meerdere kleuren (multicolor)</SelectItem></SelectContent></Select></div>
+            {form.color_selection_mode === "multiple" && <div className="mt-3 space-y-3">
+              <div><Label>Aantal kleurposities</Label><Input type="number" min={2} max={12} value={form.max_colors} onChange={(event) => setForm({ ...form, max_colors: Math.min(12, Math.max(2, Number(event.target.value) || 2)) })} /></div>
+              <div>
+                <Label>Waarvoor is iedere kleur?</Label>
+                <p className="text-xs text-muted-foreground mb-2">Deze labels ziet de klant bij het kiezen en later in de bestelling.</p>
+                <div className="space-y-2">
+                  {Array.from({ length: form.max_colors }, (_, index) => <div key={index} className="grid grid-cols-[5rem_1fr] items-center gap-2">
+                    <span className="text-sm font-medium">Kleur {index + 1}</span>
+                    <Input value={form.color_slot_labels[index] || ""} onChange={(event) => setForm((current) => {
+                      const color_slot_labels = [...current.color_slot_labels];
+                      color_slot_labels[index] = event.target.value;
+                      return { ...current, color_slot_labels };
+                    })} placeholder={index === 0 ? "Bijv. bloemblaadjes" : index === 1 ? "Bijv. steel" : "Bijv. details"} />
+                  </div>)}
+                </div>
+              </div>
+            </div>}
+          </div>
         </div>
 
         <div><Label>Beschikbare kleuren *</Label><p className="text-xs text-muted-foreground mb-3">Kleuren komen uit Kleurenbeheer en worden per product opgeslagen.</p>{availableColors.length === 0 ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p> : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{availableColors.map((color) => <label key={color.id} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="text-sm truncate">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}</div>
@@ -391,7 +424,7 @@ export default function AdminProducts() {
         <div className="flex gap-3"><Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingId ? "Product bijwerken" : "Product aanmaken"}</Button><Button variant="outline" onClick={resetEditor} disabled={saving}>Annuleren</Button></div>
       </section>}
 
-      {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></div> : products.length === 0 ? <p className="text-center text-muted-foreground py-12">Nog geen producten.</p> : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{products.map((product) => { const mainImage = orderedProductImages(product)[0]; return <article key={product.id} className={`bg-card rounded-2xl border overflow-hidden ${product.active ? "" : "opacity-60"}`}><div className="aspect-[4/3] bg-muted">{mainImage ? <SignedImage path={mainImage.storage_path} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">Geen foto</div>}</div><div className="p-4"><div className="flex gap-2 items-start"><div className="min-w-0 flex-1"><h3 className="font-bold text-primary truncate">{product.name}</h3><p className="text-accent font-semibold">€{Number(product.price).toFixed(2)}</p></div><Button variant="ghost" size="sm" onClick={() => toggleProductActive(product)} aria-label={product.active ? "Verbergen" : "Tonen"}>{product.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</Button></div><p className="text-xs text-muted-foreground mt-2">{product.product_categories?.name || "Zonder categorie"} · {product.product_options?.length || 0} extra opties · {product.colors.length} kleuren</p><div className="flex gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => openEdit(product)}><Pencil className="w-4 h-4" /> Bewerken</Button><Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ type: "product", value: product })}><Trash2 className="w-4 h-4 text-destructive" /></Button></div></div></article>; })}</div>}
+      {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></div> : products.length === 0 ? <p className="text-center text-muted-foreground py-12">Nog geen producten.</p> : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{products.map((product) => { const mainImage = orderedProductImages(product)[0]; return <article key={product.id} className={`bg-card rounded-2xl border overflow-hidden ${product.active ? "" : "opacity-60"}`}><div className="aspect-[4/3] bg-muted">{mainImage ? <SignedMedia path={mainImage.storage_path} mediaType={mainImage.media_type} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">Geen media</div>}</div><div className="p-4"><div className="flex gap-2 items-start"><div className="min-w-0 flex-1"><h3 className="font-bold text-primary truncate">{product.name}</h3><p className="text-accent font-semibold">€{Number(product.price).toFixed(2)}</p></div><Button variant="ghost" size="sm" onClick={() => toggleProductActive(product)} aria-label={product.active ? "Verbergen" : "Tonen"}>{product.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</Button></div><p className="text-xs text-muted-foreground mt-2">{product.product_categories?.name || "Zonder categorie"} · {product.product_options?.length || 0} extra opties · {product.colors.length} kleuren</p><div className="flex gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => openEdit(product)}><Pencil className="w-4 h-4" /> Bewerken</Button><Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ type: "product", value: product })}><Trash2 className="w-4 h-4 text-destructive" /></Button></div></div></article>; })}</div>}
     </div></main><Footer />
       <ConfirmActionDialog
         open={deleteTarget !== null}
