@@ -1,296 +1,187 @@
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Plus, Upload, X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, X } from "lucide-react";
-import { MATERIALS } from "@/lib/constants";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  availableMaterialsForProduct,
+  buildProductOptionAnswers,
+  CatalogProduct,
+  colorMatchesMaterial,
+  FilamentColor,
+  materialLabel,
+  orderedProductImages,
+  ProductOption,
+  ProductOptionAnswer,
+  validateCatalogColorSelection,
+} from "@/lib/productCatalog";
+import { isHeicFile, prepareImageFileForUpload } from "@/lib/imageUploads";
 import { getProductPhotoUrls } from "@/lib/productPhotos";
 
-export type CustomFieldDef = {
-  id: string;
-  type: "text" | "textarea" | "photo";
-  label: string;
-  help?: string;
-  required?: boolean;
-  maxLength?: number;
-};
-
-interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  materials: string[];
-  colors: string[];
-  photos: string[];
-  custom_text_enabled: boolean;
-  custom_text_label: string;
-  custom_text_max_length: number;
-  customer_photo_required?: boolean;
-  material_fixed?: boolean;
-  multicolor_allowed?: boolean;
-  custom_fields?: CustomFieldDef[] | null;
-}
-
 export interface PrebuiltOptions {
+  materialId: string;
   material: string;
-  color: string;
+  colors: Array<{ id: string; name: string; hex: string }>;
   quantity: number;
-  customText?: string;
-  fieldTexts: { label: string; value: string }[];
-  fieldPhotos: File[];
+  optionAnswers: ProductOptionAnswer[];
+  optionFiles: Array<{ optionId: string; label: string; files: File[] }>;
 }
 
 interface ProductDetailDialogProps {
-  product: Product | null;
+  product: CatalogProduct | null;
+  colors: FilamentColor[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (product: Product, options: PrebuiltOptions) => void;
+  onAdd: (product: CatalogProduct, options: PrebuiltOptions) => void;
 }
 
-export function ProductDetailDialog({ product, open, onOpenChange, onAdd }: ProductDetailDialogProps) {
+export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd }: ProductDetailDialogProps) {
   const [material, setMaterial] = useState("");
-  const [color, setColor] = useState("");
+  const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
-  const [customText, setCustomText] = useState("");
   const [activePhoto, setActivePhoto] = useState(0);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [fieldFiles, setFieldFiles] = useState<Record<string, File[]>>({});
+  const [values, setValues] = useState<Record<string, string | boolean>>({});
+  const [files, setFiles] = useState<Record<string, File[]>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const fields: CustomFieldDef[] = Array.isArray(product?.custom_fields) ? (product!.custom_fields as CustomFieldDef[]) : [];
+  const options = useMemo(() => {
+    if (!product) return [];
+    const activeOptions = [...(product.product_options || [])].filter((option) => option.active).sort((a, b) => a.sort_order - b.sort_order);
+    if (product.custom_text_enabled && !activeOptions.some((option) => option.id === "legacy-custom-text")) {
+      activeOptions.unshift({
+        id: "legacy-custom-text", product_id: product.id, type: "text", label: product.custom_text_label,
+        description: "", required: false, choices: [], max_length: product.custom_text_max_length, sort_order: -1, active: true,
+      });
+    }
+    if (product.customer_photo_required && !activeOptions.some((option) => option.type === "photo")) {
+      activeOptions.push({
+        id: "required-customer-photo", product_id: product.id, type: "photo", label: "Foto voor dit product",
+        description: "Upload minimaal één foto die we voor deze bestelling nodig hebben.", required: true,
+        choices: [], max_length: null, sort_order: activeOptions.length, active: true,
+      });
+    }
+    return activeOptions;
+  }, [product]);
+
+  const materials = useMemo(() => product ? availableMaterialsForProduct(product) : [], [product]);
+  const materialColors = useMemo(() => {
+    if (!product || !material) return [];
+    const explicitlyAllowed = new Set(product.colors || []);
+    const matchingMaterial = colors.filter((color) => color.active && colorMatchesMaterial(color, material));
+    const explicitMatches = matchingMaterial.filter((color) => explicitlyAllowed.has(color.id));
+    // Legacy products stored slugs such as "red" rather than filament UUIDs.
+    // If none resolve, retain a usable catalogue by offering the material's active colors.
+    return (product.colors_configured
+      ? explicitMatches
+      : explicitlyAllowed.size > 0 && explicitMatches.length > 0 ? explicitMatches : matchingMaterial)
+      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  }, [colors, material, product]);
 
   useEffect(() => {
-    if (product) {
-      const onlyMaterial = product.material_fixed && product.materials.length > 0 ? product.materials[0] : "";
-      setMaterial(onlyMaterial);
-      setColor("");
-      setQuantity(1);
-      setCustomText("");
-      setActivePhoto(0);
-      setFieldValues({});
-      setFieldFiles({});
-      setError(null);
-      getProductPhotoUrls(product.photos).then(setPhotoUrls);
-    }
+    if (!product) return;
+    const available = availableMaterialsForProduct(product);
+    const initialMaterial = product.material_mode === "fixed" || available.length === 1 ? available[0]?.id || "" : "";
+    setMaterial(initialMaterial);
+    setSelectedColorIds([]);
+    setQuantity(1);
+    setActivePhoto(0);
+    setValues({});
+    setFiles({});
+    setError(null);
+    getProductPhotoUrls(orderedProductImages(product).map((image) => image.storage_path)).then(setPhotoUrls);
   }, [product]);
+
+  useEffect(() => {
+    setSelectedColorIds([]);
+  }, [material]);
 
   if (!product) return null;
 
-  const availableMaterials = MATERIALS.filter(m => product.materials.length === 0 || product.materials.includes(m.id));
-  const availableColors = material
-    ? MATERIALS.find(m => m.id === material)?.colors.filter(c => product.colors.length === 0 || product.colors.includes(c.id)) || []
-    : [];
-  const materialLocked = !!product.material_fixed && product.materials.length > 0;
+  const toggleColor = (colorId: string) => {
+    setError(null);
+    if (product.color_selection_mode !== "multiple") {
+      setSelectedColorIds([colorId]);
+      return;
+    }
+    setSelectedColorIds((current) => {
+      if (current.includes(colorId)) return current.filter((id) => id !== colorId);
+      if (current.length >= product.max_colors) {
+        setError(`U kunt maximaal ${product.max_colors} kleuren kiezen.`);
+        return current;
+      }
+      return [...current, colorId];
+    });
+  };
 
-  const addFiles = (fieldId: string, files: File[]) => {
-    const images = files.filter(f => f.type.startsWith("image/"));
-    setFieldFiles(prev => ({ ...prev, [fieldId]: [...(prev[fieldId] || []), ...images].slice(0, 5) }));
+  const addFiles = async (optionId: string, incoming: File[]) => {
+    const images = incoming.filter((file) => (file.type.startsWith("image/") || isHeicFile(file)) && file.size <= 12 * 1024 * 1024);
+    if (images.length !== incoming.length) setError("Alleen afbeeldingen tot 12 MB worden geaccepteerd.");
+    try {
+      const prepared = await Promise.all(images.map((file) => prepareImageFileForUpload(file)));
+      setFiles((current) => ({ ...current, [optionId]: [...(current[optionId] || []), ...prepared].slice(0, 5) }));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "HEIC-conversie mislukt.");
+    }
+  };
+
+  const validate = () => {
+    if (!material) return "Kies een materiaal.";
+    const colorError = validateCatalogColorSelection(product, selectedColorIds, materialColors.map((color) => color.id));
+    if (colorError) return colorError;
+    for (const option of options) {
+      if (!option.required) continue;
+      if (option.type === "photo" && !(files[option.id]?.length)) return `Upload minimaal één foto bij “${option.label}”.`;
+      if (option.type === "checkbox" && values[option.id] !== true) return `Bevestig “${option.label}”.`;
+      if (option.type !== "photo" && option.type !== "checkbox" && !String(values[option.id] || "").trim()) return `Vul “${option.label}” in.`;
+    }
+    return null;
   };
 
   const handleAdd = () => {
-    if (!material || !color) return;
-    for (const f of fields) {
-      if (!f.required) continue;
-      if (f.type === "photo" && !(fieldFiles[f.id]?.length)) {
-        setError(`"${f.label}" is verplicht: upload minimaal 1 foto.`);
-        return;
-      }
-      if (f.type !== "photo" && !(fieldValues[f.id] || "").trim()) {
-        setError(`"${f.label}" is verplicht.`);
-        return;
-      }
-    }
-    if (product.customer_photo_required && !Object.values(fieldFiles).some(a => a.length)) {
-      setError("Voor dit product moet u minimaal 1 foto meesturen.");
-      return;
-    }
-    const matName = MATERIALS.find(m => m.id === material)?.name || material;
-    const colorName = color === "multicolor"
-      ? "Multicolor (meerdere kleuren)"
-      : availableColors.find(c => c.id === color)?.name || color;
-
-    const fieldTexts = fields
-      .filter(f => f.type !== "photo" && (fieldValues[f.id] || "").trim())
-      .map(f => ({ label: f.label, value: (fieldValues[f.id] || "").trim() }));
-    const fieldPhotos = Object.values(fieldFiles).flat();
-
+    const validationError = validate();
+    if (validationError) { setError(validationError); return; }
+    const selectedColors = selectedColorIds.map((id) => materialColors.find((color) => color.id === id)).filter(Boolean) as FilamentColor[];
+    const optionAnswers = buildProductOptionAnswers(options, values);
     onAdd(product, {
-      material: matName,
-      color: colorName,
-      quantity,
-      customText: product.custom_text_enabled ? customText : undefined,
-      fieldTexts,
-      fieldPhotos,
+      materialId: material,
+      material: materialLabel(material),
+      colors: selectedColors.map((color) => ({ id: color.id, name: color.name, hex: color.hex })),
+      quantity: Math.max(1, Math.floor(quantity)),
+      optionAnswers,
+      optionFiles: options.filter((option) => option.type === "photo" && files[option.id]?.length).map((option) => ({ optionId: option.id, label: option.label, files: files[option.id] })),
     });
     onOpenChange(false);
   };
 
-  const photoFieldDefs: CustomFieldDef[] = product.customer_photo_required && !fields.some(f => f.type === "photo")
-    ? [...fields, { id: "__photo", type: "photo", label: "Uw foto", required: true, help: "Deze foto wordt bij uw bestelling opgeslagen." }]
-    : fields;
+  const renderOption = (option: ProductOption) => {
+    if (option.type === "photo") return <div className="flex flex-wrap gap-2 mt-1">
+      {(files[option.id] || []).map((file, index) => <div key={`${file.name}-${index}`} className="relative w-16 h-16 rounded-md overflow-hidden border"><img src={URL.createObjectURL(file)} alt="Uploadvoorbeeld" className="w-full h-full object-cover" /><button type="button" onClick={() => setFiles((current) => ({ ...current, [option.id]: current[option.id].filter((_, fileIndex) => fileIndex !== index) }))} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}
+      <label className="w-16 h-16 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer"><Upload className="w-4 h-4 text-muted-foreground" /><input type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(event) => { void addFiles(option.id, Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
+    </div>;
+    if (option.type === "textarea") return <Textarea rows={3} maxLength={option.max_length || undefined} value={String(values[option.id] || "")} onChange={(event) => setValues((current) => ({ ...current, [option.id]: event.target.value }))} />;
+    if (option.type === "select") return <Select value={String(values[option.id] || "")} onValueChange={(value) => setValues((current) => ({ ...current, [option.id]: value }))}><SelectTrigger><SelectValue placeholder="Maak een keuze" /></SelectTrigger><SelectContent>{option.choices.map((choice) => <SelectItem key={choice} value={choice}>{choice}</SelectItem>)}</SelectContent></Select>;
+    if (option.type === "radio") return <div className="flex flex-wrap gap-2">{option.choices.map((choice) => <button type="button" key={choice} onClick={() => setValues((current) => ({ ...current, [option.id]: choice }))} className={`px-3 py-2 rounded-lg text-sm border ${values[option.id] === choice ? "border-accent bg-accent/10" : ""}`}>{values[option.id] === choice && <Check className="w-3 h-3 inline mr-1" />}{choice}</button>)}</div>;
+    if (option.type === "checkbox") return <label className="flex items-center gap-2 rounded-lg border p-3 cursor-pointer"><Checkbox checked={values[option.id] === true} onCheckedChange={(checked) => setValues((current) => ({ ...current, [option.id]: checked === true }))} /><span className="text-sm">Ja, dit is van toepassing</span></label>;
+    return <Input maxLength={option.max_length || undefined} value={String(values[option.id] || "")} onChange={(event) => setValues((current) => ({ ...current, [option.id]: event.target.value }))} />;
+  };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">{product.name}</DialogTitle>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Photo gallery */}
-          <div>
-            <div className="aspect-square bg-muted rounded-lg overflow-hidden">
-              {photoUrls[activePhoto] ? (
-                <img src={photoUrls[activePhoto]} alt={product.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Geen foto</div>
-              )}
-            </div>
-            {photoUrls.length > 1 && (
-              <div className="flex gap-2 mt-2 overflow-x-auto">
-                {photoUrls.map((url, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActivePhoto(i)}
-                    className={`w-16 h-16 rounded-md overflow-hidden border-2 flex-shrink-0 ${i === activePhoto ? "border-accent" : "border-border"}`}
-                  >
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Options */}
-          <div className="space-y-4">
-            <div className="text-2xl font-bold text-accent">€{Number(product.price).toFixed(2)}</div>
-            {product.description && (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>
-            )}
-
-            <div>
-              <Label className="text-xs">Materiaal</Label>
-              {materialLocked ? (
-                <p className="text-sm font-medium text-primary mt-1">
-                  {MATERIALS.find(m => m.id === product.materials[0])?.name || product.materials[0]}
-                  <span className="text-xs text-muted-foreground font-normal"> (vast materiaal voor dit product)</span>
-                </p>
-              ) : (
-                <Select value={material} onValueChange={v => { setMaterial(v); setColor(""); }}>
-                  <SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger>
-                  <SelectContent>
-                    {availableMaterials.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div>
-              <Label className="text-xs">Kleur</Label>
-              <Select value={color} onValueChange={setColor} disabled={!material}>
-                <SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger>
-                <SelectContent>
-                  {availableColors.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: c.hex }} />
-                        {c.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                  {product.multicolor_allowed !== false && (
-                    <SelectItem value="multicolor">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full border" style={{ background: "conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#a855f7,#ef4444)" }} />
-                        Multicolor (meerdere kleuren)
-                      </div>
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-xs">Aantal</Label>
-              <Input type="number" min={1} value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} />
-            </div>
-
-            {product.custom_text_enabled && (
-              <div>
-                <Label className="text-xs">{product.custom_text_label}</Label>
-                <Input
-                  value={customText}
-                  onChange={e => setCustomText(e.target.value)}
-                  maxLength={product.custom_text_max_length}
-                  placeholder={product.custom_text_label}
-                />
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {customText.length}/{product.custom_text_max_length}
-                </p>
-              </div>
-            )}
-
-            {/* Admin-configured extra options */}
-            {photoFieldDefs.map((f) => (
-              <div key={f.id}>
-                <Label className="text-xs">
-                  {f.label}{f.required ? " *" : ""}
-                </Label>
-                {f.type === "photo" ? (
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {(fieldFiles[f.id] || []).map((file, i) => (
-                      <div key={i} className="relative w-16 h-16 rounded-md overflow-hidden border">
-                        <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
-                        <button
-                          onClick={() => setFieldFiles(prev => ({ ...prev, [f.id]: prev[f.id].filter((_, idx) => idx !== i) }))}
-                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    ))}
-                    <label className="w-16 h-16 rounded-md border-2 border-dashed border-border hover:border-accent/50 flex items-center justify-center cursor-pointer">
-                      <Upload className="w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => { addFiles(f.id, Array.from(e.target.files || [])); e.target.value = ""; }}
-                      />
-                    </label>
-                  </div>
-                ) : f.type === "textarea" ? (
-                  <Textarea
-                    rows={3}
-                    maxLength={f.maxLength || undefined}
-                    value={fieldValues[f.id] || ""}
-                    onChange={(e) => setFieldValues(prev => ({ ...prev, [f.id]: e.target.value }))}
-                  />
-                ) : (
-                  <Input
-                    maxLength={f.maxLength || undefined}
-                    value={fieldValues[f.id] || ""}
-                    onChange={(e) => setFieldValues(prev => ({ ...prev, [f.id]: e.target.value }))}
-                  />
-                )}
-                {f.help && <p className="text-[10px] text-muted-foreground mt-0.5">{f.help}</p>}
-              </div>
-            ))}
-
-            {error && <p className="text-xs text-destructive">{error}</p>}
-
-            <Button onClick={handleAdd} disabled={!material || !color} className="w-full" size="lg">
-              <Plus className="w-4 h-4" /> Toevoegen aan winkelwagen
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-2xl">{product.name}</DialogTitle></DialogHeader>
+    <div className="grid md:grid-cols-2 gap-6">
+      <div><div className="aspect-square bg-muted rounded-lg overflow-hidden">{photoUrls[activePhoto] ? <img src={photoUrls[activePhoto]} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Geen foto</div>}</div>{photoUrls.length > 1 && <div className="flex gap-2 mt-2 overflow-x-auto">{photoUrls.map((url, index) => <button type="button" key={url} onClick={() => setActivePhoto(index)} className={`w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${index === activePhoto ? "border-accent" : "border-border"}`}><img src={url} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" /></button>)}</div>}</div>
+      <div className="space-y-4"><div className="text-2xl font-bold text-accent">€{Number(product.price).toFixed(2)}</div>{product.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>}
+        <div><Label>Materiaal *</Label>{product.material_mode === "fixed" ? <div className="mt-1 rounded-lg border bg-muted/40 p-3"><p className="font-medium">{materialLabel(material)}</p><p className="text-xs text-muted-foreground">Vast materiaal voor dit product</p></div> : <Select value={material} onValueChange={setMaterial}><SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger><SelectContent>{materials.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>}</div>
+        <div><Label>{product.color_selection_mode === "multiple" ? `Kleuren (max. ${product.max_colors})` : "Kleur"}{product.color_required ? " *" : ""}</Label>{!material ? <p className="text-xs text-muted-foreground mt-1">Kies eerst een materiaal.</p> : materialColors.length === 0 ? <p className="text-xs text-destructive mt-1">Voor dit materiaal zijn momenteel geen kleuren beschikbaar.</p> : product.color_selection_mode === "single" ? <Select value={selectedColorIds[0] || ""} onValueChange={(value) => setSelectedColorIds([value])}><SelectTrigger><SelectValue placeholder={product.color_required ? "Kies een kleur" : "Geen kleur gekozen"} /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select> : <div className="grid grid-cols-2 gap-2 mt-1">{materialColors.map((color) => { const selected = selectedColorIds.includes(color.id); return <button type="button" key={color.id} onClick={() => toggleColor(color.id)} className={`flex items-center gap-2 rounded-lg border p-2 text-sm ${selected ? "border-accent bg-accent/10" : ""}`}><span className="w-4 h-4 rounded-full border shrink-0" style={{ backgroundColor: color.hex }} />{color.name}{selected && <Check className="w-4 h-4 ml-auto text-accent" />}</button>; })}</div>}</div>
+        <div><Label>Aantal</Label><Input type="number" min={1} step={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))} /></div>
+        {options.map((option) => <div key={option.id}><Label>{option.label}{option.required ? " *" : ""}</Label>{option.description && <p className="text-xs text-muted-foreground mb-1">{option.description}</p>}{renderOption(option)}{option.max_length && ["text", "textarea"].includes(option.type) && <p className="text-[10px] text-muted-foreground mt-1">{String(values[option.id] || "").length}/{option.max_length} tekens</p>}</div>)}
+        {error && <p role="alert" className="text-sm text-destructive rounded-lg bg-destructive/10 p-3">{error}</p>}
+        <Button onClick={handleAdd} disabled={!material || (product.color_required && selectedColorIds.length === 0)} className="w-full" size="lg"><Plus className="w-4 h-4" /> Toevoegen aan winkelwagen</Button>
+      </div>
+    </div>
+  </DialogContent></Dialog>;
 }

@@ -19,7 +19,7 @@ export function getCookieConsent(): CookieConsentChoice | null {
 }
 
 export function setCookieConsent(choice: CookieConsentChoice) {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof window === "undefined") return false;
 
   const attributes = [
     `${COOKIE_CONSENT_NAME}=${choice}`,
@@ -30,8 +30,18 @@ export function setCookieConsent(choice: CookieConsentChoice) {
 
   if (window.location.protocol === "https:") attributes.push("Secure");
 
-  document.cookie = attributes.join("; ");
-  window.dispatchEvent(new CustomEvent<CookieConsentChoice>(COOKIE_CONSENT_CHANGE_EVENT, { detail: choice }));
+  try {
+    document.cookie = attributes.join("; ");
+  } catch {
+    return false;
+  }
+
+  const wasSaved = getCookieConsent() === choice;
+  if (wasSaved) {
+    window.dispatchEvent(new CustomEvent<CookieConsentChoice>(COOKIE_CONSENT_CHANGE_EVENT, { detail: choice }));
+  }
+
+  return wasSaved;
 }
 
 export function openCookieSettings() {

@@ -35,11 +35,11 @@ export default function Register() {
       await signUp(email, password, fullName);
       toast({
         title: "Account aangemaakt!",
-        description: "Controleer uw e-mail om uw account te bevestigen.",
+        description: "U ontvangt een welkomstmail. Controleer ook uw e-mail om het account te bevestigen.",
       });
       navigate("/login");
-    } catch (error: any) {
-      toast({ title: "Registratie mislukt", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Registratie mislukt", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
     } finally {
       setLoading(false);
     }

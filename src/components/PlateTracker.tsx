@@ -1,152 +1,33 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { AlertCircle, Check, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Loader2, Upload, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  createPlateTrackingUpdate,
+  detectBambuPlateCount,
+  normalizePlatePrintQuantities,
+  normalizePlateStatuses,
+} from "@/lib/plateTracking";
 
 interface PlateTrackerProps {
-  partsTotal: number;
-  partsPerPlate: number;
-  defaultRunsRequired: number;
-  runsRequiredPerPlate: number[];
-  plateRunsCompleted: number[];
+  totalProducts: number;
+  totalPlates: number;
+  platePrintStatuses: boolean[];
+  platePrintQuantities: number[];
   onUpdate: (data: {
-    partsTotal: number;
-    partsPerPlate: number;
-    defaultRunsRequired: number;
-    runsRequiredPerPlate: number[];
-    plateRunsCompleted: number[];
+    totalProducts: number;
+    totalPlates: number;
+    platePrintStatuses: boolean[];
+    platePrintQuantities: number[];
     platesCompleted: number;
   }) => void | Promise<void>;
 }
 
 interface Parse3MFResult {
-  objectCount: number;
-  itemCount: number;
   plateCount: number;
   details: string;
-}
-
-/**
- * Parse Bambu Studio 3MF files.
- * Bambu Studio stores plate/build-plate info in Metadata/plate_N.gcode or
- * in the 3dmodel.model XML. It also has a project settings file.
- * The key insight: Bambu uses <object> for unique meshes and <item> for instances on the plate.
- * Multiple plates are stored as separate model files or via Metadata/model_settings.config
- */
-async function parse3MFForPlateInfo(file: File): Promise<Parse3MFResult | { error: string }> {
-  try {
-    if (!file.name.toLowerCase().endsWith(".3mf")) {
-      return { error: "Bestand is geen .3mf bestand. Selecteer een bestand met de extensie .3mf." };
-    }
-
-    const buffer = await file.arrayBuffer();
-    if (buffer.byteLength < 22) {
-      return { error: `Bestand is te klein (${buffer.byteLength} bytes) om een geldig 3MF/ZIP te zijn. Minimaal 22 bytes nodig.` };
-    }
-
-    const bytes = new Uint8Array(buffer);
-
-    // Check ZIP magic bytes
-    if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
-      const got = `0x${bytes[0].toString(16).padStart(2, '0')} 0x${bytes[1].toString(16).padStart(2, '0')}`;
-      return { error: `Bestand is geen geldig ZIP/3MF (verwacht 0x50 0x4b, kreeg ${got}). Mogelijk is het bestand beschadigd of geen 3MF.` };
-    }
-
-    const allFiles = await listZipEntries(bytes);
-    const fileNames = allFiles.map(f => f.name);
-
-    // Try to find Bambu Studio model_settings.config for plate info
-    let plateCount = 1;
-    let bambuDetails = "";
-
-    const modelSettingsEntry = allFiles.find(f =>
-      f.name.toLowerCase().includes("model_settings.config") ||
-      f.name.toLowerCase().includes("metadata/model_settings")
-    );
-
-    if (modelSettingsEntry) {
-      const content = await extractFileContent(bytes, modelSettingsEntry);
-      if (content) {
-        // Count plates from Bambu model_settings
-        const plateMatches = content.match(/<plate\s/gi);
-        if (plateMatches && plateMatches.length > 0) {
-          plateCount = plateMatches.length;
-          bambuDetails += `Bambu Studio project: ${plateCount} plaat/platen gevonden in model_settings.config. `;
-        }
-
-        // Count objects assigned to plates
-        const objectMatches = content.match(/<object\s/gi);
-        if (objectMatches) {
-          bambuDetails += `${objectMatches.length} objecten in project. `;
-        }
-      }
-    }
-
-    // Bambu slice_info.config also lists one <plate> per build plate
-    const sliceInfoEntry = allFiles.find(f => f.name.toLowerCase().includes("slice_info.config"));
-    if (sliceInfoEntry) {
-      const content = await extractFileContent(bytes, sliceInfoEntry);
-      const matches = content?.match(/<plate>/gi);
-      if (matches && matches.length > plateCount) {
-        plateCount = matches.length;
-        bambuDetails += `${matches.length} platen in slice_info.config. `;
-      }
-    }
-
-    // Also check for plate files (Bambu pattern: Metadata/plate_1.gcode / plate_1.png)
-    const plateNumbers = new Set<number>();
-    fileNames.forEach((f) => {
-      const m = f.match(/metadata\/plate_(\d+)(_small)?\.(gcode|json|png)$/i);
-      if (m) plateNumbers.add(parseInt(m[1]));
-    });
-    if (plateNumbers.size > plateCount) {
-      plateCount = plateNumbers.size;
-      bambuDetails += `${plateNumbers.size} platen gevonden via plaatbestanden. `;
-    }
-
-
-    // Parse the main 3D model XML
-    const modelEntry = allFiles.find(f =>
-      f.name.toLowerCase().includes("3dmodel.model") ||
-      f.name.toLowerCase() === "3d/3dmodel.model"
-    );
-
-    if (!modelEntry) {
-      // List available files for debugging
-      const availableFiles = fileNames.slice(0, 10).join(", ");
-      return {
-        error: `Kon 3dmodel.model niet vinden in het 3MF bestand. Gevonden bestanden: ${availableFiles}${fileNames.length > 10 ? ` (en ${fileNames.length - 10} meer)` : ""}. Mogelijk is het bestand beschadigd.`
-      };
-    }
-
-    const xmlContent = await extractFileContent(bytes, modelEntry);
-    if (!xmlContent) {
-      return { error: "Kon de inhoud van 3dmodel.model niet lezen. Het bestand is mogelijk beschadigd of gebruikt een niet-ondersteunde compressie." };
-    }
-
-    const objectMatches = xmlContent.match(/<object\s/gi);
-    const itemMatches = xmlContent.match(/<item\s/gi);
-    const objectCount = objectMatches?.length || 0;
-    const itemCount = itemMatches?.length || 0;
-
-    if (objectCount === 0 && itemCount === 0) {
-      return { error: "Geen 3D-objecten gevonden in het model. Het bestand bevat mogelijk geen mesh data. Controleer of het bestand correct is opgeslagen vanuit Bambu Studio." };
-    }
-
-    const details = `${bambuDetails}${plateCount} plaat/platen gedetecteerd · ${objectCount} unieke objecten, ${itemCount || objectCount} items.`;
-
-    return {
-      objectCount,
-      itemCount: itemCount || objectCount,
-      plateCount,
-      details,
-    };
-  } catch (e: any) {
-    console.error("3MF parse error:", e);
-    return { error: `Fout bij verwerken van 3MF: ${e?.message || "Onbekende fout"}. Probeer het bestand opnieuw op te slaan vanuit Bambu Studio.` };
-  }
 }
 
 interface ZipEntry {
@@ -157,13 +38,15 @@ interface ZipEntry {
 }
 
 function listZipEntries(bytes: Uint8Array): ZipEntry[] {
-  const textDecoder = new TextDecoder();
+  const decoder = new TextDecoder();
   const entries: ZipEntry[] = [];
-
-  // Find End of Central Directory
   let eocdOffset = -1;
-  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
-    if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
+
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65_557); i -= 1) {
+    if (
+      bytes[i] === 0x50 && bytes[i + 1] === 0x4b &&
+      bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06
+    ) {
       eocdOffset = i;
       break;
     }
@@ -171,194 +54,218 @@ function listZipEntries(bytes: Uint8Array): ZipEntry[] {
   if (eocdOffset === -1) return entries;
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const cdOffset = view.getUint32(eocdOffset + 16, true);
-  const cdEntries = view.getUint16(eocdOffset + 10, true);
+  const centralDirectoryOffset = view.getUint32(eocdOffset + 16, true);
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  let offset = centralDirectoryOffset;
 
-  let offset = cdOffset;
-  for (let e = 0; e < cdEntries; e++) {
+  for (let index = 0; index < entryCount; index += 1) {
     if (offset + 46 > bytes.length) break;
-    if (bytes[offset] !== 0x50 || bytes[offset+1] !== 0x4b || bytes[offset+2] !== 0x01 || bytes[offset+3] !== 0x02) break;
+    if (
+      bytes[offset] !== 0x50 || bytes[offset + 1] !== 0x4b ||
+      bytes[offset + 2] !== 0x01 || bytes[offset + 3] !== 0x02
+    ) break;
 
     const compressionMethod = view.getUint16(offset + 10, true);
     const compressedSize = view.getUint32(offset + 20, true);
-    const nameLen = view.getUint16(offset + 28, true);
-    const extraLen = view.getUint16(offset + 30, true);
-    const commentLen = view.getUint16(offset + 32, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
     const localHeaderOffset = view.getUint32(offset + 42, true);
-    const name = textDecoder.decode(bytes.slice(offset + 46, offset + 46 + nameLen));
+    const name = decoder.decode(bytes.slice(offset + 46, offset + 46 + nameLength));
 
     entries.push({ name, compressionMethod, compressedSize, localHeaderOffset });
-    offset += 46 + nameLen + extraLen + commentLen;
+    offset += 46 + nameLength + extraLength + commentLength;
   }
+
   return entries;
 }
 
 async function extractFileContent(bytes: Uint8Array, entry: ZipEntry): Promise<string | null> {
-  const textDecoder = new TextDecoder();
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-
-  const localNameLen = view.getUint16(entry.localHeaderOffset + 26, true);
-  const localExtraLen = view.getUint16(entry.localHeaderOffset + 28, true);
-  const dataStart = entry.localHeaderOffset + 30 + localNameLen + localExtraLen;
+  const nameLength = view.getUint16(entry.localHeaderOffset + 26, true);
+  const extraLength = view.getUint16(entry.localHeaderOffset + 28, true);
+  const dataStart = entry.localHeaderOffset + 30 + nameLength + extraLength;
   const fileData = bytes.slice(dataStart, dataStart + entry.compressedSize);
 
-  if (entry.compressionMethod === 0) {
-    return textDecoder.decode(fileData);
-  } else if (entry.compressionMethod === 8) {
-    try {
-      const ds = new DecompressionStream("deflate-raw");
-      const writer = ds.writable.getWriter();
-      const reader = ds.readable.getReader();
-      writer.write(fileData);
-      writer.close();
-      const chunks: Uint8Array[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-      const result = new Uint8Array(totalLen);
-      let pos = 0;
-      for (const chunk of chunks) {
-        result.set(chunk, pos);
-        pos += chunk.length;
-      }
-      return textDecoder.decode(result);
-    } catch (e) {
-      console.error("Decompression error for", entry.name, e);
-      return null;
+  if (entry.compressionMethod === 0) return new TextDecoder().decode(fileData);
+  if (entry.compressionMethod !== 8) return null;
+
+  try {
+    const stream = new DecompressionStream("deflate-raw");
+    const writer = stream.writable.getWriter();
+    const reader = stream.readable.getReader();
+    const writeComplete = writer.write(fileData).then(() => writer.close());
+
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
     }
+    await writeComplete;
+
+    const output = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+    let position = 0;
+    for (const chunk of chunks) {
+      output.set(chunk, position);
+      position += chunk.length;
+    }
+    return new TextDecoder().decode(output);
+  } catch (error) {
+    console.error(`Kon ${entry.name} niet uitpakken`, error);
+    return null;
   }
-  return null;
 }
 
-export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, runsRequiredPerPlate, plateRunsCompleted, onUpdate }: PlateTrackerProps) {
+/**
+ * Read only Bambu build-plate metadata from a 3MF archive.
+ * Product/object counts are deliberately ignored: they are independent order data
+ * and must never be used to derive either the number or status of build plates.
+ */
+async function parse3MFForPlateInfo(
+  file: File,
+): Promise<Parse3MFResult | { error: string }> {
+  try {
+    if (!file.name.toLowerCase().endsWith(".3mf")) {
+      return { error: "Selecteer een bestand met de extensie .3mf." };
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.length < 22 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
+      return { error: "Dit is geen geldig 3MF/ZIP-bestand." };
+    }
+
+    const entries = listZipEntries(bytes);
+    if (entries.length === 0) {
+      return { error: "Het 3MF-archief bevat geen leesbare bestanden." };
+    }
+
+    const metadataEntries = entries.filter((entry) => {
+      const lowerName = entry.name.toLowerCase();
+      return lowerName.includes("model_settings.config") || lowerName.includes("slice_info.config");
+    });
+
+    const metadataDocuments: string[] = [];
+    for (const entry of metadataEntries) {
+      const content = await extractFileContent(bytes, entry);
+      if (content) metadataDocuments.push(content);
+    }
+
+    const plateCount = detectBambuPlateCount(entries.map((entry) => entry.name), metadataDocuments);
+    return {
+      plateCount,
+      details: `${plateCount} ${plateCount === 1 ? "plaat" : "platen"} gedetecteerd. Het totale aantal producten blijft ongewijzigd.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Onbekende fout";
+    return { error: `Fout bij verwerken van 3MF: ${message}` };
+  }
+}
+
+export function PlateTracker({
+  totalProducts,
+  totalPlates,
+  platePrintStatuses,
+  platePrintQuantities,
+  onUpdate,
+}: PlateTrackerProps) {
   const { toast } = useToast();
-  const [localPartsTotal, setLocalPartsTotal] = useState(String(partsTotal));
-  const [localPlateCount, setLocalPlateCount] = useState(
-    String(Math.max(1, partsPerPlate > 0 ? Math.ceil((partsTotal || 0) / partsPerPlate) : 1))
+  const [localTotalProducts, setLocalTotalProducts] = useState(String(totalProducts));
+  const [localTotalPlates, setLocalTotalPlates] = useState(String(totalPlates));
+  const [localStatuses, setLocalStatuses] = useState<boolean[]>(
+    normalizePlateStatuses(platePrintStatuses, totalPlates),
   );
-  const [localDefaultRuns, setLocalDefaultRuns] = useState(String(defaultRunsRequired));
-  const [localRunsPerPlate, setLocalRunsPerPlate] = useState<number[]>(runsRequiredPerPlate);
-  const [localCompleted, setLocalCompleted] = useState<number[]>(plateRunsCompleted);
+  const [localQuantities, setLocalQuantities] = useState<number[]>(
+    normalizePlatePrintQuantities(platePrintQuantities, totalPlates),
+  );
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
-    setLocalPartsTotal(String(partsTotal));
-    setLocalPlateCount(String(Math.max(1, partsPerPlate > 0 ? Math.ceil((partsTotal || 0) / partsPerPlate) : 1)));
-    setLocalDefaultRuns(String(defaultRunsRequired));
-    setLocalRunsPerPlate(runsRequiredPerPlate);
-    setLocalCompleted(plateRunsCompleted);
-  }, [partsTotal, partsPerPlate, defaultRunsRequired, runsRequiredPerPlate, plateRunsCompleted]);
+    setLocalTotalProducts(String(totalProducts));
+    setLocalTotalPlates(String(totalPlates));
+    setLocalStatuses(normalizePlateStatuses(platePrintStatuses, totalPlates));
+    setLocalQuantities(normalizePlatePrintQuantities(platePrintQuantities, totalPlates));
+  }, [platePrintQuantities, platePrintStatuses, totalPlates, totalProducts]);
 
-  const totalPlates = Math.max(0, parseInt(localPlateCount) || 0);
-  const partsPerPlateDerived = totalPlates > 0 ? Math.ceil((parseInt(localPartsTotal) || 0) / totalPlates) : 1;
-  const defaultRuns = parseInt(localDefaultRuns) || 1;
-
-  const getRunsRequired = (plateIndex: number) => {
-    return localRunsPerPlate[plateIndex] || defaultRuns;
-  };
+  const parsedPlateTotal = Math.max(0, Number.parseInt(localTotalPlates, 10) || 0);
 
   useEffect(() => {
-    if (localCompleted.length !== totalPlates) {
-      setLocalCompleted(Array.from({ length: totalPlates }, (_, i) => localCompleted[i] || 0));
-    }
-    if (localRunsPerPlate.length !== totalPlates) {
-      setLocalRunsPerPlate(Array.from({ length: totalPlates }, (_, i) => localRunsPerPlate[i] || defaultRuns));
-    }
-  }, [totalPlates]);
+    setLocalStatuses((current) => normalizePlateStatuses(current, parsedPlateTotal));
+    setLocalQuantities((current) => normalizePlatePrintQuantities(current, parsedPlateTotal));
+  }, [parsedPlateTotal]);
 
-  const handle3MFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handle3MFUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
     setParsing(true);
     setParseError(null);
-    try {
-      const result = await parse3MFForPlateInfo(file);
-      if ('error' in result) {
-        setParseError(result.error);
-        toast({ title: "3MF fout", description: result.error, variant: "destructive" });
-      } else {
-        setLocalPlateCount(String(Math.max(1, result.plateCount)));
-        setParseError(null);
-        toast({
-          title: `3MF verwerkt ✅`,
-          description: result.details,
-        });
-      }
-    } catch (err: any) {
-      const msg = err?.message || "Onbekende fout";
-      setParseError(msg);
-      toast({ title: "Fout bij verwerken 3MF", description: msg, variant: "destructive" });
-    } finally {
-      setParsing(false);
-      e.target.value = "";
-    }
-  };
 
-  const togglePlateRun = (plateIndex: number) => {
-    const newCompleted = [...localCompleted];
-    const req = getRunsRequired(plateIndex);
-    if (newCompleted[plateIndex] < req) {
-      newCompleted[plateIndex] = (newCompleted[plateIndex] || 0) + 1;
+    const result = await parse3MFForPlateInfo(file);
+    if ("error" in result) {
+      setParseError(result.error);
+      toast({ title: "3MF verwerken mislukt", description: result.error, variant: "destructive" });
     } else {
-      newCompleted[plateIndex] = 0;
+      setLocalTotalPlates(String(result.plateCount));
+      toast({ title: "3MF verwerkt", description: result.details });
     }
-    setLocalCompleted(newCompleted);
+
+    setParsing(false);
+    event.target.value = "";
   };
 
-  const updatePlateRunsRequired = (plateIndex: number, value: number) => {
-    const newRuns = [...localRunsPerPlate];
-    newRuns[plateIndex] = Math.max(1, value);
-    setLocalRunsPerPlate(newRuns);
+  const togglePlate = (plateIndex: number) => {
+    setLocalStatuses((current) =>
+      current.map((printed, index) => index === plateIndex ? !printed : printed),
+    );
   };
 
-  const totalCompletedRuns = localCompleted.reduce((s, c) => s + c, 0);
-  const totalRequiredRuns = Array.from({ length: totalPlates }, (_, i) => getRunsRequired(i)).reduce((s, r) => s + r, 0);
-  const totalPartsCompleted = localCompleted.reduce((sum, runs, i) => {
-    const ppp = partsPerPlateDerived;
-    const req = getRunsRequired(i);
-    return sum + Math.min(runs, req) * ppp;
-  }, 0);
-  const actualPartsCompleted = Math.min(totalPartsCompleted, parseInt(localPartsTotal) || 0);
-  const fullyCompletedPlates = localCompleted.filter((c, i) => c >= getRunsRequired(i)).length;
+  const updateQuantity = (plateIndex: number, value: string) => {
+    const quantity = Number(value);
+    setLocalQuantities((current) => current.map((item, index) => (
+      index === plateIndex && Number.isInteger(quantity) && quantity >= 1 ? quantity : item
+    )));
+  };
 
   const handleApply = async () => {
+    const products = Number(localTotalProducts);
+    const plates = Number(localTotalPlates);
+    if (!Number.isInteger(products) || products < 0 || !Number.isInteger(plates) || plates < 0) {
+      toast({
+        title: "Controleer de aantallen",
+        description: "Aantal platen en totaal producten moeten gehele, niet-negatieve getallen zijn.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const update = createPlateTrackingUpdate(products, plates, localStatuses, localQuantities);
     setApplying(true);
     try {
-      await onUpdate({
-        partsTotal: parseInt(localPartsTotal) || 0,
-        partsPerPlate: partsPerPlateDerived,
-        defaultRunsRequired: defaultRuns,
-        runsRequiredPerPlate: localRunsPerPlate,
-        plateRunsCompleted: localCompleted,
-        platesCompleted: fullyCompletedPlates,
-      });
+      await onUpdate(update);
     } finally {
       setApplying(false);
     }
   };
 
-  const applyDefaultToAll = () => {
-    setLocalRunsPerPlate(Array.from({ length: totalPlates }, () => defaultRuns));
-  };
+  const completedPlates = localStatuses.filter(Boolean).length;
+  const totalPrintRuns = localQuantities.reduce((sum, quantity) => sum + quantity, 0);
+  const progress = parsedPlateTotal > 0 ? (completedPlates / parsedPlateTotal) * 100 : 0;
 
   return (
     <div className="border-t border-border pt-4">
-      <h4 className="font-semibold text-primary mb-3">🏭 Productie tracking</h4>
-      
-      {/* 3MF upload */}
+      <h4 className="font-semibold text-primary mb-3">🏭 Productietracking</h4>
+
       <div className="mb-4">
         <label className="inline-flex items-center gap-2 px-3 py-2 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors text-sm">
           {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
           3MF inladen (Bambu Studio)
-          <input type="file" accept=".3mf" onChange={handle3MFUpload} className="hidden" />
+          <input type="file" accept=".3mf" onChange={handle3MFUpload} className="hidden" disabled={parsing} />
         </label>
-        <p className="text-xs text-muted-foreground mt-1">Het 3MF bestand wordt lokaal verwerkt en niet geüpload. Ondersteunt Bambu Studio projectbestanden.</p>
-        
+        <p className="text-xs text-muted-foreground mt-1">
+          Alleen het aantal Bambu-platen wordt lokaal gelezen; productaantallen worden nooit uit objecten op een plaat afgeleid.
+        </p>
         {parseError && (
           <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
@@ -367,84 +274,87 @@ export function PlateTracker({ partsTotal, partsPerPlate, defaultRunsRequired, r
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
-          <Label className="text-xs">Totaal onderdelen</Label>
-          <Input type="number" value={localPartsTotal} onChange={e => setLocalPartsTotal(e.target.value)} min="0" />
+          <Label className="text-xs">Totaal producten</Label>
+          <Input
+            type="number"
+            value={localTotalProducts}
+            onChange={(event) => setLocalTotalProducts(event.target.value)}
+            min="0"
+            step="1"
+          />
         </div>
         <div>
           <Label className="text-xs">Aantal platen</Label>
-          <Input type="number" value={localPlateCount} onChange={e => setLocalPlateCount(e.target.value)} min="1" />
-          <p className="text-[10px] text-muted-foreground mt-1">≈ {partsPerPlateDerived} onderdelen per plaat</p>
-        </div>
-        <div>
-          <Label className="text-xs">Standaard runs per plaat</Label>
-          <div className="flex gap-1">
-            <Input type="number" value={localDefaultRuns} onChange={e => setLocalDefaultRuns(e.target.value)} min="1" />
-            <Button onClick={applyDefaultToAll} size="sm" variant="outline" className="whitespace-nowrap text-xs" title="Pas standaard toe op alle platen">
-              Alles
-            </Button>
-          </div>
+          <Input
+            type="number"
+            value={localTotalPlates}
+            onChange={(event) => setLocalTotalPlates(event.target.value)}
+            min="0"
+            step="1"
+          />
         </div>
         <div className="flex items-end">
           <Button onClick={handleApply} size="sm" className="w-full" disabled={applying}>
-            {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Toepassen
+            {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Toepassen / opslaan
           </Button>
         </div>
       </div>
 
-      {/* Plate overview */}
-      {totalPlates > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm text-muted-foreground mb-2">
-            📊 {actualPartsCompleted}/{localPartsTotal} onderdelen · {totalCompletedRuns}/{totalRequiredRuns} runs · {fullyCompletedPlates}/{totalPlates} platen klaar
+      {parsedPlateTotal > 0 ? (
+        <div className="space-y-3">
+          <div className="text-sm text-muted-foreground">
+            {localTotalProducts || 0} producten totaal · {completedPlates}/{parsedPlateTotal} platen geprint · {totalPrintRuns} printruns nodig
           </div>
-
-          <div className="w-full bg-muted rounded-full h-3 overflow-hidden mb-3">
-            <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${(actualPartsCompleted / (parseInt(localPartsTotal) || 1)) * 100}%` }} />
+          <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {Array.from({ length: totalPlates }, (_, i) => {
-              const runs = localCompleted[i] || 0;
-              const req = getRunsRequired(i);
-              const isComplete = runs >= req;
-              return (
-                <div
-                  key={i}
-                  className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                    isComplete
-                      ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                      : runs > 0
-                      ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300"
-                      : "border-border"
-                  }`}
+            {localStatuses.map((printed, plateIndex) => (
+              <div
+                key={plateIndex}
+                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all text-left ${
+                  printed
+                    ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
+                    : "border-border hover:border-accent/60"
+                }`}
+              >
+                <button
+                  type="button"
+                  aria-pressed={printed}
+                  onClick={() => togglePlate(plateIndex)}
+                  className="w-full text-left"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span>Plaat {i + 1}</span>
-                    {isComplete && <Check className="w-4 h-4" />}
-                  </div>
-                  <div className="flex items-center gap-1 mb-1">
-                    <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Nodig:</Label>
-                    <Input
-                      type="number"
-                      value={req}
-                      onChange={e => updatePlateRunsRequired(i, parseInt(e.target.value) || 1)}
-                      min="1"
-                      className="h-6 text-xs px-1 w-14"
-                    />
-                  </div>
-                  <button
-                    onClick={() => togglePlateRun(i)}
-                    className="w-full text-xs mt-1 px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors"
-                  >
-                    {runs}/{req} runs ✓
-                  </button>
-                </div>
-              );
-            })}
+                  <span className="flex items-center justify-between">
+                    Plaat {plateIndex + 1}
+                    {printed && <Check className="w-4 h-4" />}
+                  </span>
+                  <span className="block text-xs mt-1">{printed ? "Volledig geprint" : "Nog niet klaar"}</span>
+                </button>
+                <Label htmlFor={`plate-quantity-${plateIndex}`} className="block text-xs mt-3 mb-1">
+                  Hoe vaak printen
+                </Label>
+                <Input
+                  id={`plate-quantity-${plateIndex}`}
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={localQuantities[plateIndex] ?? 1}
+                  onChange={(event) => updateQuantity(plateIndex, event.target.value)}
+                  className="h-8"
+                  aria-label={`Aantal keer plaat ${plateIndex + 1} printen`}
+                />
+              </div>
+            ))}
           </div>
         </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Vul het aantal platen in om platen af te vinken.</p>
       )}
     </div>
   );

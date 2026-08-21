@@ -16,6 +16,7 @@ interface FilamentColor {
   photos: string[];
   description: string;
   sort_order: number;
+  active: boolean;
 }
 
 export default function Kleuren() {
@@ -28,7 +29,6 @@ export default function Kleuren() {
       const { data } = await supabase
         .from("filament_colors")
         .select("*")
-        .eq("active", true)
         .order("material", { ascending: true })
         .order("sort_order", { ascending: true });
       const list = (data as FilamentColor[]) || [];
@@ -113,7 +113,7 @@ export default function Kleuren() {
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: true }}
                           transition={{ duration: 0.4 }}
-                          className="rounded-3xl border border-border/60 bg-card overflow-hidden group"
+                          className={`rounded-3xl border border-border/60 bg-card overflow-hidden group ${!c.active ? "opacity-70" : ""}`}
                         >
                           <div className="aspect-square bg-muted relative overflow-hidden">
                             {first ? (
@@ -138,7 +138,14 @@ export default function Kleuren() {
                                 title={`Weergavekleur ${c.hex}`}
                               />
                               <div>
-                                <div className="font-semibold text-primary leading-tight">{c.name}</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-semibold text-primary leading-tight">{c.name}</span>
+                                  {!c.active && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                      Tijdelijk onbeschikbaar
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground">{c.material} · {c.hex.toUpperCase()}</div>
                               </div>
                             </div>

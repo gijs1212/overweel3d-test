@@ -22,7 +22,7 @@ interface DeliverySchedulerProps {
   orderId: string;
   appointments: Appointment[];
   isAdmin?: boolean;
-  onUpdate: () => void;
+  onUpdate: () => void | Promise<void>;
 }
 
 export function DeliveryScheduler({ orderId, appointments, isAdmin = false, onUpdate }: DeliverySchedulerProps) {
@@ -32,6 +32,7 @@ export function DeliveryScheduler({ orderId, appointments, isAdmin = false, onUp
   const [timeSlot, setTimeSlot] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [appointmentActionId, setAppointmentActionId] = useState<string | null>(null);
 
   const handlePropose = async () => {
     if (!date) {
@@ -54,33 +55,51 @@ export function DeliveryScheduler({ orderId, appointments, isAdmin = false, onUp
       setDate("");
       setTimeSlot("");
       setNotes("");
-      onUpdate();
-    } catch (error: any) {
-      toast({ title: "Fout", description: error.message, variant: "destructive" });
+      await onUpdate();
+    } catch (error: unknown) {
+      toast({ title: "Fout", description: error instanceof Error ? error.message : "Het voorstel kon niet worden opgeslagen.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleConfirm = async (appointmentId: string) => {
-    const { error } = await supabase
-      .from("delivery_appointments")
-      .update({ status: "confirmed", admin_notes: "Bevestigd door admin" })
-      .eq("id", appointmentId);
-    if (!error) {
+    setAppointmentActionId(appointmentId);
+    try {
+      const { data, error } = await supabase
+        .from("delivery_appointments")
+        .update({ status: "confirmed", admin_notes: "Bevestigd door admin" })
+        .eq("id", appointmentId)
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (!data) throw new Error("De afspraak bestaat niet meer.");
       toast({ title: "Afspraak bevestigd! ✅" });
-      onUpdate();
+      await onUpdate();
+    } catch (error: unknown) {
+      toast({ title: "Bevestigen mislukt", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
+    } finally {
+      setAppointmentActionId(null);
     }
   };
 
   const handleCancel = async (appointmentId: string) => {
-    const { error } = await supabase
-      .from("delivery_appointments")
-      .update({ status: "cancelled" })
-      .eq("id", appointmentId);
-    if (!error) {
+    setAppointmentActionId(appointmentId);
+    try {
+      const { data, error } = await supabase
+        .from("delivery_appointments")
+        .update({ status: "cancelled" })
+        .eq("id", appointmentId)
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (!data) throw new Error("De afspraak bestaat niet meer.");
       toast({ title: "Afspraak geannuleerd" });
-      onUpdate();
+      await onUpdate();
+    } catch (error: unknown) {
+      toast({ title: "Annuleren mislukt", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
+    } finally {
+      setAppointmentActionId(null);
     }
   };
 
@@ -127,10 +146,10 @@ export function DeliveryScheduler({ orderId, appointments, isAdmin = false, onUp
               
               {isAdmin && apt.status === "pending" && (
                 <div className="flex gap-2 mt-2">
-                  <Button size="sm" variant="outline" onClick={() => handleConfirm(apt.id)} className="text-green-600">
-                    <Check className="w-3 h-3" /> Bevestigen
+                  <Button size="sm" variant="outline" onClick={() => void handleConfirm(apt.id)} className="text-green-600" disabled={appointmentActionId === apt.id}>
+                    {appointmentActionId === apt.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Bevestigen
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleCancel(apt.id)} className="text-destructive">
+                  <Button size="sm" variant="outline" onClick={() => void handleCancel(apt.id)} className="text-destructive" disabled={appointmentActionId === apt.id}>
                     <X className="w-3 h-3" /> Annuleren
                   </Button>
                 </div>

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { MATERIALS } from "@/lib/constants";
+import { supabase } from "@/integrations/supabase/client";
+import { availableFilamentColorsForMaterial, FilamentColor } from "@/lib/productCatalog";
 
 interface Product {
   id: string;
@@ -29,11 +31,17 @@ export function ProductCard({ product, onAdd }: ProductCardProps) {
   const [color, setColor] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [customText, setCustomText] = useState("");
+  const [filamentColors, setFilamentColors] = useState<FilamentColor[]>([]);
+
+  useEffect(() => {
+    supabase.from("filament_colors").select("*").eq("active", true).order("material").order("sort_order")
+      .then(({ data }) => setFilamentColors((data || []) as unknown as FilamentColor[]));
+  }, []);
 
   const availableMaterials = MATERIALS.filter(m => product.materials.length === 0 || product.materials.includes(m.id));
-  const availableColors = material
-    ? MATERIALS.find(m => m.id === material)?.colors.filter(c => product.colors.length === 0 || product.colors.includes(c.id)) || []
-    : [];
+  const materialColors = material ? availableFilamentColorsForMaterial(filamentColors, material) : [];
+  const explicitlyConfiguredColors = materialColors.filter((color) => product.colors.includes(color.id));
+  const availableColors = explicitlyConfiguredColors.length > 0 ? explicitlyConfiguredColors : materialColors;
 
   const photoUrl = product.photos[0]
     ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/orders/${product.photos[0]}`

@@ -1,10 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getFunctionErrorMessage } from "@/lib/functionErrors";
 
 export const NEWSLETTER_PROMPT_VERSION = "2026-08-21-v1";
 export const NEWSLETTER_PROMPT_STORAGE_KEY = `overweel3d:newsletter-prompt:${NEWSLETTER_PROMPT_VERSION}`;
 
 export type NewsletterPromptResult = "shown" | "dismissed" | "subscribed";
 export type NewsletterSignupSource = "popup" | "footer";
+
+let inMemoryPromptResult: NewsletterPromptResult | null = null;
 
 // Kept deliberately conservative for immediate feedback. The database repeats
 // validation so callers cannot bypass it by invoking the API directly.
@@ -23,12 +26,18 @@ export function hasSeenNewsletterPrompt() {
   if (typeof window === "undefined") return true;
 
   try {
-    return window.localStorage.getItem(NEWSLETTER_PROMPT_STORAGE_KEY) !== null;
+    if (window.localStorage.getItem(NEWSLETTER_PROMPT_STORAGE_KEY) !== null) return true;
   } catch {
-    // Storage can be unavailable in privacy modes. Failing closed avoids
-    // repeatedly interrupting the visitor on every render.
-    return true;
+    // Continue with session and in-memory fallbacks below.
   }
+
+  try {
+    if (window.sessionStorage.getItem(NEWSLETTER_PROMPT_STORAGE_KEY) !== null) return true;
+  } catch {
+    // The in-memory marker still prevents repeats during this page visit.
+  }
+
+  return inMemoryPromptResult !== null;
 }
 
 export function rememberNewsletterPrompt(result: NewsletterPromptResult) {
@@ -36,9 +45,19 @@ export function rememberNewsletterPrompt(result: NewsletterPromptResult) {
 
   try {
     window.localStorage.setItem(NEWSLETTER_PROMPT_STORAGE_KEY, result);
+    return;
   } catch {
-    // Newsletter signup must remain usable even when storage is unavailable.
+    // Fall back to storage with a shorter lifetime when localStorage is blocked.
   }
+
+  try {
+    window.sessionStorage.setItem(NEWSLETTER_PROMPT_STORAGE_KEY, result);
+    return;
+  } catch {
+    // Newsletter signup must remain usable even when all browser storage fails.
+  }
+
+  inMemoryPromptResult = result;
 }
 
 export async function subscribeToNewsletter(email: string, source: NewsletterSignupSource) {
@@ -48,12 +67,16 @@ export async function subscribeToNewsletter(email: string, source: NewsletterSig
     throw new Error("Vul een geldig e-mailadres in.");
   }
 
-  const { error } = await supabase.rpc("subscribe_to_newsletter", {
-    _email: normalizedEmail,
-    _source: source,
+  const { data, error } = await supabase.functions.invoke("manage-newsletter", {
+    body: {
+      action: "subscribe",
+      email: normalizedEmail,
+      source,
+    },
   });
 
   if (error) {
-    throw new Error("Aanmelden is nu niet gelukt. Probeer het later opnieuw.");
+    throw new Error(await getFunctionErrorMessage(error, "Aanmelden is nu niet gelukt. Probeer het later opnieuw."));
   }
+  if (!data?.success) throw new Error(data?.error || "Aanmelden is nu niet gelukt. Probeer het later opnieuw.");
 }

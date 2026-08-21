@@ -1,338 +1,400 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "@/components/Navbar";
+import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, X } from "lucide-react";
+
 import { Footer } from "@/components/Footer";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Save, Trash2, Loader2, Upload, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS } from "@/lib/constants";
-import { getProductPhotoUrl } from "@/lib/productPhotos";
-import heic2any from "heic2any";
+import {
+  CatalogProduct,
+  colorMatchesMaterial,
+  FilamentColor,
+  MaterialMode,
+  orderedProductImages,
+  ProductCategory,
+  ProductImage,
+  ProductOption,
+  ProductOptionType,
+} from "@/lib/productCatalog";
+import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 
-function SignedImg({ path, className }: { path: string; className?: string }) {
+type ProductForm = Omit<CatalogProduct, "id" | "product_categories" | "product_images" | "product_options">;
+type PendingImage = { key: string; file: File; previewUrl: string };
+type DeleteTarget = { type: "product"; value: CatalogProduct } | { type: "category"; value: ProductCategory };
+
+const optionTypes: Array<{ value: ProductOptionType; label: string }> = [
+  { value: "text", label: "Kort tekstveld" },
+  { value: "textarea", label: "Lang tekstveld" },
+  { value: "select", label: "Keuzelijst" },
+  { value: "radio", label: "Zichtbare keuzes" },
+  { value: "checkbox", label: "Ja/nee-keuze" },
+  { value: "photo", label: "Foto-upload" },
+];
+
+const emptyForm: ProductForm = {
+  name: "", description: "", price: 0, category_id: null, materials: [], colors: [], photos: [],
+  material_mode: "selected", material_fixed: false, color_selection_mode: "single", color_required: true, colors_configured: false,
+  max_colors: 1, multicolor_allowed: false, custom_text_enabled: false, custom_text_label: "Aangepaste tekst",
+  custom_text_max_length: 50, customer_photo_required: false, active: true,
+};
+
+function SignedImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
-    let active = true;
-    getProductPhotoUrl(path).then((u) => { if (active) setUrl(u); });
-    return () => { active = false; };
+    let current = true;
+    getProductPhotoUrl(path).then((nextUrl) => current && setUrl(nextUrl));
+    return () => { current = false; };
   }, [path]);
-  return <img src={url} alt="" className={className} />;
+  return url ? <img src={url} alt={alt} className={className} /> : <div className={`${className || ""} bg-muted animate-pulse`} />;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  materials: string[];
-  colors: string[];
-  photos: string[];
-  custom_text_enabled: boolean;
-  custom_text_label: string;
-  custom_text_max_length: number;
-  customer_photo_required: boolean;
-  active: boolean;
-}
+const sanitizeFilename = (name: string) => name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-");
 
 export default function AdminProducts() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [colors, setColors] = useState<FilamentColor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<ProductForm>({ ...emptyForm });
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [removedPaths, setRemovedPaths] = useState<string[]>([]);
+  const [primaryKey, setPrimaryKey] = useState("");
+  const [options, setOptions] = useState<ProductOption[]>([]);
+  const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryDescription, setCategoryDescription] = useState("");
+  const [categorySortOrder, setCategorySortOrder] = useState(0);
+  const [categoryActive, setCategoryActive] = useState(true);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
-  const emptyProduct: Omit<Product, "id"> = {
-    name: "", description: "", price: 0, materials: [], colors: [],
-    photos: [], custom_text_enabled: false, custom_text_label: "Aangepaste tekst",
-    custom_text_max_length: 50, customer_photo_required: false, active: true,
-  };
-
-  const [form, setForm] = useState<Omit<Product, "id">>(emptyProduct);
-
-  useEffect(() => { fetchProducts(); }, []);
-
-  const fetchProducts = async () => {
-    const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-    setProducts((data as Product[]) || []);
+  const fetchCatalog = useCallback(async () => {
+    setLoading(true);
+    const [productResult, categoryResult, colorResult, availabilityResult] = await Promise.all([
+      supabase.from("products").select("*, product_categories(*), product_images(*), product_options(*)").order("created_at", { ascending: false }),
+      supabase.from("product_categories").select("*").order("sort_order").order("name"),
+      supabase.from("filament_colors").select("*").order("material").order("sort_order").order("name"),
+      supabase.from("product_color_availability").select("product_id,color_id,available"),
+    ]);
+    const error = productResult.error || categoryResult.error || colorResult.error || availabilityResult.error;
+    if (error) toast({ title: "Catalogus laden mislukt", description: error.message, variant: "destructive" });
+    const availability = availabilityResult.data || [];
+    setProducts(((productResult.data || []) as unknown as CatalogProduct[]).map((product) => {
+      const productAvailability = availability.filter((row) => row.product_id === product.id);
+      return {
+        ...product,
+        product_images: orderedProductImages(product),
+        product_options: [...(product.product_options || [])].sort((a, b) => a.sort_order - b.sort_order),
+        colors: productAvailability.length
+          ? productAvailability.filter((row) => row.available).map((row) => row.color_id)
+          : product.colors,
+      };
+    }));
+    setCategories((categoryResult.data || []) as unknown as ProductCategory[]);
+    setColors((colorResult.data || []) as unknown as FilamentColor[]);
     setLoading(false);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!authLoading && isAdmin) fetchCatalog();
+  }, [authLoading, fetchCatalog, isAdmin]);
+
+  const resetEditor = () => {
+    pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    setEditingId(null); setForm({ ...emptyForm, materials: [], colors: [], photos: [] }); setImages([]);
+    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setSelectedColorIds([]); setShowEditor(false);
+  };
+  const openNew = () => { resetEditor(); setShowEditor(true); };
+  const openEdit = (product: CatalogProduct) => {
+    pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    const productImages = orderedProductImages(product);
+    setEditingId(product.id);
+    setForm({
+      ...emptyForm, ...product,
+      material_mode: product.material_mode || (product.material_fixed ? "fixed" : product.materials.length ? "selected" : "all"),
+      color_selection_mode: product.color_selection_mode || (product.multicolor_allowed ? "multiple" : "single"),
+      max_colors: Math.max(1, product.max_colors || (product.multicolor_allowed ? 2 : 1)),
+      product_categories: undefined, product_images: undefined, product_options: undefined,
+    } as ProductForm);
+    setImages(productImages); setPendingImages([]); setRemovedPaths([]);
+    setPrimaryKey(productImages.find((image) => image.is_primary)?.id || productImages[0]?.id || "");
+    setOptions([...(product.product_options || [])]); setSelectedColorIds([...(product.colors || [])]); setShowEditor(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const allColors = MATERIALS.flatMap(m => m.colors.map(c => ({ ...c, material: m.name })));
-  const uniqueColors = allColors.filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i);
+  const availableColors = useMemo(() => form.material_mode === "all"
+    ? colors.filter((color) => color.active)
+    : colors.filter((color) => color.active && form.materials.some((material) => colorMatchesMaterial(color, material))),
+  [colors, form.material_mode, form.materials]);
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const incoming = Array.from(e.target.files || []);
-    if (incoming.length === 0) return;
+  useEffect(() => {
+    const compatibleIds = new Set(availableColors.map((color) => color.id));
+    setSelectedColorIds((current) => current.filter((id) => compatibleIds.has(id)));
+  }, [availableColors]);
+
+  const setMaterialMode = (mode: MaterialMode) => setForm((current) => ({
+    ...current, material_mode: mode, material_fixed: mode === "fixed",
+    materials: mode === "all" ? [] : mode === "fixed" ? current.materials.slice(0, 1) : current.materials,
+  }));
+  const toggleMaterial = (materialId: string) => setForm((current) => ({
+    ...current,
+    materials: current.material_mode === "fixed" ? [materialId] : current.materials.includes(materialId)
+      ? current.materials.filter((id) => id !== materialId) : [...current.materials, materialId],
+  }));
+  const toggleColor = (colorId: string) => setSelectedColorIds((current) => current.includes(colorId)
+    ? current.filter((id) => id !== colorId) : [...current, colorId]);
+
+  const handleImageInput = async (files: File[]) => {
     const converted: File[] = [];
-    for (const f of incoming) {
-      const isHeic = /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif";
+    for (const file of files) {
+      const isHeic = isHeicFile(file);
+      if (!isHeic && !file.type.startsWith("image/")) { toast({ title: `${file.name} is geen afbeelding`, variant: "destructive" }); continue; }
+      if (file.size > 12 * 1024 * 1024) { toast({ title: `${file.name} is te groot`, description: "Maximaal 12 MB per afbeelding.", variant: "destructive" }); continue; }
       if (isHeic) {
         try {
-          const blob = await heic2any({ blob: f, toType: "image/jpeg", quality: 0.9 });
-          const b = Array.isArray(blob) ? blob[0] : blob;
-          const newName = f.name.replace(/\.(heic|heif)$/i, ".jpg");
-          converted.push(new File([b], newName, { type: "image/jpeg" }));
-        } catch (err) {
-          toast({ title: `HEIC conversie mislukt voor ${f.name}`, description: "Probeer een JPG/PNG.", variant: "destructive" });
-        }
-      } else if (f.type.startsWith("image/")) {
-        converted.push(f);
-      } else {
-        toast({ title: `${f.name} overgeslagen`, description: "Alleen afbeeldingen toegestaan.", variant: "destructive" });
-      }
+          converted.push(await prepareImageFileForUpload(file));
+        } catch { toast({ title: `HEIC-conversie mislukt voor ${file.name}`, variant: "destructive" }); }
+      } else converted.push(file);
     }
-    if (converted.length) setPhotoFiles(prev => [...prev, ...converted]);
-    e.target.value = "";
+    const additions = converted.map((file) => ({ key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) }));
+    setPendingImages((current) => [...current, ...additions]);
+    if (!primaryKey && additions[0]) setPrimaryKey(additions[0].key);
+  };
+  const removeExistingImage = (image: ProductImage) => {
+    const remaining = images.filter((item) => item.id !== image.id);
+    setImages(remaining); setRemovedPaths((current) => [...new Set([...current, image.storage_path])]);
+    if (primaryKey === image.id) setPrimaryKey(remaining[0]?.id || pendingImages[0]?.key || "");
+  };
+  const removePendingImage = (key: string) => {
+    const target = pendingImages.find((image) => image.key === key); if (target) URL.revokeObjectURL(target.previewUrl);
+    const remaining = pendingImages.filter((image) => image.key !== key); setPendingImages(remaining);
+    if (primaryKey === key) setPrimaryKey(images[0]?.id || remaining[0]?.key || "");
   };
 
-  const uploadPhotos = async (): Promise<string[]> => {
-    const urls: string[] = [...form.photos];
-    for (const file of photoFiles) {
-      const path = `products/${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from("orders").upload(path, file, { upsert: true });
-      if (!error) urls.push(path);
+  const addOption = () => setOptions((current) => [...current, {
+    id: crypto.randomUUID(), product_id: editingId || "", type: "text", label: "", description: "", required: false,
+    choices: [], max_length: 100, sort_order: current.length, active: true,
+  }]);
+  const updateOption = (id: string, patch: Partial<ProductOption>) => setOptions((current) => current.map((option) => option.id === id ? { ...option, ...patch } : option));
+
+  const validateProduct = () => {
+    if (!form.name.trim()) return "Vul een productnaam in.";
+    if (!Number.isFinite(form.price) || form.price <= 0) return "Vul een geldige prijs groter dan €0 in.";
+    if (form.material_mode !== "all" && form.materials.length === 0) return "Selecteer minimaal één materiaal.";
+    if (form.material_mode === "fixed" && form.materials.length !== 1) return "Kies precies één vast materiaal.";
+    if (form.color_required && selectedColorIds.length === 0) return "Selecteer minimaal één beschikbare kleur.";
+    if (selectedColorIds.some((id) => !availableColors.some((color) => color.id === id))) return "Een geselecteerde kleur past niet bij de gekozen materialen.";
+    if (form.color_selection_mode === "multiple" && (form.max_colors < 2 || form.max_colors > 12)) return "Het maximum aantal kleuren moet tussen 2 en 12 liggen.";
+    for (const option of options) {
+      if (!option.label.trim()) return "Iedere extra optie heeft een label nodig.";
+      if (["select", "radio"].includes(option.type) && option.choices.filter((choice) => choice.trim()).length < 2) return `Voeg minimaal twee keuzes toe bij “${option.label}”.`;
+      if (["text", "textarea"].includes(option.type) && option.max_length !== null && (!Number.isInteger(option.max_length) || option.max_length < 1 || option.max_length > 5000)) return `Kies bij “${option.label}” een tekstlimiet tussen 1 en 5000.`;
     }
-    return urls;
+    return null;
   };
 
   const handleSave = async () => {
-    if (!form.name || form.price <= 0) {
-      toast({ title: "Vul naam en prijs in", variant: "destructive" });
-      return;
-    }
+    const validationError = validateProduct();
+    if (validationError) { toast({ title: "Product nog niet compleet", description: validationError, variant: "destructive" }); return; }
     setSaving(true);
+    let productId = editingId; let createdProduct = false; let imagesCommitted = false; const uploadedPaths: string[] = [];
     try {
-      const photos = await uploadPhotos();
-      const payload = { ...form, photos };
-
-      if (editing) {
-        await supabase.from("products").update(payload).eq("id", editing.id);
-        toast({ title: "Product bijgewerkt ✅" });
+      const payload = {
+        name: form.name.trim(), description: form.description.trim(), price: form.price, category_id: form.category_id,
+        materials: form.material_mode === "all" ? [] : form.materials, colors: selectedColorIds,
+        material_mode: form.material_mode, material_fixed: form.material_mode === "fixed",
+        color_selection_mode: form.color_selection_mode, color_required: form.color_required,
+        colors_configured: true,
+        max_colors: form.color_selection_mode === "single" ? 1 : form.max_colors,
+        multicolor_allowed: form.color_selection_mode === "multiple", custom_text_enabled: form.custom_text_enabled,
+        custom_text_label: form.custom_text_label, custom_text_max_length: form.custom_text_max_length,
+        customer_photo_required: form.customer_photo_required, active: form.active,
+      };
+      if (productId) {
+        const { error } = await supabase.from("products").update(payload).eq("id", productId); if (error) throw error;
       } else {
-        await supabase.from("products").insert(payload);
-        toast({ title: "Product aangemaakt ✅" });
+        const { data, error } = await supabase.from("products").insert(payload).select("id").single(); if (error) throw error;
+        productId = data.id; createdProduct = true;
       }
-      setEditing(null);
-      setForm(emptyProduct);
-      setPhotoFiles([]);
-      fetchProducts();
-    } catch (e: any) {
-      toast({ title: "Fout", description: e.message, variant: "destructive" });
+      const uploaded: Array<{ key: string; path: string }> = [];
+      for (const pending of pendingImages) {
+        const path = `products/${productId}/${crypto.randomUUID()}-${sanitizeFilename(pending.file.name)}`;
+        const { error } = await uploadFileWithHeicConversion("orders", path, pending.file, { cacheControl: "3600", upsert: false });
+        if (error) throw new Error(`Upload van ${pending.file.name} mislukt: ${error.message}`);
+        uploadedPaths.push(path); uploaded.push({ key: pending.key, path });
+      }
+      const allImageRows = [
+        ...images.map((image) => ({ key: image.id, path: image.storage_path, alt: image.alt_text })),
+        ...uploaded.map((image) => ({ key: image.key, path: image.path, alt: form.name.trim() })),
+      ];
+      const effectivePrimary = allImageRows.some((image) => image.key === primaryKey) ? primaryKey : allImageRows[0]?.key;
+      const { error: deleteImagesError } = await supabase.from("product_images").delete().eq("product_id", productId); if (deleteImagesError) throw deleteImagesError;
+      if (allImageRows.length) {
+        const { error } = await supabase.from("product_images").insert(allImageRows.map((image, index) => ({ product_id: productId!, storage_path: image.path, alt_text: image.alt || form.name.trim(), sort_order: index, is_primary: image.key === effectivePrimary })));
+        if (error) throw error;
+      }
+      imagesCommitted = true;
+      const orderedPaths = [...allImageRows.filter((image) => image.key === effectivePrimary), ...allImageRows.filter((image) => image.key !== effectivePrimary)].map((image) => image.path);
+      const { error: legacyPhotoError } = await supabase.from("products").update({ photos: orderedPaths }).eq("id", productId); if (legacyPhotoError) throw legacyPhotoError;
+      const { error: deleteOptionsError } = await supabase.from("product_options").delete().eq("product_id", productId); if (deleteOptionsError) throw deleteOptionsError;
+      if (options.length) {
+        const { error } = await supabase.from("product_options").insert(options.map((option, index) => ({
+          product_id: productId!, type: option.type, label: option.label.trim(), description: option.description.trim(), required: option.required,
+          choices: option.choices.map((choice) => choice.trim()).filter(Boolean), max_length: ["text", "textarea"].includes(option.type) ? option.max_length : null, sort_order: index, active: true,
+        })));
+        if (error) throw error;
+      }
+      const { error: deleteAvailabilityError } = await supabase.from("product_color_availability").delete().eq("product_id", productId); if (deleteAvailabilityError) throw deleteAvailabilityError;
+      if (selectedColorIds.length) {
+        const { error } = await supabase.from("product_color_availability").insert(selectedColorIds.map((colorId) => ({ product_id: productId!, color_id: colorId, available: true })));
+        if (error) throw error;
+      }
+      const managedRemovedPaths = removedPaths.map(normalizeProductStoragePath).filter(Boolean) as string[];
+      if (managedRemovedPaths.length) {
+        const { error } = await supabase.storage.from("orders").remove(managedRemovedPaths);
+        if (error) throw new Error(`Product opgeslagen, maar oude afbeeldingen verwijderen mislukte: ${error.message}`);
+      }
+      toast({ title: editingId ? "Product bijgewerkt" : "Product aangemaakt", description: "Alle productinstellingen zijn opgeslagen." });
+      resetEditor(); await fetchCatalog();
+    } catch (error) {
+      if (uploadedPaths.length && (createdProduct || !imagesCommitted)) await supabase.storage.from("orders").remove(uploadedPaths);
+      if (createdProduct && productId) await supabase.from("products").delete().eq("id", productId);
+      toast({ title: "Opslaan mislukt", description: error instanceof Error ? error.message : "Onbekende databasefout.", variant: "destructive" });
     } finally { setSaving(false); }
   };
 
-  const handleEdit = (p: Product) => {
-    setEditing(p);
-    setForm({ name: p.name, description: p.description, price: p.price, materials: p.materials, colors: p.colors, photos: p.photos, custom_text_enabled: p.custom_text_enabled, custom_text_label: p.custom_text_label, custom_text_max_length: p.custom_text_max_length, customer_photo_required: p.customer_photo_required ?? false, active: p.active });
-    setPhotoFiles([]);
+  const handleDeleteProduct = async (product: CatalogProduct) => {
+    const paths = orderedProductImages(product).map((image) => normalizeProductStoragePath(image.storage_path)).filter(Boolean) as string[];
+    const { error } = await supabase.from("products").delete().eq("id", product.id);
+    if (error) { toast({ title: "Verwijderen mislukt", description: error.message, variant: "destructive" }); return; }
+    if (paths.length) {
+      const { error: storageError } = await supabase.storage.from("orders").remove(paths);
+      if (storageError) toast({ title: "Product verwijderd", description: "Enkele opslagbestanden konden niet worden verwijderd.", variant: "destructive" });
+      else toast({ title: "Product en afbeeldingen verwijderd" });
+    } else toast({ title: "Product verwijderd" });
+    fetchCatalog();
+  };
+  const toggleProductActive = async (product: CatalogProduct) => {
+    const { error } = await supabase.from("products").update({ active: !product.active }).eq("id", product.id);
+    if (error) toast({ title: "Wijzigen mislukt", description: error.message, variant: "destructive" });
+    else { toast({ title: product.active ? "Product verborgen" : "Product zichtbaar gemaakt" }); fetchCatalog(); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Product verwijderen?")) return;
-    await supabase.from("products").delete().eq("id", id);
-    toast({ title: "Product verwijderd" });
-    fetchProducts();
+  const resetCategoryForm = () => { setEditingCategoryId(null); setCategoryName(""); setCategoryDescription(""); setCategorySortOrder(0); setCategoryActive(true); };
+  const handleSaveCategory = async () => {
+    if (!categoryName.trim()) { toast({ title: "Vul een categorienaam in", variant: "destructive" }); return; }
+    if (categories.some((category) => category.id !== editingCategoryId && category.name.toLowerCase() === categoryName.trim().toLowerCase())) {
+      toast({ title: "Deze categorie bestaat al", variant: "destructive" });
+      return;
+    }
+    setSavingCategory(true);
+    const payload = { name: categoryName.trim(), description: categoryDescription.trim(), sort_order: categorySortOrder, active: categoryActive };
+    const result = editingCategoryId ? await supabase.from("product_categories").update(payload).eq("id", editingCategoryId) : await supabase.from("product_categories").insert(payload);
+    setSavingCategory(false);
+    if (result.error) { toast({ title: "Categorie opslaan mislukt", description: result.error.message, variant: "destructive" }); return; }
+    toast({ title: editingCategoryId ? "Categorie bijgewerkt" : "Categorie aangemaakt" }); resetCategoryForm(); fetchCatalog();
+  };
+  const editCategory = (category: ProductCategory) => { setEditingCategoryId(category.id); setCategoryName(category.name); setCategoryDescription(category.description || ""); setCategorySortOrder(category.sort_order); setCategoryActive(category.active); };
+  const deleteCategory = async (category: ProductCategory) => {
+    const { error } = await supabase.from("product_categories").delete().eq("id", category.id);
+    if (error) toast({ title: "Categorie verwijderen mislukt", description: error.message, variant: "destructive" });
+    else { toast({ title: "Categorie verwijderd" }); if (editingCategoryId === category.id) resetCategoryForm(); fetchCatalog(); }
   };
 
-  const toggleActive = async (p: Product) => {
-    await supabase.from("products").update({ active: !p.active }).eq("id", p.id);
-    fetchProducts();
-  };
-
-  const removeExistingPhoto = (index: number) => {
-    setForm(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== index) }));
-  };
-
-  const toggleMaterial = (matId: string) => {
-    setForm(prev => ({
-      ...prev,
-      materials: prev.materials.includes(matId)
-        ? prev.materials.filter(m => m !== matId)
-        : [...prev.materials, matId],
-    }));
-  };
-
-  const toggleColor = (colorId: string) => {
-    setForm(prev => ({
-      ...prev,
-      colors: prev.colors.includes(colorId)
-        ? prev.colors.filter(c => c !== colorId)
-        : [...prev.colors, colorId],
-    }));
-  };
-
-  if (!isAdmin) return <div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center"><p>Geen toegang.</p></main><Footer /></div>;
+  if (authLoading) return <div className="min-h-screen"><Navbar /><main className="pt-24 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></main><Footer /></div>;
+  if (!isAdmin) return <div className="min-h-screen"><Navbar /><main className="pt-24 text-center">Geen toegang.</main><Footer /></div>;
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="pt-20 pb-16">
-        <div className="container mx-auto px-4 py-8 max-w-5xl">
-          <div className="flex items-center gap-3 mb-8">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}><ArrowLeft className="w-4 h-4" /> Terug</Button>
-            <h1 className="text-2xl font-bold text-primary">🛍️ Kant-en-klare artikelen</h1>
+    <div className="min-h-screen"><Navbar /><main className="pt-24 pb-16"><div className="container mx-auto px-4 max-w-6xl">
+      <div className="flex flex-wrap items-center gap-3 mb-8">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}><ArrowLeft className="w-4 h-4" /> Terug</Button>
+        <h1 className="text-2xl font-bold text-primary">Kant-en-klare producten</h1>
+        <Button className="ml-auto" onClick={openNew}><Plus className="w-4 h-4" /> Nieuw product</Button>
+      </div>
+
+      <section className="bg-card rounded-2xl border border-border/60 p-5 mb-8">
+        <h2 className="font-bold text-primary mb-1">Categorieën</h2><p className="text-sm text-muted-foreground mb-4">Beheer de dynamische indeling die klanten in de productcatalogus zien.</p>
+        <div className="grid lg:grid-cols-2 gap-5">
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-[1fr_110px] gap-3"><div><Label>Naam *</Label><Input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Bijv. Decoratie" /></div><div><Label>Volgorde</Label><Input type="number" value={categorySortOrder} onChange={(event) => setCategorySortOrder(Number(event.target.value) || 0)} /></div></div>
+            <div><Label>Omschrijving</Label><Input value={categoryDescription} onChange={(event) => setCategoryDescription(event.target.value)} placeholder="Korte uitleg voor deze categorie" /></div>
+            <div className="flex items-center gap-2"><Switch checked={categoryActive} onCheckedChange={setCategoryActive} /><Label>Actief</Label></div>
+            <div className="flex gap-2"><Button size="sm" onClick={handleSaveCategory} disabled={savingCategory}>{savingCategory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingCategoryId ? "Bijwerken" : "Categorie toevoegen"}</Button>{editingCategoryId && <Button size="sm" variant="outline" onClick={resetCategoryForm}>Annuleren</Button>}</div>
           </div>
-
-          {/* Form */}
-          <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50 mb-8">
-            <h3 className="font-bold text-primary mb-4">{editing ? "Product bewerken" : "Nieuw product"}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Naam *</Label>
-                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="bijv. Roos" />
-              </div>
-              <div>
-                <Label>Prijs (€) *</Label>
-                <Input type="number" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Beschrijving</Label>
-                <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} />
-              </div>
-
-              {/* Photos */}
-              <div className="md:col-span-2">
-                <Label>Foto's</Label>
-                <div className="flex flex-wrap gap-3 mt-2">
-                   {form.photos.map((p, i) => (
-                     <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border group">
-                       <SignedImg path={p} className="w-full h-full object-cover" />
-                      <button onClick={() => removeExistingPhoto(i)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">×</button>
-                    </div>
-                  ))}
-                  {photoFiles.map((f, i) => (
-                    <div key={`new-${i}`} className="relative w-20 h-20 rounded-lg overflow-hidden border">
-                      <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
-                      <button onClick={() => setPhotoFiles(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs">×</button>
-                    </div>
-                  ))}
-                  <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
-                    <Upload className="w-5 h-5 text-muted-foreground" />
-                    <span className="text-[10px] text-muted-foreground">Foto</span>
-                    <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" multiple />
-                  </label>
-                </div>
-              </div>
-
-              {/* Materials */}
-              <div>
-                <Label>Materialen</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {MATERIALS.map(m => (
-                    <button key={m.id} onClick={() => toggleMaterial(m.id)}
-                      className={`px-3 py-1 rounded-full text-sm border transition-colors ${form.materials.includes(m.id) ? "bg-accent text-accent-foreground border-accent" : "border-border hover:border-accent/50"}`}>
-                      {m.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Colors */}
-              <div>
-                <Label>Kleuren</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {uniqueColors.map(c => (
-                    <button key={c.id} onClick={() => toggleColor(c.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors ${form.colors.includes(c.id) ? "bg-accent text-accent-foreground border-accent" : "border-border hover:border-accent/50"}`}>
-                      <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: c.hex }} />
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom text */}
-              <div className="md:col-span-2 border-t border-border pt-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Checkbox checked={form.custom_text_enabled} onCheckedChange={v => setForm({ ...form, custom_text_enabled: v === true })} />
-                  <Label>Aangepaste tekst toestaan</Label>
-                </div>
-                {form.custom_text_enabled && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-xs">Label voor tekstveld</Label>
-                      <Input value={form.custom_text_label} onChange={e => setForm({ ...form, custom_text_label: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Max tekens</Label>
-                      <Input type="number" value={form.custom_text_max_length} onChange={e => setForm({ ...form, custom_text_max_length: parseInt(e.target.value) || 50 })} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Customer photo required */}
-              <div className="md:col-span-2 border-t border-border pt-4">
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={form.customer_photo_required} onCheckedChange={v => setForm({ ...form, customer_photo_required: v === true })} />
-                  <Label>Klant moet een foto uploaden bij bestelling</Label>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 ml-7">De klant moet minimaal 1 foto uploaden voordat dit product besteld kan worden.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {editing ? "Bijwerken" : "Aanmaken"}
-              </Button>
-              {editing && (
-                <Button variant="ghost" onClick={() => { setEditing(null); setForm(emptyProduct); setPhotoFiles([]); }}>Annuleren</Button>
-              )}
-            </div>
+          <div className="space-y-2 max-h-52 overflow-y-auto">
+            {categories.length === 0 && <p className="text-sm text-muted-foreground">Nog geen categorieën.</p>}
+            {categories.map((category) => <div key={category.id} className={`flex items-center gap-2 rounded-xl border p-3 ${category.active ? "" : "opacity-60"}`}><div className="min-w-0 flex-1"><p className="font-medium truncate">{category.name}</p><p className="text-xs text-muted-foreground truncate">{category.description || `Volgorde ${category.sort_order}`}</p></div><Button variant="ghost" size="sm" onClick={() => editCategory(category)} aria-label={`${category.name} bewerken`}><Pencil className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ type: "category", value: category })} aria-label={`${category.name} verwijderen`}><Trash2 className="w-4 h-4 text-destructive" /></Button></div>)}
           </div>
-
-          {/* Product list */}
-          {loading ? (
-            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>
-          ) : products.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">Nog geen producten. Maak er een hierboven.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {products.map(p => (
-                <div key={p.id} className={`bg-card rounded-2xl p-4 shadow-sm border transition-opacity ${!p.active ? "opacity-60" : ""}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h4 className="font-bold text-primary">{p.name}</h4>
-                      <p className="text-lg font-semibold text-accent">€{Number(p.price).toFixed(2)}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => toggleActive(p)} title={p.active ? "Deactiveren" : "Activeren"}>
-                        {p.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(p)}>✏️</Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  </div>
-                  {p.description && <p className="text-sm text-muted-foreground mb-2">{p.description}</p>}
-                  <div className="flex flex-wrap gap-1 text-xs">
-                    {p.materials.map(m => <span key={m} className="px-2 py-0.5 bg-muted rounded-full">{m}</span>)}
-                    {p.custom_text_enabled && <span className="px-2 py-0.5 bg-accent/20 text-accent rounded-full">✏️ Tekst</span>}
-                    {p.customer_photo_required && <span className="px-2 py-0.5 bg-accent/20 text-accent rounded-full">📷 Foto verplicht</span>}
-                  </div>
-                  {p.photos.length > 0 && (
-                    <div className="flex gap-2 mt-2">
-                       {p.photos.slice(0, 3).map((ph, i) => (
-                         <SignedImg key={i} path={ph} className="w-12 h-12 rounded object-cover" />
-                       ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      </main>
-      <Footer />
+      </section>
+
+      {showEditor && <section className="bg-card rounded-2xl border border-border/60 p-6 mb-8 space-y-7">
+        <div className="flex items-center justify-between"><h2 className="font-bold text-primary">{editingId ? "Product bewerken" : "Nieuw product"}</h2><Button variant="ghost" size="sm" onClick={resetEditor}><X className="w-4 h-4" /> Sluiten</Button></div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div><Label>Naam *</Label><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></div><div><Label>Prijs (€) *</Label><Input type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></div>
+          <div className="md:col-span-2"><Label>Beschrijving</Label><Textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></div>
+          <div><Label>Categorie</Label><Select value={form.category_id || "none"} onValueChange={(value) => setForm({ ...form, category_id: value === "none" ? null : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Geen categorie</SelectItem>{categories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}{!category.active ? " (inactief)" : ""}</SelectItem>)}</SelectContent></Select></div>
+          <div className="flex items-end gap-2 pb-2"><Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /><Label>Zichtbaar voor klanten</Label></div>
+        </div>
+
+        <div><Label>Productafbeeldingen</Label><p className="text-xs text-muted-foreground mb-3">Upload meerdere foto's en klik op de ster om de hoofdafbeelding te kiezen.</p><div className="flex flex-wrap gap-3">
+          {images.map((image) => <div key={image.id} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.id ? "border-accent" : "border-border"}`}><SignedImage path={image.storage_path} alt={form.name} className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.id)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdfoto"><Star className={`w-4 h-4 ${primaryKey === image.id ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removeExistingImage(image)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Afbeelding verwijderen"><X className="w-4 h-4" /></button></div>)}
+          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.key ? "border-accent" : "border-border"}`}><img src={image.previewUrl} alt="Nieuwe productfoto" className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdfoto"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Afbeelding verwijderen"><X className="w-4 h-4" /></button></div>)}
+          <label className="w-28 h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-accent/60"><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">Foto's</span><input type="file" multiple accept="image/*,.heic,.heif" className="hidden" onChange={(event) => { handleImageInput(Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
+        </div></div>
+
+        <div className="grid lg:grid-cols-2 gap-6 border-t pt-6">
+          <div><Label>Materiaalkeuze</Label><Select value={form.material_mode} onValueChange={(value) => setMaterialMode(value as MaterialMode)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Vast materiaal</SelectItem><SelectItem value="selected">Klant kiest uit geselecteerde materialen</SelectItem><SelectItem value="all">Klant kiest uit alle materialen</SelectItem></SelectContent></Select>{form.material_mode !== "all" && <div className="flex flex-wrap gap-2 mt-3">{MATERIALS.map((material) => <button type="button" key={material.id} onClick={() => toggleMaterial(material.id)} className={`px-3 py-1.5 text-sm rounded-full border ${form.materials.includes(material.id) ? "bg-accent text-accent-foreground border-accent" : ""}`}>{material.name}</button>)}</div>}{form.material_mode === "fixed" && <p className="text-xs text-muted-foreground mt-2">De klant ziet het gekozen materiaal, maar kan dit niet aanpassen.</p>}</div>
+          <div><div className="flex items-center gap-2"><Switch checked={form.color_required} onCheckedChange={(color_required) => setForm({ ...form, color_required })} /><Label>Minimaal één kleur verplicht</Label></div><div className="mt-3"><Label>Kleurkeuze</Label><Select value={form.color_selection_mode} onValueChange={(value) => setForm({ ...form, color_selection_mode: value as "single" | "multiple", max_colors: value === "single" ? 1 : Math.max(2, form.max_colors) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="single">Eén kleur</SelectItem><SelectItem value="multiple">Meerdere kleuren (multicolor)</SelectItem></SelectContent></Select></div>{form.color_selection_mode === "multiple" && <div className="mt-3"><Label>Maximaal aantal kleuren</Label><Input type="number" min={2} max={12} value={form.max_colors} onChange={(event) => setForm({ ...form, max_colors: Number(event.target.value) || 2 })} /></div>}</div>
+        </div>
+
+        <div><Label>Beschikbare kleuren *</Label><p className="text-xs text-muted-foreground mb-3">Kleuren komen uit Kleurenbeheer en worden per product opgeslagen.</p>{availableColors.length === 0 ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p> : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{availableColors.map((color) => <label key={color.id} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="text-sm truncate">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}</div>
+
+        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Extra keuzes en personalisatie</Label><p className="text-xs text-muted-foreground">Voeg zoveel tekstvelden en keuzes toe als nodig.</p></div><Button type="button" variant="outline" size="sm" className="ml-auto" onClick={addOption}><Plus className="w-4 h-4" /> Optie toevoegen</Button></div><div className="space-y-4">
+          {options.map((option, index) => <div key={option.id} className="rounded-xl border p-4 grid md:grid-cols-2 gap-3"><div><Label>Type</Label><Select value={option.type} onValueChange={(type) => updateOption(option.id, { type: type as ProductOptionType, choices: ["select", "radio"].includes(type) ? option.choices : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{optionTypes.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent></Select></div><div><Label>Label *</Label><Input value={option.label} onChange={(event) => updateOption(option.id, { label: event.target.value })} placeholder="Bijv. Tekst op voorkant" /></div><div className="md:col-span-2"><Label>Uitleg voor de klant</Label><Input value={option.description} onChange={(event) => updateOption(option.id, { description: event.target.value })} placeholder="Bijv. Welke tekst moet op de voorkant?" /></div>{["select", "radio"].includes(option.type) && <div className="md:col-span-2"><Label>Keuzes (één per regel)</Label><Textarea rows={3} value={option.choices.join("\n")} onChange={(event) => updateOption(option.id, { choices: event.target.value.split("\n") })} placeholder={"Klein\nMiddel\nGroot"} /></div>}{["text", "textarea"].includes(option.type) && <div><Label>Maximaal tekens</Label><Input type="number" min={1} max={5000} value={option.max_length || ""} onChange={(event) => updateOption(option.id, { max_length: Number(event.target.value) || null })} /></div>}<div className="flex items-end gap-2"><Switch checked={option.required} onCheckedChange={(required) => updateOption(option.id, { required })} /><Label>Verplicht</Label></div><div className="md:col-span-2 flex justify-between items-center"><span className="text-xs text-muted-foreground">Optie {index + 1}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOptions((current) => current.filter((item) => item.id !== option.id))}><Trash2 className="w-4 h-4 text-destructive" /> Verwijderen</Button></div></div>)}
+          {options.length === 0 && <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">Geen extra opties. Klanten kiezen alleen materiaal, kleur en aantal.</p>}
+        </div></div>
+        <div className="flex items-center gap-2"><Switch checked={form.customer_photo_required} onCheckedChange={(customer_photo_required) => setForm({ ...form, customer_photo_required })} /><Label>Altijd minimaal één klantfoto verplichten</Label></div>
+        <div className="flex gap-3"><Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingId ? "Product bijwerken" : "Product aanmaken"}</Button><Button variant="outline" onClick={resetEditor} disabled={saving}>Annuleren</Button></div>
+      </section>}
+
+      {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></div> : products.length === 0 ? <p className="text-center text-muted-foreground py-12">Nog geen producten.</p> : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{products.map((product) => { const mainImage = orderedProductImages(product)[0]; return <article key={product.id} className={`bg-card rounded-2xl border overflow-hidden ${product.active ? "" : "opacity-60"}`}><div className="aspect-[4/3] bg-muted">{mainImage ? <SignedImage path={mainImage.storage_path} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">Geen foto</div>}</div><div className="p-4"><div className="flex gap-2 items-start"><div className="min-w-0 flex-1"><h3 className="font-bold text-primary truncate">{product.name}</h3><p className="text-accent font-semibold">€{Number(product.price).toFixed(2)}</p></div><Button variant="ghost" size="sm" onClick={() => toggleProductActive(product)} aria-label={product.active ? "Verbergen" : "Tonen"}>{product.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</Button></div><p className="text-xs text-muted-foreground mt-2">{product.product_categories?.name || "Zonder categorie"} · {product.product_options?.length || 0} extra opties · {product.colors.length} kleuren</p><div className="flex gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => openEdit(product)}><Pencil className="w-4 h-4" /> Bewerken</Button><Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ type: "product", value: product })}><Trash2 className="w-4 h-4 text-destructive" /></Button></div></div></article>; })}</div>}
+    </div></main><Footer />
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={deleteTarget?.type === "product" ? "Product verwijderen?" : "Categorie verwijderen?"}
+        description={deleteTarget?.type === "product"
+          ? `“${deleteTarget.value.name}” en de bijbehorende productfoto's worden definitief verwijderd.`
+          : `“${deleteTarget?.value.name || "Deze categorie"}” wordt verwijderd. Producten blijven bestaan zonder categorie.`}
+        confirmLabel="Verwijderen"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget?.type === "product") await handleDeleteProduct(deleteTarget.value);
+          if (deleteTarget?.type === "category") await deleteCategory(deleteTarget.value);
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

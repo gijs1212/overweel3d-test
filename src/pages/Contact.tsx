@@ -37,7 +37,7 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.functions.invoke("send-contact-message", {
+      const { data, error } = await supabase.functions.invoke("send-contact-message", {
         body: {
           name: formData.name,
           email: formData.email,
@@ -47,8 +47,10 @@ export default function Contact() {
       });
 
       if (error) throw error;
+      if (data?.error || data?.success === false) throw new Error(data.error || "Het bericht kon niet worden verzonden.");
 
       setIsSubmitted(true);
+      setFormData({ name: "", email: "", subject: "", message: "" });
       toast({
         title: "Bericht verzonden!",
         description: "We nemen zo snel mogelijk contact met u op.",

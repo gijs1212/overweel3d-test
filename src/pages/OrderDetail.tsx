@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useState, useEffect } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package, Upload, Eye } from "lucide-react";
+import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package, Upload, Eye, Link2, LogIn } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { PrintProgress } from "@/components/PrintProgress";
+import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { ModelViewer } from "@/components/ModelViewer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -41,15 +42,17 @@ interface Order {
   postal_code: string;
   city: string;
   country: string;
-  parts_total: number;
-  parts_per_plate: number;
-  plates_completed: number;
+  total_products: number;
+  total_plates: number;
+  plate_print_statuses: boolean[];
+  plate_runs_required_per_plate: number[];
   shipping_carrier?: string;
   tracking_code?: string;
   shipping_cost?: number;
   customer_upload_requested?: boolean;
   customer_upload_request_note?: string | null;
-  user_id?: string | null;
+  linked_to_account: boolean;
+  linked_to_current_user: boolean;
 }
 
 interface OrderFile { id: string; storage_path: string; original_filename: string; file_size: number; }
@@ -79,10 +82,14 @@ export default function OrderDetail() {
   const [proposingDelivery, setProposingDelivery] = useState(false);
   const [uploadingCustomer, setUploadingCustomer] = useState(false);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
-
-  const fetchOrder = async () => {
+  const [previewFiles, setPreviewFiles] = useState<Record<string, File>>({});
+  const [fileLoadingId, setFileLoadingId] = useState<string | null>(null);
+  const [claimingOrder, setClaimingOrder] = useState(false);
+  const fetchOrder = useCallback(async (registerVisit = true) => {
     if (!token) return;
-    const { data, error } = await supabase.functions.invoke("get-order-by-token", { body: { token } });
+    const { data, error } = await supabase.functions.invoke("get-order-by-token", {
+      body: { token, registerVisit },
+    });
     if (error || !data?.order) {
       toast({ title: "Bestelling niet gevonden", variant: "destructive" });
       setLoading(false);
@@ -94,18 +101,23 @@ export default function OrderDetail() {
     setMessages(data.messages || []);
     setAppointments(data.appointments || []);
     setLoading(false);
-  };
+  }, [toast, token]);
 
-  useEffect(() => { fetchOrder(); }, [token]);
+  useEffect(() => { void fetchOrder(); }, [fetchOrder]);
 
   const handleAccept = async () => {
     if (!order) return;
     setActionLoading(true);
     try {
-      await supabase.functions.invoke("update-order-status", { body: { token, action: "accept" } });
+      const { data, error } = await supabase.functions.invoke("update-order-status", { body: { token, action: "accept" } });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Accepteren mislukt");
       toast({ title: "Bestelling geaccepteerd! 🎉" });
-      await fetchOrder();
-    } catch { toast({ title: "Er ging iets mis", variant: "destructive" }); }
+      await fetchOrder(false);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Probeer het opnieuw.";
+      toast({ title: "Accepteren mislukt", description, variant: "destructive" });
+    }
     finally { setActionLoading(false); }
   };
 
@@ -113,37 +125,94 @@ export default function OrderDetail() {
     if (!order) return;
     setActionLoading(true);
     try {
-      await supabase.functions.invoke("update-order-status", { body: { token, action: "reject" } });
+      const { data, error } = await supabase.functions.invoke("update-order-status", { body: { token, action: "reject" } });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Afwijzen mislukt");
       toast({ title: "Bestelling afgewezen" });
-      await fetchOrder();
-    } catch { toast({ title: "Er ging iets mis", variant: "destructive" }); }
+      await fetchOrder(false);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Probeer het opnieuw.";
+      toast({ title: "Afwijzen mislukt", description, variant: "destructive" });
+    }
     finally { setActionLoading(false); }
   };
 
-  const downloadFile = async (storagePath: string, filename: string) => {
-    const { data, error } = await supabase.storage.from("orders").download(storagePath);
-    if (error) {
-      toast({ title: "Bestand niet beschikbaar", variant: "destructive" });
+  const requestFileUrl = async (fileId: string, download: boolean) => {
+    if (!token) throw new Error("Ongeldige bestellink");
+    const { data, error } = await supabase.functions.invoke("get-order-by-token", {
+      body: { token, action: "get_file_url", fileId, download },
+    });
+    if (error) throw error;
+    if (!data?.signedUrl) throw new Error(data?.error || "Bestand niet beschikbaar");
+    return data.signedUrl as string;
+  };
+
+  const downloadFile = async (file: OrderFile) => {
+    setFileLoadingId(file.id);
+    try {
+      const signedUrl = await requestFileUrl(file.id, true);
+      const anchor = document.createElement("a");
+      anchor.href = signedUrl;
+      anchor.download = file.original_filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch (error) {
+      toast({
+        title: "Bestand niet beschikbaar",
+        description: error instanceof Error ? error.message : "Probeer het opnieuw.",
+        variant: "destructive",
+      });
+    } finally {
+      setFileLoadingId(null);
+    }
+  };
+
+  const togglePreview = async (file: OrderFile) => {
+    if (previewFileId === file.id) {
+      setPreviewFileId(null);
       return;
     }
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+    if (previewFiles[file.id]) {
+      setPreviewFileId(file.id);
+      return;
+    }
+    setFileLoadingId(file.id);
+    try {
+      const signedUrl = await requestFileUrl(file.id, false);
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error("Previewbestand downloaden mislukt");
+      const blob = await response.blob();
+      const previewFile = new File([blob], file.original_filename, { type: blob.type });
+      setPreviewFiles((current) => ({ ...current, [file.id]: previewFile }));
+      setPreviewFileId(file.id);
+    } catch (error) {
+      toast({
+        title: "Preview niet beschikbaar",
+        description: error instanceof Error ? error.message : "Probeer het opnieuw.",
+        variant: "destructive",
+      });
+    } finally {
+      setFileLoadingId(null);
+    }
   };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !token) return;
     setSending(true);
     try {
-      const { error } = await supabase.functions.invoke("get-order-by-token", {
+      const { data, error } = await supabase.functions.invoke("get-order-by-token", {
         body: { token, action: "send_message", message: newMessage.trim() },
       });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Bericht verzenden mislukt");
       setNewMessage("");
       toast({ title: "Bericht verzonden ✅" });
-      await fetchOrder();
-    } catch (e: any) {
-      toast({ title: "Verzenden mislukt", variant: "destructive" });
+      await fetchOrder(false);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Probeer het opnieuw.";
+      toast({ title: "Verzenden mislukt", description, variant: "destructive" });
     } finally { setSending(false); }
   };
 
@@ -151,16 +220,39 @@ export default function OrderDetail() {
     if (!deliveryDate || !token) return;
     setProposingDelivery(true);
     try {
-      await supabase.functions.invoke("get-order-by-token", {
+      const { data, error } = await supabase.functions.invoke("get-order-by-token", {
         body: { token, action: "propose_delivery", appointmentData: { date: deliveryDate, timeSlot: deliveryTime, notes: deliveryNotes } },
       });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Bezorgvoorstel indienen mislukt");
       toast({ title: "Bezorgvoorstel ingediend ✅" });
       setShowDeliveryForm(false);
       setDeliveryDate(""); setDeliveryTime(""); setDeliveryNotes("");
-      await fetchOrder();
-    } catch {
-      toast({ title: "Fout", variant: "destructive" });
+      await fetchOrder(false);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Probeer het opnieuw.";
+      toast({ title: "Bezorgvoorstel mislukt", description, variant: "destructive" });
     } finally { setProposingDelivery(false); }
+  };
+
+  const handleClaimOrder = async () => {
+    if (!token || !user) return;
+    setClaimingOrder(true);
+    try {
+      const { data, error } = await supabase.rpc("claim_order_to_account", { p_token: token });
+      if (error) throw error;
+      if (!data) throw new Error("De bestelling kon niet worden gekoppeld.");
+      toast({ title: "Bestelling gekoppeld", description: "Deze bestelling staat nu in uw dashboard." });
+      await fetchOrder(false);
+    } catch (error) {
+      toast({
+        title: "Koppelen mislukt",
+        description: error instanceof Error ? error.message : "Probeer het opnieuw.",
+        variant: "destructive",
+      });
+    } finally {
+      setClaimingOrder(false);
+    }
   };
 
   if (loading) {
@@ -204,6 +296,48 @@ export default function OrderDetail() {
           )}
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            {!order.linked_to_account && (
+              <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/5 p-5">
+                <div className="flex items-start gap-3">
+                  <Link2 className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                  <div className="flex-1">
+                    <h2 className="font-semibold text-primary">Koppel deze bestelling aan uw account</h2>
+                    {!user ? (
+                      <>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Log in of maak een account aan met <strong>{order.customer_email}</strong>. Daarna kunt u de bestelling vanuit uw dashboard bekijken.
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button asChild size="sm"><Link to="/login"><LogIn className="h-4 w-4" />Inloggen</Link></Button>
+                          <Button asChild size="sm" variant="outline"><Link to="/register">Account aanmaken</Link></Button>
+                        </div>
+                      </>
+                    ) : user.email?.trim().toLowerCase() === order.customer_email.trim().toLowerCase() ? (
+                      <>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          U bent ingelogd met hetzelfde e-mailadres als op de bestelling. Koppelen kan eenmalig.
+                        </p>
+                        <Button className="mt-4" disabled={claimingOrder} onClick={() => void handleClaimOrder()} size="sm">
+                          {claimingOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                          Aan mijn account koppelen
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Log in met <strong>{order.customer_email}</strong> om deze bestelling te koppelen. U bent nu ingelogd met een ander e-mailadres.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {order.linked_to_current_user && (
+              <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                Deze bestelling is gekoppeld aan uw account en staat in <Link className="font-semibold underline" to="/dashboard">Mijn bestellingen</Link>.
+              </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
               <div>
@@ -217,12 +351,17 @@ export default function OrderDetail() {
               </span>
             </div>
 
-            {/* Productie voortgang - always show when in_production or parts_total > 0 */}
+            {/* Productievoortgang uses independent product and plate totals. */}
             <div className="mb-6">
               <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50">
                 <h3 className="font-bold text-primary mb-4">🏭 Productie</h3>
-                {order.parts_total > 0 ? (
-                  <PrintProgress partsTotal={order.parts_total} partsPerPlate={order.parts_per_plate} platesCompleted={order.plates_completed} />
+                {order.total_products > 0 || order.total_plates > 0 ? (
+                  <PrintProgress
+                    totalProducts={order.total_products || 0}
+                    totalPlates={order.total_plates || 0}
+                    platePrintStatuses={Array.isArray(order.plate_print_statuses) ? order.plate_print_statuses : []}
+                    platePrintQuantities={Array.isArray(order.plate_runs_required_per_plate) ? order.plate_runs_required_per_plate : []}
+                  />
                 ) : (
                   <p className="text-sm text-muted-foreground">Productie-informatie wordt bijgewerkt zodra de productie start.</p>
                 )}
@@ -357,22 +496,28 @@ export default function OrderDetail() {
                             setUploadingCustomer(true);
                             try {
                               for (const f of fs) {
-                                const path = `${order.order_number}/files/customer-${Date.now()}-${f.name}`;
-                                const { error: upErr } = await supabase.storage.from("orders").upload(path, f, { upsert: true });
+                                const safeName = f.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+                                const path = `${order.order_number}/files/customer-${crypto.randomUUID()}-${safeName}`;
+                                const uploaded = await uploadFileWithHeicConversion("orders", path, f, { upsert: false });
+                                const { error: upErr } = uploaded;
                                 if (upErr) throw upErr;
                                 const { error: insErr } = await supabase.from("order_files").insert({
                                   order_id: order.id,
-                                  storage_path: path,
-                                  original_filename: f.name,
-                                  file_size: f.size,
-                                  mime_type: f.type || "application/octet-stream",
+                                  storage_path: uploaded.path,
+                                  original_filename: uploaded.file.name,
+                                  file_size: uploaded.file.size,
+                                  mime_type: uploaded.file.type || "application/octet-stream",
                                 });
-                                if (insErr) throw insErr;
+                                if (insErr) {
+                                  await supabase.storage.from("orders").remove([uploaded.path]);
+                                  throw insErr;
+                                }
                               }
                               toast({ title: `${fs.length} bestand(en) geüpload ✅` });
-                              await fetchOrder();
-                            } catch (err: any) {
-                              toast({ title: "Upload mislukt", description: err.message, variant: "destructive" });
+                              await fetchOrder(false);
+                            } catch (error) {
+                              const description = error instanceof Error ? error.message : "Probeer het opnieuw.";
+                              toast({ title: "Upload mislukt", description, variant: "destructive" });
                             } finally {
                               setUploadingCustomer(false);
                               e.target.value = "";
@@ -394,18 +539,18 @@ export default function OrderDetail() {
                             </div>
                             <div className="flex items-center gap-1">
                               {/\.(stl|obj)$/i.test(file.original_filename) && (
-                                <Button variant="ghost" size="sm" onClick={() => setPreviewFileId(previewFileId === file.id ? null : file.id)}>
-                                  <Eye className="w-4 h-4" />
+                                <Button variant="ghost" size="sm" onClick={() => void togglePreview(file)} disabled={fileLoadingId === file.id} aria-label={`Preview van ${file.original_filename}`}>
+                                  {fileLoadingId === file.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                                 </Button>
                               )}
-                              <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}>
-                                <Download className="w-4 h-4" />
+                              <Button variant="ghost" size="sm" onClick={() => void downloadFile(file)} disabled={fileLoadingId === file.id} aria-label={`${file.original_filename} downloaden`}>
+                                {fileLoadingId === file.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                               </Button>
                             </div>
                           </div>
                           {previewFileId === file.id && (
                             <div className="mt-3">
-                              <ModelViewer storagePath={file.storage_path} filename={file.original_filename} height={240} />
+                              <ModelViewer file={previewFiles[file.id]} filename={file.original_filename} height={240} />
                             </div>
                           )}
                         </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -32,13 +33,18 @@ const CONTENT_TYPES = [
 ];
 
 export default function AdminContentMarketing() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [platform, setPlatform] = useState("instagram");
   const [contentType, setContentType] = useState("social_post");
   const [topic, setTopic] = useState("");
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState("");
+
+  if (authLoading) {
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><Loader2 aria-label="Toegang controleren" className="w-8 h-8 animate-spin text-accent" /></main><Footer /></div>);
+  }
 
   if (!isAdmin) {
     return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><p className="text-muted-foreground">Geen toegang.</p></main><Footer /></div>);
@@ -58,14 +64,26 @@ export default function AdminContentMarketing() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setResult(data.content || "Geen resultaat ontvangen.");
-    } catch (error: any) {
-      toast({ title: "Genereren mislukt", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: "Genereren mislukt",
+        description: error instanceof Error ? error.message : "Onbekende fout.",
+        variant: "destructive",
+      });
     } finally { setGenerating(false); }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(result);
-    toast({ title: "Gekopieerd! 📋" });
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(result);
+      toast({ title: "Gekopieerd! 📋" });
+    } catch (error) {
+      toast({
+        title: "Kopiëren mislukt",
+        description: error instanceof Error ? error.message : "Selecteer en kopieer de tekst handmatig.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -74,7 +92,7 @@ export default function AdminContentMarketing() {
       <main className="pt-20 pb-16">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="flex items-center gap-3 mb-8">
-            <Button variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="w-4 h-4" /> Terug</Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}><ArrowLeft className="w-4 h-4" /> Terug</Button>
             <h1 className="text-2xl font-bold text-primary">📢 Content Marketing</h1>
           </div>
 

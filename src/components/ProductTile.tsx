@@ -1,34 +1,27 @@
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui/card";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
-
-interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  photos: string[];
-}
+import { CatalogProduct, orderedProductImages } from "@/lib/productCatalog";
 
 interface ProductTileProps {
-  product: Product;
+  product: CatalogProduct;
   onClick: () => void;
 }
 
 export function ProductTile({ product, onClick }: ProductTileProps) {
   const [photoUrl, setPhotoUrl] = useState<string>("");
+  const primaryPath = orderedProductImages(product)[0]?.storage_path || "";
 
   useEffect(() => {
     let active = true;
-    if (product.photos[0]) {
-      getProductPhotoUrl(product.photos[0]).then((url) => {
+    if (primaryPath) {
+      getProductPhotoUrl(primaryPath).then((url) => {
         if (active) setPhotoUrl(url);
       });
     } else {
       setPhotoUrl("");
     }
     return () => { active = false; };
-  }, [product.photos]);
+  }, [primaryPath]);
 
   return (
     <div className="group flex flex-col items-center text-center">
@@ -54,6 +47,9 @@ export function ProductTile({ product, onClick }: ProductTileProps) {
         </span>
       </button>
       <h3 className="mt-3 text-sm font-medium text-primary line-clamp-1">{product.name}</h3>
+      {product.product_categories?.name && (
+        <span className="text-[11px] text-muted-foreground mt-0.5">{product.product_categories.name}</span>
+      )}
       <span className="text-sm text-muted-foreground mt-0.5">€{Number(product.price).toFixed(2)}</span>
     </div>
   );

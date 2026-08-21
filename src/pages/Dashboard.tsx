@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Package, Plus, Loader2, User, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
 
@@ -21,7 +22,8 @@ interface OrderSummary {
 }
 
 export default function Dashboard() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileDismissed, setProfileDismissed] = useState(false);
@@ -29,18 +31,47 @@ export default function Dashboard() {
   const isProfileIncomplete = profile && (!profile.billing_address || !profile.city || !profile.postal_code || !profile.phone);
 
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     const fetchOrders = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("orders")
         .select("id, order_number, status, instant_quote_price, final_price, customer_order_token, submitted_at, material")
         .eq("user_id", user.id)
         .order("submitted_at", { ascending: false });
-      setOrders((data as OrderSummary[]) || []);
+      if (error) {
+        toast({ title: "Bestellingen laden mislukt", description: error.message, variant: "destructive" });
+        setOrders([]);
+      } else {
+        setOrders((data as OrderSummary[]) || []);
+      }
       setLoading(false);
     };
-    fetchOrders();
-  }, [user]);
+    void fetchOrders();
+  }, [authLoading, toast, user]);
+
+  if (authLoading) {
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-accent" /></main><Footer /></div>);
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-20 pb-16 flex min-h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <h1 className="mb-2 text-2xl font-bold text-primary">Log in voor uw dashboard</h1>
+            <p className="mb-5 text-muted-foreground">Uw bestellingen zijn alleen zichtbaar wanneer u bent ingelogd.</p>
+            <Button asChild><Link to="/login">Inloggen</Link></Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

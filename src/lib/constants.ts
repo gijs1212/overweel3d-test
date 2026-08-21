@@ -20,8 +20,14 @@ export const MATERIALS = [
     pricePerGram: 0.05,
     colors: [
       { id: "white", name: "Wit", hex: "#FFFFFF" },
+      { id: "jade-white", name: "Jadewit", hex: "#FFFFFF" },
       { id: "black", name: "Zwart", hex: "#000000" },
-      { id: "blue", name: "Blauw", hex: "#0066FF" },
+      { id: "blue", name: "Blauw", hex: "#0A2989" },
+      { id: "sunflower-yellow", name: "Zonnebloemgeel", hex: "#FEC600" },
+      { id: "bambu-green", name: "Bamboegroen", hex: "#00AE42" },
+      { id: "blue-grey", name: "Blauwgrijs", hex: "#5B6579" },
+      { id: "pumpkin-orange", name: "Pompoenoranje", hex: "#FF9016" },
+      { id: "ice-blue-translucent", name: "Ice Blue (Translucent)", hex: "#B8CDE9" },
       { id: "green", name: "Groen", hex: "#00CC00" },
       { id: "leafgreen", name: "Bladgroen", hex: "#228B22" },
       { id: "red", name: "Rood", hex: "#FF0000" },
@@ -37,6 +43,7 @@ export const MATERIALS = [
       { id: "white", name: "Wit", hex: "#FFFFFF" },
       { id: "black", name: "Zwart", hex: "#000000" },
       { id: "red", name: "Rood", hex: "#FF0000" },
+      { id: "reflex-blue", name: "Reflex Blue", hex: "#001A89" },
     ],
   },
   {

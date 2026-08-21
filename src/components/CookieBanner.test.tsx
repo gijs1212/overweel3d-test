@@ -65,6 +65,33 @@ describe("CookieBanner", () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
+  it("stays open and explains the problem when the browser blocks cookie storage", () => {
+    const ownCookieDescriptor = Object.getOwnPropertyDescriptor(document, "cookie");
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      get: () => "",
+      set: () => undefined,
+    });
+
+    try {
+      renderBanner();
+
+      act(() => getButton("Alles toestaan").click());
+
+      expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+      expect(container.querySelector('[role="alert"]')).toHaveTextContent(
+        "Uw cookievoorkeur kon niet worden opgeslagen.",
+      );
+      expect(getCookieConsent()).toBeNull();
+    } finally {
+      if (ownCookieDescriptor) {
+        Object.defineProperty(document, "cookie", ownCookieDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "cookie");
+      }
+    }
+  });
+
   it("saves declined consent and does not ask again", () => {
     renderBanner();
 

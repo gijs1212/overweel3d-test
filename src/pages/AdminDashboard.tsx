@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
+import { getFunctionErrorMessage } from "@/lib/functionErrors";
 
 interface AdminOrder {
   id: string;
@@ -21,27 +23,77 @@ interface AdminOrder {
   final_price: number | null;
   submitted_at: string;
   material: string;
+  link_first_viewed_at: string | null;
+  link_last_viewed_at: string | null;
+  link_view_count: number;
 }
 
 export default function AdminDashboard() {
-  const { isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { isAdmin, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>(() => searchParams.get("customer")?.trim().toLowerCase() || "all");
+  const [sendingTestMail, setSendingTestMail] = useState(false);
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (authLoading) return;
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
 
-  const fetchOrders = async () => {
-    const { data } = await supabase
-      .from("orders")
-      .select("id, order_number, customer_name, customer_email, status, instant_quote_price, final_price, submitted_at, material")
-      .order("submitted_at", { ascending: false });
-    setOrders((data as AdminOrder[]) || []);
-    setLoading(false);
+    const fetchOrders = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_number, customer_name, customer_email, status, instant_quote_price, final_price, submitted_at, material, link_first_viewed_at, link_last_viewed_at, link_view_count")
+        .order("submitted_at", { ascending: false });
+      if (error) {
+        toast({ title: "Bestellingen laden mislukt", description: error.message, variant: "destructive" });
+        setOrders([]);
+      } else {
+        setOrders((data as AdminOrder[]) || []);
+      }
+      setLoading(false);
+    };
+
+    void fetchOrders();
+  }, [authLoading, isAdmin, toast]);
+
+  const handleSendTestMail = async () => {
+    setSendingTestMail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-order-email", {
+        body: { type: "test_email" },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Onbekende e-mailfout");
+      toast({
+        title: "Testmail verzonden",
+        description: "De testmail is verzonden naar gijsoverweel@gmail.com.",
+      });
+    } catch (error) {
+      const message = await getFunctionErrorMessage(error, "Probeer het later opnieuw.");
+      toast({ title: "Testmail verzenden mislukt", description: message, variant: "destructive" });
+    } finally {
+      setSendingTestMail(false);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -65,8 +117,20 @@ export default function AdminDashboard() {
       o.customer_name.toLowerCase().includes(search.toLowerCase()) ||
       o.customer_email.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchCustomer = customerFilter === "all" || o.customer_email.trim().toLowerCase() === customerFilter;
+    return matchSearch && matchStatus && matchCustomer;
   });
+
+  const customerOptions = Array.from(
+    new Map(
+      orders
+        .filter((order) => order.customer_email?.trim())
+        .map((order) => [order.customer_email.trim().toLowerCase(), {
+          email: order.customer_email.trim().toLowerCase(),
+          name: order.customer_name || order.customer_email,
+        }]),
+    ).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name, "nl"));
 
   return (
     <div className="min-h-screen">
@@ -79,6 +143,10 @@ export default function AdminDashboard() {
               <p className="text-muted-foreground">{orders.length} bestellingen totaal</p>
             </div>
             <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" onClick={handleSendTestMail} disabled={sendingTestMail}>
+                {sendingTestMail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                Testmail sturen
+              </Button>
               <Link to="/admin/blog">
                 <Button variant="outline"><FileText className="w-4 h-4" /> Blog</Button>
               </Link>
@@ -93,6 +161,12 @@ export default function AdminDashboard() {
               </Link>
               <Link to="/admin/colors">
                 <Button variant="outline">🎨 Kleuren</Button>
+              </Link>
+              <Link to="/admin/newsletter">
+                <Button variant="outline"><MailPlus className="w-4 h-4" /> Nieuwsbrief</Button>
+              </Link>
+              <Link to="/admin/customers">
+                <Button variant="outline"><Users className="w-4 h-4" /> Klanten</Button>
               </Link>
               <Link to="/admin/new-order">
                 <Button><Plus className="w-4 h-4" /> Bestelling aanmaken</Button>
@@ -122,6 +196,19 @@ export default function AdminDashboard() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={customerFilter} onValueChange={setCustomerFilter}>
+              <SelectTrigger className="w-full md:w-[260px]">
+                <SelectValue placeholder="Filter op klant" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle klanten</SelectItem>
+                {customerOptions.map((customer) => (
+                  <SelectItem key={customer.email} value={customer.email}>
+                    {customer.name} — {customer.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {loading ? (
@@ -142,6 +229,7 @@ export default function AdminDashboard() {
                       <th className="text-left p-4 font-medium text-muted-foreground">Bestelling</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Klant</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">Klantlink</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Indicatie</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Definitief</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Datum</th>
@@ -166,6 +254,36 @@ export default function AdminDashboard() {
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
                               {statusInfo.label}
                             </span>
+                          </td>
+                          <td className="p-4">
+                            {order.link_first_viewed_at ? (
+                              <div>
+                                <span className="text-green-700 dark:text-green-300 font-medium">Bezocht</span>
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                  Eerste: {new Date(order.link_first_viewed_at).toLocaleString("nl-NL", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                  {` · ${order.link_view_count}×`}
+                                </div>
+                                {order.link_last_viewed_at && order.link_last_viewed_at !== order.link_first_viewed_at && (
+                                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                    Laatste: {new Date(order.link_last_viewed_at).toLocaleString("nl-NL", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Niet bezocht</span>
+                            )}
                           </td>
                           <td className="p-4">€{Number(order.instant_quote_price || 0).toFixed(2)}</td>
                           <td className="p-4 font-semibold text-accent">

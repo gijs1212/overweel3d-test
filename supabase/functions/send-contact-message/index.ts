@@ -16,6 +16,15 @@ interface ContactRequest {
   message: string;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 const handler = async (req: Request): Promise<Response> => {
   console.log("Received contact message request");
 
@@ -30,10 +39,25 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Subject:", subject);
 
     // Validate required fields
-    if (!name || !email || !subject || !message) {
+    const cleanName = name?.trim();
+    const cleanEmail = email?.trim().toLowerCase();
+    const cleanSubject = subject?.trim();
+    const cleanMessage = message?.trim();
+    if (!cleanName || !cleanEmail || !cleanSubject || !cleanMessage) {
       console.error("Missing required fields");
       throw new Error("Missing required fields");
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanEmail.length > 254) {
+      throw new Error("Invalid email address");
+    }
+    if (cleanName.length > 150 || cleanSubject.length > 200 || cleanMessage.length > 10_000) {
+      throw new Error("Contact message is too long");
+    }
+
+    const safeName = escapeHtml(cleanName);
+    const safeEmail = escapeHtml(cleanEmail);
+    const safeSubject = escapeHtml(cleanSubject);
+    const safeMessage = escapeHtml(cleanMessage).replace(/\r?\n/g, "<br>");
 
     const contactDate = new Date().toLocaleString("nl-NL", {
       dateStyle: "full",
@@ -41,11 +65,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Send notification email to Overweel3D
-    const emailResponse = await resend.emails.send({
+    const { data: emailData, error: emailError } = await resend.emails.send({
       from: "Overweel3D <onboarding@resend.dev>",
       to: ["gijsoverweel@gmail.com"],
-      reply_to: email,
-      subject: `💬 Nieuw bericht: ${subject}`,
+      reply_to: cleanEmail,
+      subject: `💬 Nieuw bericht: ${cleanSubject}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -74,24 +98,24 @@ const handler = async (req: Request): Promise<Response> => {
               <h2>Van wie?</h2>
               <div class="info">
                 <div class="label">Naam</div>
-                <div class="value">${name}</div>
+                <div class="value">${safeName}</div>
               </div>
               <div class="info">
                 <div class="label">E-mail</div>
-                <div class="value">${email}</div>
+                <div class="value">${safeEmail}</div>
               </div>
               <div class="info">
                 <div class="label">Onderwerp</div>
-                <div class="value">${subject}</div>
+                <div class="value">${safeSubject}</div>
               </div>
             </div>
 
             <div class="section">
               <h2>Bericht</h2>
               <div class="message-box">
-                ${message.replace(/\n/g, "<br>")}
+                ${safeMessage}
               </div>
-              <a href="mailto:${email}" class="reply-btn">↩️ Beantwoorden</a>
+              <a href="mailto:${encodeURIComponent(cleanEmail)}" class="reply-btn">↩️ Beantwoorden</a>
             </div>
 
             <div class="section" style="text-align: center;">
@@ -106,17 +130,19 @@ const handler = async (req: Request): Promise<Response> => {
         </html>
       `,
     });
+    if (emailError) throw new Error(emailError.message);
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Email sent successfully:", emailData?.id);
 
-    return new Response(JSON.stringify({ success: true, emailResponse }), {
+    return new Response(JSON.stringify({ success: true, emailId: emailData?.id }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in send-contact-message function:", error);
+    const message = error instanceof Error ? error.message : "Onbekende fout";
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

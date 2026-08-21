@@ -28,9 +28,12 @@ import BlogPost from "./pages/BlogPost";
 import AdminContentMarketing from "./pages/AdminContentMarketing";
 import AdminDiscountCodes from "./pages/AdminDiscountCodes";
 import AdminColors from "./pages/AdminColors";
+import AdminNewsletter from "./pages/AdminNewsletter";
+import AdminCustomers from "./pages/AdminCustomers";
 import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
+import NewsletterPopup from "./components/NewsletterPopup";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +67,8 @@ const App = () => (
             <Route path="/admin/content" element={<AdminContentMarketing />} />
             <Route path="/admin/discounts" element={<AdminDiscountCodes />} />
             <Route path="/admin/colors" element={<AdminColors />} />
+            <Route path="/admin/newsletter" element={<AdminNewsletter />} />
+            <Route path="/admin/customers" element={<AdminCustomers />} />
             <Route path="/kleuren" element={<Kleuren />} />
             <Route path="/blog" element={<Blog />} />
 
@@ -73,6 +78,7 @@ const App = () => (
         </AuthProvider>
       </BrowserRouter>
       <CookieBanner />
+      <NewsletterPopup />
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -11,6 +11,7 @@ import { ArrowLeft, Plus, Save, Trash2, Loader2, Tag, ToggleLeft, ToggleRight, U
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 interface DiscountCode {
   id: string;
@@ -30,13 +31,17 @@ interface DiscountCode {
   parent_code_id?: string | null;
 }
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Onbekende fout";
+
 export default function AdminDiscountCodes() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [deleteCodeId, setDeleteCodeId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     code: "",
@@ -50,13 +55,21 @@ export default function AdminDiscountCodes() {
     reward_percentage: 10,
   });
 
-  useEffect(() => { fetchCodes(); }, []);
-
-  const fetchCodes = async () => {
-    const { data } = await supabase.from("discount_codes").select("*").order("created_at", { ascending: false });
-    setCodes((data as DiscountCode[]) || []);
+  const fetchCodes = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("discount_codes").select("*").order("created_at", { ascending: false });
+    if (error) {
+      toast({ title: "Kortingscodes laden mislukt", description: error.message, variant: "destructive" });
+    } else {
+      setCodes((data as DiscountCode[]) || []);
+    }
     setLoading(false);
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (!authLoading && isAdmin) void fetchCodes();
+    if (!authLoading && !isAdmin) setLoading(false);
+  }, [authLoading, fetchCodes, isAdmin]);
 
   const handleSave = async () => {
     if (!form.code.trim()) {
@@ -65,6 +78,14 @@ export default function AdminDiscountCodes() {
     }
     if (form.is_referral && !form.owner_email.trim()) {
       toast({ title: "Vul een e-mail van de eigenaar in", variant: "destructive" });
+      return;
+    }
+    if (form.discount_value <= 0 || (form.discount_type === "percentage" && form.discount_value > 100)) {
+      toast({ title: "Vul een geldige kortingswaarde in", description: "Een percentage moet tussen 0 en 100 liggen.", variant: "destructive" });
+      return;
+    }
+    if (form.max_uses && parseInt(form.max_uses) < 1) {
+      toast({ title: "Maximaal gebruik moet minimaal 1 zijn", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -80,27 +101,36 @@ export default function AdminDiscountCodes() {
         owner_name: form.is_referral ? form.owner_name.trim() || null : null,
         reward_percentage: form.is_referral ? form.reward_percentage : null,
       };
-      await supabase.from("discount_codes").insert(payload);
+      const { error } = await supabase.from("discount_codes").insert(payload);
+      if (error) throw error;
       toast({ title: "Kortingscode aangemaakt ✅" });
       setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, owner_email: "", owner_name: "", reward_percentage: 10 });
       fetchCodes();
-    } catch (e: any) {
-      toast({ title: "Fout", description: e.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" });
     } finally { setSaving(false); }
   };
 
   const toggleActive = async (c: DiscountCode) => {
-    await supabase.from("discount_codes").update({ active: !c.active }).eq("id", c.id);
-    fetchCodes();
+    setActionId(c.id);
+    const { error } = await supabase.from("discount_codes").update({ active: !c.active }).eq("id", c.id);
+    if (error) toast({ title: "Bijwerken mislukt", description: error.message, variant: "destructive" });
+    else {
+      toast({ title: c.active ? "Kortingscode gedeactiveerd" : "Kortingscode geactiveerd" });
+      await fetchCodes();
+    }
+    setActionId(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Kortingscode verwijderen?")) return;
-    await supabase.from("discount_codes").delete().eq("id", id);
-    toast({ title: "Verwijderd" });
-    fetchCodes();
+  const handleDelete = async () => {
+    if (!deleteCodeId) return;
+    const { error } = await supabase.from("discount_codes").delete().eq("id", deleteCodeId);
+    if (error) toast({ title: "Verwijderen mislukt", description: error.message, variant: "destructive" });
+    else { toast({ title: "Kortingscode verwijderd" }); await fetchCodes(); }
+    setDeleteCodeId(null);
   };
 
+  if (authLoading) return <div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><Loader2 aria-label="Toegang controleren" className="w-8 h-8 animate-spin text-accent" /></main><Footer /></div>;
   if (!isAdmin) return <div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center"><p>Geen toegang.</p></main><Footer /></div>;
 
   return (
@@ -212,10 +242,10 @@ export default function AdminDiscountCodes() {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => toggleActive(c)} title={c.active ? "Deactiveren" : "Activeren"}>
-                        {c.active ? <ToggleRight className="w-5 h-5 text-accent" /> : <ToggleLeft className="w-5 h-5" />}
+                      <Button variant="ghost" size="sm" onClick={() => toggleActive(c)} disabled={actionId === c.id} title={c.active ? "Deactiveren" : "Activeren"}>
+                        {actionId === c.id ? <Loader2 className="w-5 h-5 animate-spin" /> : c.active ? <ToggleRight className="w-5 h-5 text-accent" /> : <ToggleLeft className="w-5 h-5" />}
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(c.id)}>
+                      <Button variant="ghost" size="sm" onClick={() => setDeleteCodeId(c.id)} disabled={actionId === c.id}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -224,6 +254,15 @@ export default function AdminDiscountCodes() {
               })}
             </div>
           )}
+          <ConfirmActionDialog
+            open={deleteCodeId !== null}
+            onOpenChange={(open) => !open && setDeleteCodeId(null)}
+            title="Kortingscode verwijderen?"
+            description="De kortingscode kan daarna niet meer worden gebruikt. Deze actie kan niet ongedaan worden gemaakt."
+            confirmLabel="Kortingscode verwijderen"
+            destructive
+            onConfirm={handleDelete}
+          />
         </div>
       </main>
       <Footer />

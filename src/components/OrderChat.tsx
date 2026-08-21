@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Send, MessageCircle } from "lucide-react";
@@ -26,19 +26,23 @@ export function OrderChat({ orderId, senderType, orderNumber }: OrderChatProps) 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  const fetchMessages = async () => {
-    const { data } = await supabase
+  const fetchMessages = useCallback(async () => {
+    const { data, error } = await supabase
       .from("order_messages")
       .select("*")
       .eq("order_id", orderId)
       .order("created_at", { ascending: true });
-    setMessages((data as Message[]) || []);
+    if (error) {
+      toast({ title: "Berichten laden mislukt", description: error.message, variant: "destructive" });
+    } else {
+      setMessages((data as Message[]) || []);
+    }
     setLoading(false);
-  };
+  }, [orderId, toast]);
 
   useEffect(() => {
-    fetchMessages();
-  }, [orderId]);
+    void fetchMessages();
+  }, [fetchMessages]);
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
@@ -56,17 +60,19 @@ export function OrderChat({ orderId, senderType, orderNumber }: OrderChatProps) 
 
       // Send email notification
       try {
-        await supabase.functions.invoke("send-chat-notification", {
+        const { error: notificationError } = await supabase.functions.invoke("send-chat-notification", {
           body: { orderId, message: newMessage.trim(), senderType },
         });
+        if (notificationError) console.error("Chat notification failed:", notificationError.message);
       } catch (e) {
         console.error("Chat notification failed:", e);
       }
 
       setNewMessage("");
-      fetchMessages();
-    } catch (error: any) {
-      toast({ title: "Bericht verzenden mislukt", description: error.message, variant: "destructive" });
+      await fetchMessages();
+      toast({ title: "Bericht verzonden" });
+    } catch (error: unknown) {
+      toast({ title: "Bericht verzenden mislukt", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
     } finally {
       setSending(false);
     }

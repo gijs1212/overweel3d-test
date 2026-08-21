@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { MATERIALS } from "@/lib/constants";
-import { getProductPhotoUrl } from "@/lib/productPhotos";
-import heic2any from "heic2any";
+import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
+import { materialLabel, normalizeMaterialId } from "@/lib/productCatalog";
+import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 
 function SignedImg({ path, className }: { path: string; className?: string }) {
   const [url, setUrl] = useState("");
@@ -23,6 +25,7 @@ function SignedImg({ path, className }: { path: string; className?: string }) {
     getProductPhotoUrl(path).then((u) => { if (active) setUrl(u); });
     return () => { active = false; };
   }, [path]);
+  if (!url) return <div aria-hidden="true" className={`${className || ""} animate-pulse bg-muted`} />;
   return <img src={url} alt="" className={className} />;
 }
 
@@ -37,7 +40,7 @@ interface FilamentColor {
   active: boolean;
 }
 
-interface Product { id: string; name: string; materials: string[]; }
+interface Product { id: string; name: string; materials: string[]; active: boolean; }
 interface Availability { product_id: string; color_id: string; available: boolean; }
 
 const emptyForm = {
@@ -50,7 +53,7 @@ const emptyForm = {
 };
 
 export default function AdminColors() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -63,24 +66,43 @@ export default function AdminColors() {
   const [form, setForm] = useState({ ...emptyForm });
   const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
   const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
+  const [removedPhotoPaths, setRemovedPhotoPaths] = useState<string[]>([]);
   const [productAvail, setProductAvail] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FilamentColor | null>(null);
 
-  useEffect(() => { fetchAll(); }, []);
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     const [cRes, pRes, aRes] = await Promise.all([
       supabase.from("filament_colors").select("*").order("material").order("sort_order"),
-      supabase.from("products").select("id,name,materials").eq("active", true),
+      supabase.from("products").select("id,name,materials,active"),
       supabase.from("product_color_availability").select("*"),
     ]);
+    const error = cRes.error || pRes.error || aRes.error;
+    if (error) toast({ title: "Kleuren laden mislukt", description: error.message, variant: "destructive" });
     setColors((cRes.data as FilamentColor[]) || []);
     setProducts((pRes.data as Product[]) || []);
     setAvailability((aRes.data as Availability[]) || []);
     setLoading(false);
+  }, [toast]);
+
+  const setTemporaryAvailability = async (color: FilamentColor, active: boolean) => {
+    const { error } = await supabase.from("filament_colors").update({ active }).eq("id", color.id);
+    if (error) {
+      toast({ title: "Beschikbaarheid wijzigen mislukt", description: error.message, variant: "destructive" });
+      return;
+    }
+    setColors((current) => current.map((item) => item.id === color.id ? { ...item, active } : item));
+    toast({
+      title: active ? `${color.name} is weer beschikbaar` : `${color.name} is tijdelijk onbeschikbaar`,
+      description: active ? "De kleur staat weer in alle kleurkeuzes." : "De kleur is direct uit alle klant- en adminbestelkeuzes gehaald.",
+    });
   };
+
+  useEffect(() => {
+    if (!authLoading && isAdmin) fetchAll();
+  }, [authLoading, fetchAll, isAdmin]);
 
   const openNew = () => {
     setShowForm(true);
@@ -88,6 +110,7 @@ export default function AdminColors() {
     setForm({ ...emptyForm });
     setExistingPhotos([]);
     setNewPhotoFiles([]);
+    setRemovedPhotoPaths([]);
     setProductAvail({});
   };
 
@@ -96,7 +119,7 @@ export default function AdminColors() {
     setEditing(c);
     setForm({
       name: c.name,
-      material: c.material,
+      material: materialLabel(c.material),
       hex: c.hex,
       description: c.description,
       sort_order: c.sort_order,
@@ -104,6 +127,7 @@ export default function AdminColors() {
     });
     setExistingPhotos([...c.photos]);
     setNewPhotoFiles([]);
+    setRemovedPhotoPaths([]);
     const map: Record<string, boolean> = {};
     availability
       .filter((a) => a.color_id === c.id)
@@ -117,21 +141,22 @@ export default function AdminColors() {
     setForm({ ...emptyForm });
     setExistingPhotos([]);
     setNewPhotoFiles([]);
+    setRemovedPhotoPaths([]);
     setProductAvail({});
   };
 
-  const relevantProducts = products.filter((p) => (p.materials || []).includes(form.material));
+  const relevantProducts = products.filter((p) => {
+    const productMaterials = (p.materials || []).map(normalizeMaterialId);
+    return productMaterials.length === 0 || productMaterials.includes(normalizeMaterialId(form.material));
+  });
 
   const handlePhotoInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const converted: File[] = [];
     for (const f of files) {
-      const isHeic = f.type === "image/heic" || f.type === "image/heif" || /\.hei[cf]$/i.test(f.name);
-      if (isHeic) {
+      if (isHeicFile(f)) {
         try {
-          const blob = await heic2any({ blob: f, toType: "image/jpeg", quality: 0.85 });
-          const b = Array.isArray(blob) ? blob[0] : blob;
-          converted.push(new File([b], f.name.replace(/\.hei[cf]$/i, ".jpg"), { type: "image/jpeg" }));
+          converted.push(await prepareImageFileForUpload(f));
         } catch {
           toast({ title: `HEIC conversie mislukt voor ${f.name}`, variant: "destructive" });
         }
@@ -145,67 +170,103 @@ export default function AdminColors() {
     e.target.value = "";
   };
 
-  const uploadPhotos = async (): Promise<string[]> => {
+  const uploadPhotos = async (uploadedPaths: string[]): Promise<string[]> => {
     const paths: string[] = [...existingPhotos];
     for (const file of newPhotoFiles) {
-      const path = `colors/${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from("orders").upload(path, file, { upsert: true });
-      if (!error) paths.push(path);
+      const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+      const path = `colors/${crypto.randomUUID()}-${safeName}`;
+      const { error } = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
+      if (error) throw new Error(`Upload van ${file.name} mislukt: ${error.message}`);
+      uploadedPaths.push(path);
+      paths.push(path);
     }
     return paths;
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast({ title: "Vul een naam in", variant: "destructive" }); return; }
+    if (!/^#[0-9a-f]{6}$/i.test(form.hex.trim())) {
+      toast({ title: "Ongeldige kleurcode", description: "Gebruik een hexcode zoals #1A2B3C.", variant: "destructive" });
+      return;
+    }
+    const duplicate = colors.some((color) => color.id !== editing?.id
+      && color.name.trim().toLowerCase() === form.name.trim().toLowerCase()
+      && normalizeMaterialId(color.material) === normalizeMaterialId(form.material));
+    if (duplicate) {
+      toast({ title: "Deze kleur bestaat al", description: `Er is al een kleur met deze naam voor ${form.material}.`, variant: "destructive" });
+      return;
+    }
     setSaving(true);
+    const uploadedPaths: string[] = [];
+    let photosCommitted = false;
     try {
-      const photos = await uploadPhotos();
-      const payload = { ...form, name: form.name.trim(), photos };
+      const photos = await uploadPhotos(uploadedPaths);
+      const payload = { ...form, name: form.name.trim(), description: form.description.trim(), hex: form.hex.toUpperCase(), photos };
 
       let colorId = editing?.id;
       if (editing) {
-        await supabase.from("filament_colors").update(payload).eq("id", editing.id);
+        const { error } = await supabase.from("filament_colors").update(payload).eq("id", editing.id);
+        if (error) throw error;
       } else {
         const { data, error } = await supabase.from("filament_colors").insert(payload).select().single();
         if (error) throw error;
-        colorId = (data as any).id;
+        colorId = data.id;
       }
+      photosCommitted = true;
 
       if (colorId) {
-        // Sync availability rows for products with this material
-        const productIds = relevantProducts.map((p) => p.id);
-        // Remove availability for products no longer relevant (material changed)
-        await supabase
-          .from("product_color_availability")
-          .delete()
-          .eq("color_id", colorId)
-          .not("product_id", "in", `(${productIds.length ? productIds.map((i) => `"${i}"`).join(",") : '""'})`);
-
-        for (const p of relevantProducts) {
-          const available = productAvail[p.id] ?? true;
-          await supabase
-            .from("product_color_availability")
-            .upsert(
-              { product_id: p.id, color_id: colorId, available },
-              { onConflict: "product_id,color_id" }
-            );
+        const { error: clearError } = await supabase.from("product_color_availability").delete().eq("color_id", colorId);
+        if (clearError) throw clearError;
+        if (relevantProducts.length) {
+          const { error: availabilityError } = await supabase.from("product_color_availability").insert(
+            relevantProducts.map((product) => ({
+              product_id: product.id,
+              color_id: colorId!,
+              available: productAvail[product.id] ?? !editing,
+            })),
+          );
+          if (availabilityError) throw availabilityError;
+          const { error: configuredError } = await supabase
+            .from("products")
+            .update({ colors_configured: true })
+            .in("id", relevantProducts.map((product) => product.id));
+          if (configuredError) throw configuredError;
         }
+      }
+
+      const managedRemovedPaths = removedPhotoPaths.map(normalizeProductStoragePath).filter(Boolean) as string[];
+      if (managedRemovedPaths.length) {
+        const { error } = await supabase.storage.from("orders").remove(managedRemovedPaths);
+        if (error) throw new Error(`Kleur opgeslagen, maar oude foto's verwijderen mislukte: ${error.message}`);
       }
 
       toast({ title: editing ? "Kleur bijgewerkt ✅" : "Kleur toegevoegd ✅" });
       cancel();
       fetchAll();
-    } catch (e: any) {
-      toast({ title: "Fout", description: e.message, variant: "destructive" });
+    } catch (error: unknown) {
+      if (uploadedPaths.length && !photosCommitted) {
+        await supabase.storage.from("orders").remove(uploadedPaths);
+      }
+      toast({ title: "Fout", description: error instanceof Error ? error.message : "Onbekende databasefout.", variant: "destructive" });
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Kleur verwijderen?")) return;
-    await supabase.from("filament_colors").delete().eq("id", id);
-    toast({ title: "Verwijderd" });
+    const color = colors.find((item) => item.id === id);
+    const { error } = await supabase.from("filament_colors").delete().eq("id", id);
+    if (error) { toast({ title: "Verwijderen mislukt", description: error.message, variant: "destructive" }); return; }
+    const managedPhotoPaths = (color?.photos || []).map(normalizeProductStoragePath).filter(Boolean) as string[];
+    if (managedPhotoPaths.length) {
+      const { error: storageError } = await supabase.storage.from("orders").remove(managedPhotoPaths);
+      if (storageError) toast({ title: "Kleur verwijderd", description: "Enkele foto's konden niet uit storage worden verwijderd.", variant: "destructive" });
+      else toast({ title: "Kleur en foto's verwijderd" });
+    } else toast({ title: "Kleur verwijderd" });
     fetchAll();
   };
+
+  if (authLoading) return (
+    <div className="min-h-screen"><Navbar /><main className="pt-24 pb-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></main><Footer /></div>
+  );
 
   if (!isAdmin) return (
     <div className="min-h-screen"><Navbar /><main className="pt-24 pb-16 flex items-center justify-center"><p>Geen toegang.</p></main><Footer /></div>
@@ -265,7 +326,10 @@ export default function AdminColors() {
                 </div>
                 <div className="md:col-span-2 flex items-center gap-3">
                   <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
-                  <Label>Actief (zichtbaar op de website)</Label>
+                  <div>
+                    <Label>{form.active ? "Beschikbaar" : "Tijdelijk onbeschikbaar"}</Label>
+                    <p className="text-xs text-muted-foreground">Onbeschikbare kleuren blijven bewaard, maar verdwijnen uit alle bestelkeuzes.</p>
+                  </div>
                 </div>
               </div>
 
@@ -278,7 +342,10 @@ export default function AdminColors() {
                       <SignedImg path={p} className="w-full h-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => setExistingPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                        onClick={() => {
+                          setExistingPhotos((prev) => prev.filter((_, idx) => idx !== i));
+                          setRemovedPhotoPaths((prev) => [...new Set([...prev, p])]);
+                        }}
                         className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1"
                       >
                         <X className="w-3 h-3" />
@@ -315,10 +382,10 @@ export default function AdminColors() {
                 ) : (
                   <div className="space-y-2">
                     {relevantProducts.map((p) => {
-                      const val = productAvail[p.id] ?? true;
+                      const val = productAvail[p.id] ?? !editing;
                       return (
                         <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50">
-                          <span className="text-sm font-medium">{p.name}</span>
+                          <span className="text-sm font-medium">{p.name}{!p.active ? " (verborgen)" : ""}</span>
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={val}
@@ -368,12 +435,20 @@ export default function AdminColors() {
                       <span className="w-4 h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: c.hex }} />
                       <span className="font-semibold text-primary truncate">{c.name}</span>
                       <span className="text-xs bg-muted px-2 py-0.5 rounded">{c.material}</span>
-                      {!c.active && <span className="text-xs bg-muted px-2 py-0.5 rounded">Verborgen</span>}
+                      {!c.active && <span className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-2 py-0.5 rounded">Tijdelijk onbeschikbaar</span>}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">{c.photos.length} foto('s)</div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Switch
+                        checked={c.active}
+                        onCheckedChange={(active) => void setTemporaryAvailability(c, active)}
+                        aria-label={`${c.name} beschikbaarheid`}
+                      />
+                      <span className="text-xs">{c.active ? "Beschikbaar" : "Tijdelijk onbeschikbaar"}</span>
+                    </div>
                     <div className="flex gap-1 mt-2">
                       <Button variant="outline" size="sm" onClick={() => openEdit(c)}>Bewerken</Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(c.id)}>
+                      <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(c)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -385,6 +460,18 @@ export default function AdminColors() {
         </div>
       </main>
       <Footer />
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Kleur verwijderen?"
+        description={`“${deleteTarget?.name || "Deze kleur"}” en de bijbehorende foto's worden definitief verwijderd.`}
+        confirmLabel="Verwijderen"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

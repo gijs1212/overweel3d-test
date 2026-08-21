@@ -14,25 +14,24 @@ import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
+import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 import { ProductTile } from "@/components/ProductTile";
-import { ProductDetailDialog } from "@/components/ProductDetailDialog";
+import { PrebuiltOptions, ProductDetailDialog } from "@/components/ProductDetailDialog";
 import { OrderAuthGate } from "@/components/OrderAuthGate";
 import { ModelViewer } from "@/components/ModelViewer";
+import {
+  availableFilamentColorsForMaterial,
+  CatalogOrderItem,
+  CatalogProduct,
+  FilamentColor,
+  ProductOptionAnswer,
+} from "@/lib/productCatalog";
+import { createOrderConfirmationRequest } from "@/lib/orderConfirmation";
 
-interface ProductItem {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  materials: string[];
-  colors: string[];
-  photos: string[];
-  custom_text_enabled: boolean;
-  custom_text_label: string;
-  custom_text_max_length: number;
-}
+type ProductItem = CatalogProduct;
 
 type FileLine = {
   kind: "file";
@@ -61,12 +60,15 @@ type PrebuiltLine = {
   id: string;
   productId: string;
   name: string;
+  materialId: string;
   material: string;
   color: string;
+  colors: Array<{ id: string; name: string; hex: string }>;
   quantity: number;
   price: number; // total for this line
   unitPrice: number;
-  customText?: string;
+  optionAnswers: ProductOptionAnswer[];
+  optionFiles: Array<{ optionId: string; label: string; files: File[] }>;
 };
 
 type CustomLine = {
@@ -87,6 +89,7 @@ export default function NewOrder() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [products, setProducts] = useState<ProductItem[]>([]);
+  const [catalogColors, setCatalogColors] = useState<FilamentColor[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [activeTab, setActiveTab] = useState<"link" | "file" | "prebuilt" | "custom">("link");
 
@@ -141,13 +144,29 @@ export default function NewOrder() {
   }, [profile]);
 
   useEffect(() => {
-    supabase.from("products").select("*").eq("active", true).then(({ data }) => {
-      setProducts((data as ProductItem[]) || []);
+    Promise.all([
+      supabase.from("products").select("*, product_categories(*), product_images(*), product_options(*)").eq("active", true),
+      supabase.from("filament_colors").select("*").eq("active", true).order("material").order("sort_order"),
+      supabase.from("product_color_availability").select("product_id,color_id,available"),
+    ]).then(([productResult, colorResult, availabilityResult]) => {
+      const availability = availabilityResult.data || [];
+      setProducts(((productResult.data || []) as unknown as ProductItem[]).map((product) => {
+        const productAvailability = availability.filter((row) => row.product_id === product.id);
+        return {
+          ...product,
+          product_images: [...(product.product_images || [])].sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order),
+          product_options: [...(product.product_options || [])].sort((a, b) => a.sort_order - b.sort_order),
+          colors: productAvailability.length ? productAvailability.filter((row) => row.available).map((row) => row.color_id) : product.colors,
+        };
+      }));
+      setCatalogColors((colorResult.data || []) as unknown as FilamentColor[]);
+      const error = productResult.error || colorResult.error || availabilityResult.error;
+      if (error) toast({ title: "Productcatalogus laden mislukt", description: error.message, variant: "destructive" });
     });
-  }, []);
+  }, [toast]);
 
   const getColorsForMaterial = (materialId: string) =>
-    MATERIALS.find((m) => m.id === materialId)?.colors || [];
+    availableFilamentColorsForMaterial(catalogColors, materialId);
 
   const MULTICOLOR_ID = "multicolor";
   const MULTICOLOR_LABEL = "Multicolor (meerdere kleuren)";
@@ -209,10 +228,10 @@ export default function NewOrder() {
     e.target.value = "";
   };
 
-  const updateDraftFile = (id: string, field: keyof FileLine, value: any) => {
+  const updateDraftFile = <K extends keyof FileLine>(id: string, field: K, value: FileLine[K]) => {
     setDraftFiles((prev) => prev.map((d) => {
       if (d.id !== id) return d;
-      const next: any = { ...d, [field]: value };
+      const next = { ...d, [field]: value } as FileLine;
       if (field === "material") next.color = "";
       return next;
     }));
@@ -244,20 +263,28 @@ export default function NewOrder() {
   };
 
   // ===== Prebuilt =====
-  const addPrebuiltToCart = (product: ProductItem, material: string, color: string, quantity: number, customText?: string) => {
+  const addPrebuiltToCart = (product: ProductItem, options: PrebuiltOptions) => {
+    const color = options.colors.length ? options.colors.map((item) => item.name).join(" + ") : "Geen kleurkeuze";
     setCart((c) => [...c, {
       kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
-      material, color, quantity, unitPrice: product.price, price: product.price * quantity, customText,
+      materialId: options.materialId, material: options.material, color, colors: options.colors,
+      quantity: options.quantity, unitPrice: product.price, price: product.price * options.quantity,
+      optionAnswers: options.optionAnswers, optionFiles: options.optionFiles,
     }]);
     toast({ title: `${product.name} toegevoegd` });
     setSelectedProduct(null);
   };
 
   // ===== Custom draft =====
-  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
-    setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...files].slice(0, 5) }));
+  const handleCustomPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const incoming = Array.from(e.target.files || []).filter((file) => file.type.startsWith("image/") || isHeicFile(file));
     e.target.value = "";
+    try {
+      const files = await Promise.all(incoming.map((file) => prepareImageFileForUpload(file)));
+      setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...files].slice(0, 5) }));
+    } catch (error) {
+      toast({ title: "HEIC-conversie mislukt", description: error instanceof Error ? error.message : "Onbekende fout", variant: "destructive" });
+    }
   };
 
   const addCustomToCart = () => {
@@ -298,12 +325,13 @@ export default function NewOrder() {
     if (!discountCode.trim()) return;
     setCheckingDiscount(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("discount_codes")
         .select("*")
         .eq("code", discountCode.toUpperCase().trim())
         .eq("active", true)
         .maybeSingle();
+      if (error) throw error;
       if (!data) { toast({ title: "Ongeldige kortingscode", variant: "destructive" }); return; }
       if (data.expires_at && new Date(data.expires_at) < new Date()) { toast({ title: "Kortingscode is verlopen", variant: "destructive" }); return; }
       if (data.max_uses !== null && data.times_used >= data.max_uses) { toast({ title: "Kortingscode al maximaal gebruikt", variant: "destructive" }); return; }
@@ -325,6 +353,8 @@ export default function NewOrder() {
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setIsSubmitting(true);
+    const stagedStoragePaths: string[] = [];
+    let orderCreated = false;
     try {
       const { data: orderNumData, error: orderNumError } = await supabase.rpc("generate_order_number");
       if (orderNumError) throw orderNumError;
@@ -341,11 +371,51 @@ export default function NewOrder() {
       for (const cl of customLines) {
         const urls: string[] = [];
         for (const photo of cl.photos) {
-          const storagePath = `custom-orders/${orderNumber}/${cl.id}-${photo.name}`;
-          const { error } = await supabase.storage.from("orders").upload(storagePath, photo, { upsert: true });
-          if (!error) urls.push(storagePath);
+          const safeName = photo.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+          const storagePath = `custom-orders/${orderNumber}/${cl.id}-${crypto.randomUUID()}-${safeName}`;
+          const uploaded = await uploadFileWithHeicConversion("orders", storagePath, photo, { upsert: false });
+          const { error } = uploaded;
+          if (error) throw new Error(`Upload van ${photo.name} mislukt: ${error.message}`);
+          urls.push(uploaded.path);
+          stagedStoragePaths.push(uploaded.path);
         }
         customSections.push(`CUSTOM OPDRACHT\nBeschrijving: ${cl.description}${urls.length ? `\nFoto's: ${urls.join(", ")}` : ""}`);
+      }
+
+      // Persist a complete snapshot of configured ready-made products and answers.
+      // Photo answers are uploaded first and their storage paths become part of the order snapshot.
+      const catalogItems: CatalogOrderItem[] = [];
+      for (const line of prebuiltLines) {
+        const answers: ProductOptionAnswer[] = line.optionAnswers.map((answer) => ({ ...answer }));
+        for (const upload of line.optionFiles) {
+          const storagePaths: string[] = [];
+          for (const file of upload.files) {
+            const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+            const storagePath = `custom-orders/${orderNumber}/products/${line.id}/${crypto.randomUUID()}-${safeName}`;
+            const uploaded = await uploadFileWithHeicConversion("orders", storagePath, file, { upsert: false });
+            const { error } = uploaded;
+            if (error) throw new Error(`Upload bij “${upload.label}” mislukt: ${error.message}`);
+            storagePaths.push(uploaded.path);
+            stagedStoragePaths.push(uploaded.path);
+          }
+          answers.push({
+            optionId: upload.optionId,
+            label: upload.label,
+            type: "photo",
+            value: `${storagePaths.length} foto${storagePaths.length === 1 ? "" : "'s"}`,
+            files: storagePaths,
+          });
+        }
+        catalogItems.push({
+          productId: line.productId,
+          productName: line.name,
+          material: line.material,
+          colors: line.colors,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          totalPrice: line.price,
+          answers,
+        });
       }
 
       const sections: string[] = [];
@@ -358,7 +428,7 @@ export default function NewOrder() {
       }
       if (prebuiltLines.length) {
         sections.push("KANT-EN-KLARE ARTIKELEN:\n" + prebuiltLines.map((p) =>
-          `- ${p.name} x${p.quantity} – ${p.material} ${p.color}${p.customText ? ` ("${p.customText}")` : ""} – €${p.price.toFixed(2)}`
+          `- ${p.name} x${p.quantity} – ${p.material} ${p.color} – €${p.price.toFixed(2)}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${String(answer.value)}`).join(" · ")}` : ""}`
         ).join("\n"));
       }
       if (customSections.length) sections.push(customSections.join("\n\n"));
@@ -375,52 +445,76 @@ export default function NewOrder() {
         if (l.kind === "prebuilt") return l.color;
         return "—";
       }).filter(Boolean).join(", ");
-      const totalQuantity = cart.reduce((s, l) => s + ((l as any).quantity || 1), 0);
+      const totalQuantity = cart.reduce((sum, line) => sum + (line.kind === "custom" ? 1 : line.quantity), 0);
 
       const orderMethod = cart.length === 1 ? cart[0].kind : "mixed";
 
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          order_number: orderNumber,
-          user_id: user?.id || null,
-          customer_email: formData.email,
-          customer_name: formData.name,
-          phone: formData.phone,
-          company_name: formData.company_name,
-          billing_address: formData.billing_address,
-          shipping_address: formData.shipping_address || formData.billing_address,
-          postal_code: formData.postal_code,
-          city: formData.city,
-          country: formData.country,
-          material: materialNames || "—",
-          color: colorNames || "—",
-          quantity: totalQuantity,
-          notes: formData.notes,
-          print_preferences: formData.print_preferences,
-          instant_quote_price: estimatedTotal,
-          file_links: sections.join("\n\n"),
-          order_method: orderMethod,
-          status: "submitted",
-        })
-        .select()
-        .single();
+      const orderPayload = {
+        order_number: orderNumber,
+        user_id: user?.id || null,
+        customer_email: formData.email,
+        customer_name: formData.name,
+        phone: formData.phone,
+        company_name: formData.company_name,
+        billing_address: formData.billing_address,
+        shipping_address: formData.shipping_address || formData.billing_address,
+        postal_code: formData.postal_code,
+        city: formData.city,
+        country: formData.country,
+        material: materialNames || "—",
+        color: colorNames || "—",
+        quantity: totalQuantity,
+        notes: formData.notes,
+        print_preferences: formData.print_preferences,
+        instant_quote_price: estimatedTotal,
+        file_links: sections.join("\n\n"),
+        catalog_items: catalogItems,
+        order_method: orderMethod,
+        status: "submitted" as const,
+      };
 
-      if (orderError) throw orderError;
+      let order: { id: string; customer_order_token: string };
+      if (user) {
+        const { data, error } = await supabase
+          .from("orders")
+          .insert(orderPayload)
+          .select("id, customer_order_token")
+          .single();
+        if (error) throw error;
+        order = data;
+      } else {
+        // Guest RETURNING previously depended on an unsafe anon SELECT policy.
+        // The SECURITY DEFINER RPC accepts a strict allow-list and returns only
+        // the id plus high-entropy customer token.
+        const { data, error } = await supabase.rpc("create_guest_order", {
+          p_order: orderPayload as unknown as Json,
+        });
+        if (error) throw error;
+        const guestOrder = data?.[0];
+        if (!guestOrder) throw new Error("De bestelling kon niet worden aangemaakt.");
+        order = guestOrder;
+      }
+      orderCreated = true;
 
       // Upload file lines
       const failedFiles: string[] = [];
       for (const fl of fileLines) {
-        const storagePath = `${orderNumber}/files/${fl.file.name}`;
-        const { error: upErr } = await supabase.storage.from("orders").upload(storagePath, fl.file, { upsert: true });
+        const safeName = fl.file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+        const storagePath = `${orderNumber}/files/${crypto.randomUUID()}-${safeName}`;
+        const uploaded = await uploadFileWithHeicConversion("orders", storagePath, fl.file, { upsert: false });
+        const { error: upErr } = uploaded;
         if (upErr) { failedFiles.push(fl.file.name); continue; }
-        await supabase.from("order_files").insert({
+        const { error: fileRowError } = await supabase.from("order_files").insert({
           order_id: order.id,
-          storage_path: storagePath,
-          original_filename: fl.file.name,
-          file_size: fl.file.size,
-          mime_type: fl.file.type || "application/octet-stream",
+          storage_path: uploaded.path,
+          original_filename: uploaded.file.name,
+          file_size: uploaded.file.size,
+          mime_type: uploaded.file.type || "application/octet-stream",
         });
+        if (fileRowError) {
+          await supabase.storage.from("orders").remove([uploaded.path]);
+          failedFiles.push(fl.file.name);
+        }
       }
       if (failedFiles.length) {
         toast({
@@ -431,21 +525,30 @@ export default function NewOrder() {
       }
 
       if (discountApplied) {
-        try { await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code }); } catch {}
+        const { error: usageError } = await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code });
+        if (usageError) console.error("Kortingsgebruik bijwerken mislukt:", usageError.message);
         try {
-          await supabase.functions.invoke("process-referral-reward", {
+          const { error: referralError } = await supabase.functions.invoke("process-referral-reward", {
             body: { order_id: order.id, discount_code: discountApplied.code },
           });
-        } catch {}
+          if (referralError) console.error("Referralverwerking mislukt:", referralError.message);
+        } catch { /* Referral processing is best-effort after order creation. */ }
+      }
+      const { data: confirmationData, error: confirmationError } = await supabase.functions.invoke("send-order-email", {
+        body: createOrderConfirmationRequest(order),
+      });
+      if (confirmationError || !confirmationData?.success) {
+        toast({
+          title: "Bestelling geplaatst, e-mail niet verzonden",
+          description: confirmationError?.message || confirmationData?.error || "Neem contact op als u geen bevestiging ontvangt.",
+          variant: "destructive",
+        });
       }
 
-      await supabase.functions.invoke("send-order-email", {
-        body: { type: "order_confirmation", orderId: order.id },
-      });
-
       navigate(`/order/${order.customer_order_token}?success=true`);
-    } catch (error: any) {
-      toast({ title: "Er ging iets mis", description: error.message || "Probeer het opnieuw.", variant: "destructive" });
+    } catch (error: unknown) {
+      if (!orderCreated && stagedStoragePaths.length) await supabase.storage.from("orders").remove(stagedStoragePaths);
+      toast({ title: "Er ging iets mis", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -518,7 +621,7 @@ export default function NewOrder() {
                         <p className="text-sm text-muted-foreground mb-4">
                           U kunt items uit verschillende categorieën combineren in één winkelmandje.
                         </p>
-                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
                           <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full h-auto">
                             <TabsTrigger value="link"><Link2 className="w-4 h-4 mr-1" /> Link</TabsTrigger>
                             <TabsTrigger value="file"><Upload className="w-4 h-4 mr-1" /> Bestand</TabsTrigger>
@@ -656,6 +759,7 @@ export default function NewOrder() {
                             )}
                             <ProductDetailDialog
                               product={selectedProduct}
+                              colors={catalogColors}
                               open={!!selectedProduct}
                               onOpenChange={(o) => !o && setSelectedProduct(null)}
                               onAdd={addPrebuiltToCart}
@@ -685,7 +789,7 @@ export default function NewOrder() {
                                   <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
                                     <Camera className="w-5 h-5 text-muted-foreground" />
                                     <span className="text-[10px] text-muted-foreground mt-1">Foto</span>
-                                    <input type="file" accept="image/*" onChange={handleCustomPhotoUpload} className="hidden" multiple />
+                                    <input type="file" accept="image/*,.heic,.heif" onChange={handleCustomPhotoUpload} className="hidden" multiple />
                                   </label>
                                 </div>
                               </div>
@@ -831,6 +935,16 @@ export default function NewOrder() {
                                   {line.kind === "prebuilt" && `${(line as PrebuiltLine).quantity}× · ${(line as PrebuiltLine).material} ${(line as PrebuiltLine).color}`}
                                   {line.kind === "custom" && `${(line as CustomLine).photos.length} foto('s)`}
                                 </p>
+                                {line.kind === "prebuilt" && (line.optionAnswers.length > 0 || line.optionFiles.length > 0) && (
+                                  <div className="mt-1 space-y-0.5">
+                                    {line.optionAnswers.map((answer) => (
+                                      <p key={answer.optionId} className="text-[11px] text-muted-foreground truncate">{answer.label}: {typeof answer.value === "boolean" ? (answer.value ? "Ja" : "Nee") : answer.value}</p>
+                                    ))}
+                                    {line.optionFiles.map((upload) => (
+                                      <p key={upload.optionId} className="text-[11px] text-muted-foreground">{upload.label}: {upload.files.length} foto{upload.files.length === 1 ? "" : "'s"}</p>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 <span className="text-sm font-semibold text-accent">{cartLinePrice(line)}</span>

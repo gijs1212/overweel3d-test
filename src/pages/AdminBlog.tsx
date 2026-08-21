@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Loader2, Sparkles, Save, Eye, Trash2, ArrowLeft, Edit, Upload } from "l
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 interface BlogPost {
   id: string;
@@ -21,9 +23,27 @@ interface BlogPost {
   tags: string[];
 }
 
+interface EditableBlogPost extends BlogPost {
+  content: string;
+  meta_description: string;
+}
+
+interface ImportedBlogPost {
+  title?: string;
+  slug?: string;
+  excerpt?: string;
+  meta_description?: string;
+  content?: string;
+  tags?: string[] | string;
+  status?: string;
+}
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Onbekende fout";
+
 export default function AdminBlog() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -31,22 +51,36 @@ export default function AdminBlog() {
   const [showImport, setShowImport] = useState(false);
   const [topic, setTopic] = useState("");
   const [keywords, setKeywords] = useState("");
-  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [editingPost, setEditingPost] = useState<EditableBlogPost | null>(null);
   const [saving, setSaving] = useState(false);
   const [importData, setImportData] = useState({ title: "", slug: "", excerpt: "", meta_description: "", content: "", tags: "" });
   const [importing, setImporting] = useState(false);
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [postActionId, setPostActionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchPosts = async () => {
-    const { data } = await supabase
+  const fetchPosts = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
       .from("blog_posts")
       .select("id, title, slug, excerpt, status, published_at, created_at, tags")
       .order("created_at", { ascending: false });
-    setPosts((data as BlogPost[]) || []);
+    if (error) {
+      toast({ title: "Blog laden mislukt", description: error.message, variant: "destructive" });
+    } else {
+      setPosts((data as BlogPost[]) || []);
+    }
     setLoading(false);
-  };
+  }, [toast]);
 
-  useEffect(() => { fetchPosts(); }, []);
+  useEffect(() => {
+    if (!authLoading && isAdmin) void fetchPosts();
+    if (!authLoading && !isAdmin) setLoading(false);
+  }, [authLoading, fetchPosts, isAdmin]);
+
+  if (authLoading) {
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><Loader2 aria-label="Toegang controleren" className="w-8 h-8 animate-spin text-accent" /></main><Footer /></div>);
+  }
 
   if (!isAdmin) {
     return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><p className="text-muted-foreground">Geen toegang.</p></main><Footer /></div>);
@@ -62,7 +96,7 @@ export default function AdminBlog() {
       toast({ title: "Artikel gegenereerd! 🎉" });
       setTopic(""); setKeywords(""); setShowGenerator(false);
       fetchPosts();
-    } catch (error: any) { toast({ title: "Genereren mislukt", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Genereren mislukt", description: getErrorMessage(error), variant: "destructive" }); }
     finally { setGenerating(false); }
   };
 
@@ -85,7 +119,7 @@ export default function AdminBlog() {
       setImportData({ title: "", slug: "", excerpt: "", meta_description: "", content: "", tags: "" });
       setShowImport(false);
       fetchPosts();
-    } catch (error: any) { toast({ title: "Import mislukt", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Import mislukt", description: getErrorMessage(error), variant: "destructive" }); }
     finally { setImporting(false); }
   };
 
@@ -97,7 +131,7 @@ export default function AdminBlog() {
       const text = event.target?.result as string;
       try {
         // Try JSON import
-        const json = JSON.parse(text);
+        const json = JSON.parse(text) as ImportedBlogPost | ImportedBlogPost[];
         if (Array.isArray(json)) {
           // Bulk import
           handleBulkImport(json);
@@ -131,7 +165,7 @@ export default function AdminBlog() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleBulkImport = async (articles: any[]) => {
+  const handleBulkImport = async (articles: ImportedBlogPost[]) => {
     let success = 0;
     for (const article of articles) {
       const slug = article.slug || article.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `post-${Date.now()}`;
@@ -152,24 +186,33 @@ export default function AdminBlog() {
   };
 
   const handlePublish = async (postId: string) => {
-    await supabase.from("blog_posts").update({ status: "published", published_at: new Date().toISOString() }).eq("id", postId);
-    toast({ title: "Gepubliceerd! ✅" }); fetchPosts();
+    setPostActionId(postId);
+    const { error } = await supabase.from("blog_posts").update({ status: "published", published_at: new Date().toISOString() }).eq("id", postId);
+    if (error) toast({ title: "Publiceren mislukt", description: error.message, variant: "destructive" });
+    else { toast({ title: "Gepubliceerd! ✅" }); await fetchPosts(); }
+    setPostActionId(null);
   };
 
   const handleUnpublish = async (postId: string) => {
-    await supabase.from("blog_posts").update({ status: "draft" }).eq("id", postId);
-    toast({ title: "Teruggetrokken" }); fetchPosts();
+    setPostActionId(postId);
+    const { error } = await supabase.from("blog_posts").update({ status: "draft" }).eq("id", postId);
+    if (error) toast({ title: "Terugtrekken mislukt", description: error.message, variant: "destructive" });
+    else { toast({ title: "Artikel teruggetrokken" }); await fetchPosts(); }
+    setPostActionId(null);
   };
 
-  const handleDelete = async (postId: string) => {
-    if (!confirm("Artikel verwijderen?")) return;
-    await supabase.from("blog_posts").delete().eq("id", postId);
-    toast({ title: "Verwijderd" }); fetchPosts();
+  const handleDelete = async () => {
+    if (!deletePostId) return;
+    const { error } = await supabase.from("blog_posts").delete().eq("id", deletePostId);
+    if (error) toast({ title: "Verwijderen mislukt", description: error.message, variant: "destructive" });
+    else { toast({ title: "Artikel verwijderd" }); await fetchPosts(); }
+    setDeletePostId(null);
   };
 
   const openEdit = async (postId: string) => {
-    const { data } = await supabase.from("blog_posts").select("*").eq("id", postId).single();
+    const { data, error } = await supabase.from("blog_posts").select("*").eq("id", postId).single();
     if (data) setEditingPost(data);
+    else toast({ title: "Artikel laden mislukt", description: error?.message, variant: "destructive" });
   };
 
   const saveEdit = async () => {
@@ -195,7 +238,7 @@ export default function AdminBlog() {
             <div><Label>Slug</Label><Input value={editingPost.slug} onChange={(e) => setEditingPost({ ...editingPost, slug: e.target.value })} /></div>
             <div><Label>Excerpt</Label><Textarea value={editingPost.excerpt} onChange={(e) => setEditingPost({ ...editingPost, excerpt: e.target.value })} rows={2} /></div>
             <div><Label>Meta description</Label><Textarea value={editingPost.meta_description} onChange={(e) => setEditingPost({ ...editingPost, meta_description: e.target.value })} rows={2} /></div>
-            <div><Label>Tags (komma-gescheiden)</Label><Input value={editingPost.tags?.join(", ") || ""} onChange={(e) => setEditingPost({ ...editingPost, tags: e.target.value.split(",").map((t: string) => t.trim()).filter(Boolean) })} /></div>
+            <div><Label>Tags (komma-gescheiden)</Label><Input value={editingPost.tags?.join(", ") || ""} onChange={(e) => setEditingPost({ ...editingPost, tags: e.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} /></div>
             <div><Label>Content (Markdown)</Label><Textarea value={editingPost.content} onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })} rows={20} className="font-mono text-sm" /></div>
             <Button onClick={saveEdit} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Opslaan</Button>
           </div>
@@ -209,7 +252,7 @@ export default function AdminBlog() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="w-4 h-4" /> Terug</Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}><ArrowLeft className="w-4 h-4" /> Terug</Button>
             <h1 className="text-2xl font-bold text-primary">Blog beheer</h1>
           </div>
           <div className="flex gap-2">
@@ -271,18 +314,31 @@ export default function AdminBlog() {
                   <p className="text-sm text-muted-foreground truncate">{post.excerpt}</p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(post.id)}><Edit className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(post.id)} disabled={postActionId === post.id}><Edit className="w-4 h-4" /></Button>
                   {post.status === "draft" ? (
-                    <Button variant="ghost" size="sm" onClick={() => handlePublish(post.id)} className="text-green-600"><Eye className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => handlePublish(post.id)} disabled={postActionId === post.id} className="text-green-600">
+                      {postActionId === post.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                    </Button>
                   ) : (
-                    <Button variant="ghost" size="sm" onClick={() => handleUnpublish(post.id)} className="text-yellow-600"><Eye className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleUnpublish(post.id)} disabled={postActionId === post.id} className="text-yellow-600">
+                      {postActionId === post.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                    </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(post.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => setDeletePostId(post.id)} disabled={postActionId === post.id}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                 </div>
               </div>
             ))}
           </div>
         )}
+        <ConfirmActionDialog
+          open={deletePostId !== null}
+          onOpenChange={(open) => !open && setDeletePostId(null)}
+          title="Artikel verwijderen?"
+          description="Dit artikel wordt definitief uit het blog verwijderd. Deze actie kan niet ongedaan worden gemaakt."
+          confirmLabel="Artikel verwijderen"
+          destructive
+          onConfirm={handleDelete}
+        />
       </div>
     </main><Footer /></div>
   );

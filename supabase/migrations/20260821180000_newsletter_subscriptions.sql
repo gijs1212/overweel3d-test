@@ -14,10 +14,12 @@ CREATE TABLE IF NOT EXISTS public.newsletter_subscriptions (
     CHECK (char_length(email) BETWEEN 3 AND 254),
   CONSTRAINT newsletter_subscriptions_source_length
     CHECK (char_length(source) BETWEEN 1 AND 50),
+  CONSTRAINT newsletter_subscriptions_source_allowed
+    CHECK (source IN ('popup', 'footer', 'website')),
   CONSTRAINT newsletter_subscriptions_unsubscribe_state
     CHECK (
       (active AND unsubscribed_at IS NULL)
-      OR (NOT active)
+      OR (NOT active AND unsubscribed_at IS NOT NULL)
     )
 );
 
@@ -76,13 +78,17 @@ SET search_path = ''
 AS $$
 DECLARE
   normalized_email text := lower(btrim(_email));
-  normalized_source text := left(coalesce(nullif(btrim(_source), ''), 'website'), 50);
+  normalized_source text := lower(coalesce(nullif(btrim(_source), ''), 'website'));
 BEGIN
   IF normalized_email IS NULL
     OR char_length(normalized_email) NOT BETWEEN 3 AND 254
     OR normalized_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
   THEN
     RAISE EXCEPTION 'Ongeldig e-mailadres' USING ERRCODE = '22023';
+  END IF;
+
+  IF normalized_source NOT IN ('popup', 'footer', 'website') THEN
+    normalized_source := 'website';
   END IF;
 
   INSERT INTO public.newsletter_subscriptions (
@@ -124,8 +130,36 @@ DO $$
 BEGIN
   IF to_regclass('public.newsletter_subscribers') IS NOT NULL THEN
     EXECUTE $copy$
-      INSERT INTO public.newsletter_subscriptions (
-        id,
+      WITH normalized AS (
+        SELECT
+          lower(btrim(email)) AS normalized_email,
+          CASE lower(btrim(source))
+            WHEN 'popup' THEN 'popup'
+            WHEN 'footer' THEN 'footer'
+            WHEN 'website' THEN 'website'
+            ELSE 'website'
+          END AS normalized_source,
+          active,
+          created_at,
+          updated_at
+        FROM public.newsletter_subscribers
+        WHERE email IS NOT NULL
+          AND char_length(lower(btrim(email))) BETWEEN 3 AND 254
+          AND lower(btrim(email)) ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+      ),
+      aggregated AS (
+        SELECT
+          normalized_email,
+          (array_agg(normalized_source ORDER BY active DESC, created_at ASC, normalized_source ASC))[1]
+            AS normalized_source,
+          bool_or(active) AS active,
+          coalesce(min(created_at) FILTER (WHERE active), min(created_at)) AS subscribed_at,
+          min(created_at) AS created_at,
+          max(updated_at) AS updated_at
+        FROM normalized
+        GROUP BY normalized_email
+      )
+      INSERT INTO public.newsletter_subscriptions AS destination (
         email,
         source,
         active,
@@ -135,20 +169,39 @@ BEGIN
         updated_at
       )
       SELECT
-        id,
-        lower(btrim(email)),
-        left(coalesce(nullif(btrim(source), ''), 'website'), 50),
+        normalized_email,
+        normalized_source,
         active,
-        created_at,
+        subscribed_at,
         CASE WHEN active THEN NULL ELSE updated_at END,
         created_at,
         updated_at
-      FROM public.newsletter_subscribers
-      WHERE email IS NOT NULL
-        AND char_length(lower(btrim(email))) BETWEEN 3 AND 254
-        AND lower(btrim(email)) ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
-      ON CONFLICT ((lower(email))) DO NOTHING
+      FROM aggregated
+      ON CONFLICT ((lower(email))) DO UPDATE
+      SET
+        active = destination.active OR EXCLUDED.active,
+        unsubscribed_at = CASE
+          WHEN destination.active OR EXCLUDED.active THEN NULL
+          ELSE greatest(destination.unsubscribed_at, EXCLUDED.unsubscribed_at)
+        END,
+        subscribed_at = CASE
+          WHEN destination.active AND EXCLUDED.active
+            THEN least(destination.subscribed_at, EXCLUDED.subscribed_at)
+          WHEN destination.active THEN destination.subscribed_at
+          WHEN EXCLUDED.active THEN EXCLUDED.subscribed_at
+          ELSE least(destination.subscribed_at, EXCLUDED.subscribed_at)
+        END,
+        source = CASE
+          WHEN destination.active THEN destination.source
+          WHEN EXCLUDED.active THEN EXCLUDED.source
+          ELSE destination.source
+        END,
+        created_at = least(destination.created_at, EXCLUDED.created_at)
     $copy$;
+
+    -- Stop new writes from drifting into the legacy table after the copy.
+    EXECUTE 'REVOKE INSERT ON TABLE public.newsletter_subscribers FROM anon, authenticated';
+    EXECUTE 'DROP POLICY IF EXISTS "Anyone can subscribe" ON public.newsletter_subscribers';
   END IF;
 END;
 $$;

@@ -13,8 +13,10 @@ export default function CookieBanner() {
     const choice = getCookieConsent();
     return { choice, isVisible: choice === null };
   });
+  const [storageError, setStorageError] = useState("");
   const titleId = useId();
   const descriptionId = useId();
+  const errorId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -23,6 +25,7 @@ export default function CookieBanner() {
   useEffect(() => {
     const showCookieSettings = () => {
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setStorageError("");
       setBannerState({ choice: getCookieConsent(), isVisible: true });
     };
 
@@ -41,7 +44,14 @@ export default function CookieBanner() {
   };
 
   const saveChoice = (nextChoice: CookieConsentChoice) => {
-    setCookieConsent(nextChoice);
+    if (!setCookieConsent(nextChoice)) {
+      setStorageError(
+        "Uw cookievoorkeur kon niet worden opgeslagen. Sta functionele cookies toe in uw browser en probeer opnieuw.",
+      );
+      return;
+    }
+
+    setStorageError("");
     closeBanner(nextChoice);
   };
 
@@ -50,7 +60,7 @@ export default function CookieBanner() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-[100] p-4 sm:p-6">
       <section
-        aria-describedby={descriptionId}
+        aria-describedby={`${descriptionId}${storageError ? ` ${errorId}` : ""}`}
         aria-labelledby={titleId}
         aria-modal="false"
         className="relative mx-auto max-w-4xl rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-overweel-lg sm:p-6"
@@ -86,6 +96,11 @@ export default function CookieBanner() {
               {choice !== null && (
                 <p className="mt-2 text-xs font-semibold text-primary">
                   Huidige keuze: {choice === "accepted" ? "alles toegestaan" : "alleen noodzakelijke cookies"}
+                </p>
+              )}
+              {storageError && (
+                <p className="mt-2 text-sm font-medium text-destructive" id={errorId} role="alert">
+                  {storageError}
                 </p>
               )}
             </div>

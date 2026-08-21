@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -13,9 +13,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus, MATERIALS } from "@/lib/constants";
+import { normalizePlatePrintQuantities } from "@/lib/plateTracking";
+import { availableFilamentColorsForMaterial, FilamentColor } from "@/lib/productCatalog";
 
 export default function AdminNewOrder() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
@@ -24,11 +26,43 @@ export default function AdminNewOrder() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [material, setMaterial] = useState("");
   const [color, setColor] = useState("");
-  const [quantity, setQuantity] = useState("1");
+  const [totalProducts, setTotalProducts] = useState("1");
+  const [totalPlates, setTotalPlates] = useState("0");
+  const [platePrintQuantities, setPlatePrintQuantities] = useState<number[]>([]);
   const [filenames, setFilenames] = useState("");
   const [finalPrice, setFinalPrice] = useState("");
   const [status, setStatus] = useState<OrderStatus>("submitted");
   const [internalNotes, setInternalNotes] = useState("");
+  const [filamentColors, setFilamentColors] = useState<FilamentColor[]>([]);
+
+  useEffect(() => {
+    if (authLoading || !isAdmin) return;
+    supabase
+      .from("filament_colors")
+      .select("*")
+      .eq("active", true)
+      .order("material")
+      .order("sort_order")
+      .then(({ data, error }) => {
+        if (error) {
+          toast({ title: "Kleuren laden mislukt", description: error.message, variant: "destructive" });
+          return;
+        }
+        setFilamentColors((data || []) as unknown as FilamentColor[]);
+      });
+  }, [authLoading, isAdmin, toast]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -43,7 +77,23 @@ export default function AdminNewOrder() {
   }
 
   const getColorsForMaterial = (materialId: string) => {
-    return MATERIALS.find((m) => m.id === materialId)?.colors || [];
+    return availableFilamentColorsForMaterial(filamentColors, materialId);
+  };
+
+  const handleTotalPlatesChange = (value: string) => {
+    setTotalPlates(value);
+    const count = Number(value);
+    if (Number.isInteger(count) && count >= 0) {
+      setPlatePrintQuantities((current) => normalizePlatePrintQuantities(current, count));
+    }
+  };
+
+  const setPlatePrintQuantity = (plateIndex: number, value: string) => {
+    const quantity = Number(value);
+    if (!Number.isInteger(quantity) || quantity < 1) return;
+    setPlatePrintQuantities((current) => current.map((item, index) => (
+      index === plateIndex ? quantity : item
+    )));
   };
 
   const handleSave = async () => {
@@ -51,6 +101,18 @@ export default function AdminNewOrder() {
       toast({ title: "Naam en e-mail van klant zijn verplicht", variant: "destructive" });
       return;
     }
+    if (!/^\S+@\S+\.\S+$/.test(customerEmail.trim())) {
+      toast({ title: "Vul een geldig e-mailadres in", variant: "destructive" });
+      return;
+    }
+
+    const parsedProducts = Number(totalProducts);
+    const parsedPlates = Number(totalPlates);
+    if (!Number.isInteger(parsedProducts) || parsedProducts < 0 || !Number.isInteger(parsedPlates) || parsedPlates < 0) {
+      toast({ title: "Controleer het aantal producten en platen", variant: "destructive" });
+      return;
+    }
+    const normalizedPrintQuantities = normalizePlatePrintQuantities(platePrintQuantities, parsedPlates);
     setSaving(true);
     try {
       const { data: orderNumData, error: orderNumError } = await supabase.rpc("generate_order_number");
@@ -71,7 +133,11 @@ export default function AdminNewOrder() {
           customer_name: customerName.trim(),
           material: materialName,
           color: colorName,
-          quantity: parseInt(quantity) || 1,
+          quantity: parsedProducts,
+          total_products: parsedProducts,
+          total_plates: parsedPlates,
+          plate_print_statuses: Array.from({ length: parsedPlates }, () => false),
+          plate_runs_required_per_plate: normalizedPrintQuantities,
           notes: filenames ? `Bestandsnamen: ${filenames}` : "",
           final_price: finalPrice ? parseFloat(finalPrice) : null,
           instant_quote_price: 0,
@@ -83,10 +149,26 @@ export default function AdminNewOrder() {
 
       if (error) throw error;
 
-      toast({ title: `Bestelling ${orderNumber} aangemaakt! ✅` });
+      const { data: mailData, error: mailError } = await supabase.functions.invoke("send-order-email", {
+        body: { type: "admin_order_created", orderId: order.id },
+      });
+
+      if (mailError || !mailData?.success) {
+        toast({
+          title: `Bestelling ${orderNumber} is aangemaakt`,
+          description: `De bedankmail kon niet worden verzonden: ${mailError?.message || mailData?.error || "onbekende e-mailfout"}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: `Bestelling ${orderNumber} aangemaakt`,
+          description: "De klant heeft één bedankmail ontvangen.",
+        });
+      }
       navigate(`/admin/order/${order.id}`);
-    } catch (error: any) {
-      toast({ title: "Fout bij aanmaken", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      const description = error instanceof Error ? error.message : "Onbekende fout";
+      toast({ title: "Fout bij aanmaken", description, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -156,8 +238,12 @@ export default function AdminNewOrder() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Aantal</Label>
-                  <Input type="number" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                  <Label>Totaal producten</Label>
+                  <Input type="number" min={0} step={1} value={totalProducts} onChange={(e) => setTotalProducts(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Aantal platen</Label>
+                  <Input type="number" min={0} step={1} value={totalPlates} onChange={(e) => handleTotalPlatesChange(e.target.value)} />
                 </div>
                 <div>
                   <Label>Status</Label>
@@ -171,6 +257,31 @@ export default function AdminNewOrder() {
                   </Select>
                 </div>
               </div>
+
+              {platePrintQuantities.length > 0 && (
+                <div>
+                  <Label>Hoe vaak moet elke plaat worden geprint?</Label>
+                  <p className="text-xs text-muted-foreground mb-2">Standaard staat iedere plaat op 1 keer.</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {platePrintQuantities.map((quantity, plateIndex) => (
+                      <div key={plateIndex}>
+                        <Label htmlFor={`new-order-plate-${plateIndex}`} className="text-xs">
+                          Plaat {plateIndex + 1}
+                        </Label>
+                        <Input
+                          id={`new-order-plate-${plateIndex}`}
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={quantity}
+                          onChange={(event) => setPlatePrintQuantity(plateIndex, event.target.value)}
+                          aria-label={`Aantal keer plaat ${plateIndex + 1} printen`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label>Bestandsnamen</Label>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Mail, MapPin, Clock } from "lucide-react";
 import { Logo } from "./Logo";
 import { openCookieSettings } from "@/lib/cookieConsent";
+import { NewsletterSignupForm } from "./NewsletterSignupForm";
 
 export function Footer() {
   return (
@@ -17,9 +18,19 @@ export function Footer() {
               </span>
             </div>
             <p className="text-primary-foreground/70 max-w-md mt-4">
-              Breng uw ideeën tot leven met onze professionele 3D-printservice. 
+              Breng uw ideeën tot leven met onze professionele 3D-printservice.
               Van prototype tot eindproduct, wij printen het voor u.
             </p>
+            <div className="mt-7 max-w-xl">
+              <h4 className="mb-1 text-lg font-semibold">Overweel3D-nieuws in uw inbox</h4>
+              <p className="mb-3 text-sm leading-6 text-primary-foreground/70">
+                Ontvang updates over nieuwe materialen, producten, kleuren en kortingsacties.
+              </p>
+              <NewsletterSignupForm
+                inputClassName="border-white/20 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-emerald"
+                source="footer"
+              />
+            </div>
           </div>
 
           {/* Quick Links */}

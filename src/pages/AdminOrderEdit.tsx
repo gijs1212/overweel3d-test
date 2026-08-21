@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -13,10 +13,13 @@ import { OrderChat } from "@/components/OrderChat";
 import { DeliveryScheduler } from "@/components/DeliveryScheduler";
 import { PlateTracker } from "@/components/PlateTracker";
 import { ModelViewer } from "@/components/ModelViewer";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { CatalogOrderItems } from "@/components/CatalogOrderItems";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
+import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 
 interface Order {
   id: string; order_number: string; user_id: string | null; customer_email: string;
@@ -29,20 +32,30 @@ interface Order {
   order_method: string; submitted_at: string; approved_at: string | null;
   rejected_at: string | null; created_at: string; updated_at: string;
   parts_total: number; parts_per_plate: number; plates_completed: number;
+  total_products: number; total_plates: number; plate_print_statuses: boolean[];
+  plate_runs_required_per_plate: unknown;
+  link_first_viewed_at: string | null; link_last_viewed_at: string | null; link_view_count: number;
   delivery_email: string;
   shipping_carrier: string; tracking_code: string; shipping_cost: number;
-  plate_runs_required: number; plate_runs_completed: any;
+  plate_runs_required: number; plate_runs_completed: unknown;
   customer_upload_requested?: boolean;
   customer_upload_request_note?: string | null;
   customer_upload_requested_at?: string | null;
+  filament_weight_g?: number | null;
+  filament_price_per_kg?: number | null;
+  catalog_items?: unknown;
 }
 
 interface OrderFile { id: string; storage_path: string; original_filename: string; file_size: number; mime_type: string; }
 interface Appointment { id: string; proposed_date: string; proposed_time_slot: string; status: string; proposed_by: string; customer_notes: string; admin_notes: string; created_at: string; }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Onbekende fout";
+}
+
 export default function AdminOrderEdit() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
@@ -50,6 +63,7 @@ export default function AdminOrderEdit() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resettingBackup, setResettingBackup] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -65,18 +79,19 @@ export default function AdminOrderEdit() {
   const [uploadRequestNote, setUploadRequestNote] = useState("");
   const [savingUploadRequest, setSavingUploadRequest] = useState(false);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+  const [filePendingDelete, setFilePendingDelete] = useState<OrderFile | null>(null);
+  const [showCompleteConfirmation, setShowCompleteConfirmation] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   const [finalPrice, setFinalPrice] = useState("");
   const [tikkieLink, setTikkieLink] = useState("");
   const [status, setStatus] = useState<OrderStatus>("submitted");
   const [customerNotes, setCustomerNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
-  const [partsTotal, setPartsTotal] = useState(0);
-  const [partsPerPlate, setPartsPerPlate] = useState(1);
-  const [platesCompleted, setPlatesCompleted] = useState(0);
-  const [defaultRunsRequired, setDefaultRunsRequired] = useState(1);
-  const [runsRequiredPerPlate, setRunsRequiredPerPlate] = useState<number[]>([]);
-  const [plateRunsCompleted, setPlateRunsCompleted] = useState<number[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPlates, setTotalPlates] = useState(0);
+  const [platePrintStatuses, setPlatePrintStatuses] = useState<boolean[]>([]);
+  const [platePrintQuantities, setPlatePrintQuantities] = useState<number[]>([]);
   const [deliveryEmail, setDeliveryEmail] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState("none");
   const [trackingCode, setTrackingCode] = useState("");
@@ -86,16 +101,28 @@ export default function AdminOrderEdit() {
   const [filamentPricePerKg, setFilamentPricePerKg] = useState("");
   const [filamentMarginPct, setFilamentMarginPct] = useState("50");
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     if (!orderId) return;
-    const { data } = await supabase.from("delivery_appointments").select("*").eq("order_id", orderId).order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("delivery_appointments").select("*").eq("order_id", orderId).order("created_at", { ascending: false });
+    if (error) {
+      toast({ title: "Bezorgafspraken laden mislukt", description: error.message, variant: "destructive" });
+      return;
+    }
     setAppointments((data as Appointment[]) || []);
-  };
+  }, [orderId, toast]);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (authLoading) return;
+    if (!isAdmin || !orderId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const load = async () => {
-      const { data: orderData } = await supabase.from("orders").select("*").eq("id", orderId).single();
+      const { data: orderData, error: orderError } = await supabase.from("orders").select("*").eq("id", orderId).single();
+      if (orderError) {
+        toast({ title: "Bestelling laden mislukt", description: orderError.message, variant: "destructive" });
+      }
       if (orderData) {
         const o = orderData as unknown as Order;
         setOrder(o);
@@ -104,29 +131,50 @@ export default function AdminOrderEdit() {
         setStatus(o.status);
         setCustomerNotes(o.customer_visible_notes || "");
         setInternalNotes(o.internal_notes || "");
-        setPartsTotal(o.parts_total || 0);
-        setPartsPerPlate(o.parts_per_plate || 1);
-        setPlatesCompleted(o.plates_completed || 0);
-        setDefaultRunsRequired(o.plate_runs_required || 1);
-        setRunsRequiredPerPlate(Array.isArray((o as any).plate_runs_required_per_plate) ? (o as any).plate_runs_required_per_plate : []);
-        setPlateRunsCompleted(Array.isArray(o.plate_runs_completed) ? o.plate_runs_completed : []);
+        const legacyPlateCount = o.parts_per_plate > 0 && o.parts_total > 0
+          ? Math.ceil(o.parts_total / o.parts_per_plate)
+          : Math.max(0, o.plates_completed || 0);
+        const loadedTotalPlates = Math.max(0, o.total_plates ?? legacyPlateCount);
+        const storedPlateStatuses = Array.isArray(o.plate_print_statuses)
+          ? o.plate_print_statuses.map((printed) => printed === true)
+          : [];
+        const storedPlateQuantities = Array.isArray(o.plate_runs_required_per_plate)
+          ? o.plate_runs_required_per_plate
+          : [];
+        setTotalProducts(Math.max(0, o.total_products ?? o.parts_total ?? o.quantity ?? 0));
+        setTotalPlates(loadedTotalPlates);
+        setPlatePrintStatuses(Array.from(
+          { length: loadedTotalPlates },
+          (_, index) => storedPlateStatuses[index] ?? index < (o.plates_completed || 0),
+        ));
+        setPlatePrintQuantities(Array.from(
+          { length: loadedTotalPlates },
+          (_, index) => {
+            const quantity = Number(storedPlateQuantities[index]);
+            return Number.isInteger(quantity) && quantity >= 1 ? quantity : 1;
+          },
+        ));
         setDeliveryEmail(o.delivery_email || "");
         setShippingCarrier(o.shipping_carrier || "none");
         setTrackingCode(o.tracking_code || "");
         setShippingCost(o.shipping_cost?.toString() || "");
         setOriginalFinalPrice(o.final_price);
-        setUploadRequestNote((o as any).customer_upload_request_note || "");
-        setFilamentWeightG(((o as any).filament_weight_g ?? "").toString());
-        setFilamentPricePerKg(((o as any).filament_price_per_kg ?? "").toString());
+        setUploadRequestNote(o.customer_upload_request_note || "");
+        setFilamentWeightG((o.filament_weight_g ?? "").toString());
+        setFilamentPricePerKg((o.filament_price_per_kg ?? "").toString());
       }
-      const { data: filesData } = await supabase.from("order_files").select("*").eq("order_id", orderId);
+      const { data: filesData, error: filesError } = await supabase.from("order_files").select("*").eq("order_id", orderId);
+      if (filesError) toast({ title: "Bestanden laden mislukt", description: filesError.message, variant: "destructive" });
       setFiles((filesData as OrderFile[]) || []);
       setLoading(false);
     };
-    load();
-    fetchAppointments();
-  }, [orderId]);
+    void load();
+    void fetchAppointments();
+  }, [authLoading, fetchAppointments, isAdmin, orderId, toast]);
 
+  if (authLoading) {
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-accent" /></main><Footer /></div>);
+  }
   if (!isAdmin) {
     return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]"><p className="text-muted-foreground">Geen toegang.</p></main><Footer /></div>);
   }
@@ -145,12 +193,6 @@ export default function AdminOrderEdit() {
         status: effectiveStatus,
         customer_visible_notes: customerNotes,
         internal_notes: internalNotes,
-        parts_total: partsTotal,
-        parts_per_plate: partsPerPlate,
-        plates_completed: platesCompleted,
-        plate_runs_required: defaultRunsRequired,
-        plate_runs_required_per_plate: runsRequiredPerPlate,
-        plate_runs_completed: plateRunsCompleted,
         delivery_email: deliveryEmail,
         shipping_carrier: shippingCarrier === "none" ? null : shippingCarrier,
         tracking_code: trackingCode,
@@ -158,7 +200,7 @@ export default function AdminOrderEdit() {
         filament_weight_g: filamentWeightG ? parseFloat(filamentWeightG) : null,
         filament_price_per_kg: filamentPricePerKg ? parseFloat(filamentPricePerKg) : null,
         saved: false,
-      }).eq("id", order.id);
+      }).eq("id", order.id).select("id").single();
       if (error) throw error;
 
       await supabase.from("order_events").insert({
@@ -169,78 +211,93 @@ export default function AdminOrderEdit() {
         visible_to_customer: true,
       });
 
-      const isAdminOrder = order.customer_email === "admin@overweel3d.nl";
-      if (!isAdminOrder) {
-        await supabase.functions.invoke("send-order-email", { body: { type: "order_updated", orderId: order.id } });
-      }
-
-      toast({ title: isAdminOrder ? "Opgeslagen! ✅" : "Opgeslagen! Klant op de hoogte gebracht. ✉️" });
+      toast({
+        title: "Bestelling opgeslagen",
+        description: "De wijzigingen zijn opgeslagen. Er is geen e-mail verzonden.",
+      });
       setOriginalFinalPrice(newFinalPrice);
       setStatus(effectiveStatus);
-      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes, parts_total: partsTotal, parts_per_plate: partsPerPlate, plates_completed: platesCompleted, delivery_email: deliveryEmail, shipping_carrier: shippingCarrier, tracking_code: trackingCode, shipping_cost: parseFloat(shippingCost) || 0, plate_runs_required: defaultRunsRequired, plate_runs_completed: plateRunsCompleted });
-    } catch (error: any) {
-      toast({ title: "Fout bij opslaan", description: error.message, variant: "destructive" });
+      setOrder({ ...order, final_price: newFinalPrice, tikkie_link: tikkieLink || null, status: effectiveStatus, customer_visible_notes: customerNotes, internal_notes: internalNotes, delivery_email: deliveryEmail, shipping_carrier: shippingCarrier, tracking_code: trackingCode, shipping_cost: parseFloat(shippingCost) || 0 });
+    } catch (error: unknown) {
+      toast({ title: "Fout bij opslaan", description: getErrorMessage(error), variant: "destructive" });
     } finally { setSaving(false); }
   };
 
   const savePlateProgress = async (data: {
-    partsTotal: number;
-    partsPerPlate: number;
-    defaultRunsRequired: number;
-    runsRequiredPerPlate: number[];
-    plateRunsCompleted: number[];
+    totalProducts: number;
+    totalPlates: number;
+    platePrintStatuses: boolean[];
+    platePrintQuantities: number[];
     platesCompleted: number;
   }) => {
-    setPartsTotal(data.partsTotal);
-    setPartsPerPlate(data.partsPerPlate);
-    setDefaultRunsRequired(data.defaultRunsRequired);
-    setRunsRequiredPerPlate(data.runsRequiredPerPlate);
-    setPlateRunsCompleted(data.plateRunsCompleted);
-    setPlatesCompleted(data.platesCompleted);
-
     if (!order) return;
     try {
       const { error } = await supabase.from("orders").update({
-        parts_total: data.partsTotal,
-        parts_per_plate: data.partsPerPlate,
+        total_products: data.totalProducts,
+        total_plates: data.totalPlates,
+        plate_print_statuses: data.platePrintStatuses,
+        plate_runs_required_per_plate: data.platePrintQuantities,
+        // Retain the legacy completed count for older exports only. New logic
+        // never derives plates or products from the legacy per-plate fields.
         plates_completed: data.platesCompleted,
-        plate_runs_required: data.defaultRunsRequired,
-        plate_runs_required_per_plate: data.runsRequiredPerPlate,
-        plate_runs_completed: data.plateRunsCompleted,
-      }).eq("id", order.id);
+      }).eq("id", order.id).select("id").single();
       if (error) throw error;
 
-      const totalPlates = data.partsPerPlate > 0 ? Math.ceil(data.partsTotal / data.partsPerPlate) : 0;
       await supabase.from("order_events").insert({
         order_id: order.id,
         event_type: "production_progress",
-        event_description: `Productievoortgang bijgewerkt: ${data.platesCompleted}/${totalPlates} platen gereed.`,
+        event_description: `Printstatus opgeslagen: ${data.platesCompleted}/${data.totalPlates} platen geprint, ${data.platePrintQuantities.reduce((sum, quantity) => sum + quantity, 0)} printruns nodig (${data.totalProducts} producten totaal).`,
         visible_to_customer: true,
       });
 
+      setTotalProducts(data.totalProducts);
+      setTotalPlates(data.totalPlates);
+      setPlatePrintStatuses(data.platePrintStatuses);
+      setPlatePrintQuantities(data.platePrintQuantities);
       setOrder({
         ...order,
-        parts_total: data.partsTotal,
-        parts_per_plate: data.partsPerPlate,
+        total_products: data.totalProducts,
+        total_plates: data.totalPlates,
+        plate_print_statuses: data.platePrintStatuses,
+        plate_runs_required_per_plate: data.platePrintQuantities,
         plates_completed: data.platesCompleted,
-        plate_runs_required: data.defaultRunsRequired,
-        plate_runs_completed: data.plateRunsCompleted,
       });
 
-      toast({ title: "Productievoortgang opgeslagen ✅", description: "Zichtbaar als melding voor de klant, geen e-mail verzonden." });
-    } catch (error: any) {
-      toast({ title: "Fout bij opslaan voortgang", description: error.message, variant: "destructive" });
+      toast({ title: "Printstatus opgeslagen", description: "De plaatstatussen zijn opgeslagen. Er is geen e-mail verzonden." });
+    } catch (error: unknown) {
+      toast({ title: "Opslaan mislukt", description: getErrorMessage(error), variant: "destructive" });
+      throw error;
     }
   };
-
   const handleNotifyCustomer = async () => {
     if (!order) return;
     setNotifying(true);
     try {
-      await supabase.functions.invoke("send-order-email", { body: { type: "order_updated", orderId: order.id } });
+      const { data, error } = await supabase.functions.invoke("send-order-email", {
+        body: { type: "order_updated", orderId: order.id },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Onbekende e-mailfout");
       toast({ title: "Klant is op de hoogte gebracht!" });
-    } catch { toast({ title: "E-mail verzenden mislukt", variant: "destructive" }); }
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Probeer het later opnieuw.";
+      toast({ title: "E-mail verzenden mislukt", description, variant: "destructive" });
+    }
     finally { setNotifying(false); }
+  };
+
+  const handleResetBackup = async () => {
+    if (!order) return;
+    setResettingBackup(true);
+    try {
+      const { error } = await supabase.from("orders").update({ saved: false }).eq("id", order.id).select("id").single();
+      if (error) throw error;
+      toast({ title: "Backupstatus gereset" });
+    } catch (error: unknown) {
+      toast({ title: "Resetten mislukt", description: getErrorMessage(error), variant: "destructive" });
+    } finally {
+      setResettingBackup(false);
+    }
   };
 
   const downloadFile = async (storagePath: string, filename: string) => {
@@ -252,25 +309,30 @@ export default function AdminOrderEdit() {
   };
 
   const deleteFile = async (fileId: string, storagePath: string) => {
-    if (!confirm("Bestand verwijderen?")) return;
     try {
-      await supabase.storage.from("orders").remove([storagePath]);
-      await supabase.from("order_files").delete().eq("id", fileId);
-      setFiles(files.filter((f) => f.id !== fileId));
+      const { error: rowError } = await supabase.from("order_files").delete().eq("id", fileId).select("id").single();
+      if (rowError) throw rowError;
+      setFiles((currentFiles) => currentFiles.filter((file) => file.id !== fileId));
+      const { error: storageError } = await supabase.storage.from("orders").remove([storagePath]);
+      if (storageError) {
+        toast({ title: "Bestand verwijderd", description: "De database is bijgewerkt, maar het opslagbestand kon niet worden opgeschoond.", variant: "destructive" });
+        return;
+      }
       toast({ title: "Bestand verwijderd" });
-    } catch (error: any) { toast({ title: "Fout", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" }); }
   };
 
   const handleCompleteOrder = async () => {
-    if (!order || !confirm(`Bestelling ${order.order_number} voltooien?`)) return;
+    if (!order) return;
     setCompleting(true);
     try {
-      const { error } = await supabase.functions.invoke("complete-order", { body: { order_id: order.id } });
+      const { data, error } = await supabase.functions.invoke("complete-order", { body: { order_id: order.id } });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Bestelling voltooien mislukt");
       toast({ title: "Bestelling voltooid! ✅" });
       setOrder({ ...order, status: "completed" as OrderStatus });
       setStatus("completed" as OrderStatus);
-    } catch (error: any) { toast({ title: "Fout", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" }); }
     finally { setCompleting(false); }
   };
 
@@ -294,25 +356,25 @@ export default function AdminOrderEdit() {
       }
       toast({ title: `Factuur ${data.invoiceNumber} gegenereerd ✅` });
       setShowInvoice(false);
-    } catch (e: any) {
-      toast({ title: "Fout bij genereren factuur", description: e.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Fout bij genereren factuur", description: getErrorMessage(error), variant: "destructive" });
     } finally { setGeneratingInvoice(false); }
   };
 
   const handleDeleteOrder = async () => {
-    if (!order || !confirm(`Bestelling ${order.order_number} VERWIJDEREN? Dit kan niet ongedaan worden.`)) return;
+    if (!order) return;
     setDeleting(true);
     try {
-      if (files.length > 0) await supabase.storage.from("orders").remove(files.map((f) => f.storage_path));
-      await supabase.from("order_files").delete().eq("order_id", order.id);
-      await supabase.from("order_events").delete().eq("order_id", order.id);
-      await supabase.from("order_messages").delete().eq("order_id", order.id);
-      await supabase.from("delivery_appointments").delete().eq("order_id", order.id);
+      if (files.length > 0) {
+        const { error: storageError } = await supabase.storage.from("orders").remove(files.map((file) => file.storage_path));
+        if (storageError) throw storageError;
+      }
+      // Related database rows use ON DELETE CASCADE.
       const { error } = await supabase.from("orders").delete().eq("id", order.id);
       if (error) throw error;
       toast({ title: "Bestelling verwijderd" });
       navigate("/admin");
-    } catch (error: any) { toast({ title: "Fout", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" }); }
     finally { setDeleting(false); }
   };
 
@@ -370,6 +432,8 @@ export default function AdminOrderEdit() {
               </div>
             </div>
 
+            <CatalogOrderItems items={order.catalog_items} />
+
             {/* File links / custom photos */}
             {order.order_method === "custom" ? (
               <CustomPhotosSection fileLinks={order.file_links} />
@@ -403,22 +467,27 @@ export default function AdminOrderEdit() {
                         setUploadingFiles(true);
                         try {
                           for (const f of filesIn) {
-                            const path = `${order.order_number}/files/admin-${Date.now()}-${f.name}`;
-                            const { error: upErr } = await supabase.storage.from("orders").upload(path, f, { upsert: true });
+                            const safeName = f.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+                            const path = `${order.order_number}/files/admin-${crypto.randomUUID()}-${safeName}`;
+                            const uploaded = await uploadFileWithHeicConversion("orders", path, f, { upsert: false });
+                            const { error: upErr } = uploaded;
                             if (upErr) throw upErr;
                             const { data: row, error: insErr } = await supabase.from("order_files").insert({
                               order_id: order.id,
-                              storage_path: path,
-                              original_filename: f.name,
-                              file_size: f.size,
-                              mime_type: f.type || "application/octet-stream",
+                              storage_path: uploaded.path,
+                              original_filename: uploaded.file.name,
+                              file_size: uploaded.file.size,
+                              mime_type: uploaded.file.type || "application/octet-stream",
                             }).select().single();
-                            if (insErr) throw insErr;
+                            if (insErr) {
+                              await supabase.storage.from("orders").remove([uploaded.path]);
+                              throw insErr;
+                            }
                             setFiles((prev) => [...prev, row as OrderFile]);
                           }
                           toast({ title: `${filesIn.length} bestand(en) geüpload ✅` });
-                        } catch (err: any) {
-                          toast({ title: "Upload mislukt", description: err.message, variant: "destructive" });
+                        } catch (error: unknown) {
+                          toast({ title: "Upload mislukt", description: getErrorMessage(error), variant: "destructive" });
                         } finally {
                           setUploadingFiles(false);
                           e.target.value = "";
@@ -453,8 +522,8 @@ export default function AdminOrderEdit() {
                           if (error) throw error;
                           setOrder({ ...order, customer_upload_requested: false, customer_upload_request_note: null });
                           toast({ title: "Verzoek geannuleerd" });
-                        } catch (err: any) {
-                          toast({ title: "Fout", description: err.message, variant: "destructive" });
+                        } catch (error: unknown) {
+                          toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" });
                         } finally { setSavingUploadRequest(false); }
                       }}
                     >
@@ -480,14 +549,14 @@ export default function AdminOrderEdit() {
                             if (error) throw error;
                             setOrder({ ...order, customer_upload_requested: true, customer_upload_request_note: uploadRequestNote || null });
                             setShowRequestUpload(false);
-                            try {
-                              await supabase.functions.invoke("send-order-email", {
-                                body: { type: "customer_upload_request", orderId: order.id, note: uploadRequestNote },
-                              });
-                            } catch {}
+                            const { data: mailData, error: mailError } = await supabase.functions.invoke("send-order-email", {
+                              body: { type: "customer_upload_request", orderId: order.id, note: uploadRequestNote },
+                            });
+                            if (mailError) throw mailError;
+                            if (!mailData?.success) throw new Error(mailData?.error || "Upload-verzoekmail verzenden mislukt");
                             toast({ title: "Verzoek verstuurd ✅" });
-                          } catch (err: any) {
-                            toast({ title: "Fout", description: err.message, variant: "destructive" });
+                          } catch (error: unknown) {
+                            toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" });
                           } finally { setSavingUploadRequest(false); }
                         }}
                       >
@@ -519,7 +588,7 @@ export default function AdminOrderEdit() {
                           </Button>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => downloadFile(file.storage_path, file.original_filename)}><Download className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="sm" onClick={() => deleteFile(file.id, file.storage_path)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => setFilePendingDelete(file)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                       </div>
                     </div>
                     {previewFileId === file.id && (
@@ -606,11 +675,10 @@ export default function AdminOrderEdit() {
                 {/* Plate tracking */}
                 <div className="md:col-span-2">
                   <PlateTracker
-                    partsTotal={partsTotal}
-                    partsPerPlate={partsPerPlate}
-                    defaultRunsRequired={defaultRunsRequired}
-                    runsRequiredPerPlate={runsRequiredPerPlate}
-                    plateRunsCompleted={plateRunsCompleted}
+                    totalProducts={totalProducts}
+                    totalPlates={totalPlates}
+                    platePrintStatuses={platePrintStatuses}
+                    platePrintQuantities={platePrintQuantities}
                     onUpdate={savePlateProgress}
                   />
                 </div>
@@ -680,19 +748,18 @@ export default function AdminOrderEdit() {
                   </Button>
                 )}
                 {(order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production") && (
-                  <Button onClick={handleCompleteOrder} disabled={completing} className="bg-green-600 hover:bg-green-700 text-white">
+                  <Button onClick={() => setShowCompleteConfirmation(true)} disabled={completing} className="bg-green-600 hover:bg-green-700 text-white">
                     {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Voltooi bestelling
                   </Button>
                 )}
-                <Button variant="outline" onClick={async () => {
-                  try { await supabase.from("orders").update({ saved: false }).eq("id", order.id); toast({ title: "Backup status gereset ✅" }); }
-                  catch (e: any) { toast({ title: "Fout", description: e.message, variant: "destructive" }); }
-                }}>🔄 Reset backup</Button>
+                <Button variant="outline" onClick={handleResetBackup} disabled={resettingBackup}>
+                  {resettingBackup ? <Loader2 className="w-4 h-4 animate-spin" /> : "🔄"} Reset backup
+                </Button>
                 <Button variant="outline" onClick={() => setShowInvoice(true)}>
                   <Receipt className="w-4 h-4" /> Factuur
                 </Button>
                 <div className="sm:ml-auto">
-                  <Button variant="destructive" onClick={handleDeleteOrder} disabled={deleting}>
+                  <Button variant="destructive" onClick={() => setShowDeleteConfirmation(true)} disabled={deleting}>
                     {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Verwijderen
                   </Button>
                 </div>
@@ -747,14 +814,61 @@ export default function AdminOrderEdit() {
             {/* Order link */}
             {!isAdminOrder && (
               <div className="lg:col-span-2 bg-muted/50 rounded-xl p-4">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-3">
                   📎 Klant order link:{" "}
                   <a href={`${window.location.origin}/order/${order.customer_order_token}`} target="_blank" rel="noopener noreferrer" className="text-accent underline break-all">
                     {window.location.origin}/order/{order.customer_order_token}
                   </a>
                 </p>
+                {order.link_first_viewed_at ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm border-t border-border pt-3">
+                    <div>
+                      <span className="block text-xs text-muted-foreground">Eerste bezoek</span>
+                      <span className="font-medium">{new Date(order.link_first_viewed_at).toLocaleString("nl-NL")}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-muted-foreground">Meest recente bezoek</span>
+                      <span className="font-medium">{new Date(order.link_last_viewed_at || order.link_first_viewed_at).toLocaleString("nl-NL")}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-muted-foreground">Aantal bezoeken</span>
+                      <span className="font-medium">{order.link_view_count}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground border-t border-border pt-3">De klant heeft deze link nog niet bezocht.</p>
+                )}
               </div>
             )}
+
+            <ConfirmActionDialog
+              open={filePendingDelete !== null}
+              onOpenChange={(open) => { if (!open) setFilePendingDelete(null); }}
+              title="Bestand verwijderen?"
+              description={`Weet u zeker dat u ${filePendingDelete?.original_filename || "dit bestand"} permanent wilt verwijderen?`}
+              confirmLabel="Bestand verwijderen"
+              destructive
+              onConfirm={async () => {
+                if (filePendingDelete) await deleteFile(filePendingDelete.id, filePendingDelete.storage_path);
+              }}
+            />
+            <ConfirmActionDialog
+              open={showCompleteConfirmation}
+              onOpenChange={setShowCompleteConfirmation}
+              title="Bestelling voltooien?"
+              description={`Bestelling ${order.order_number} wordt als voltooid gemarkeerd.`}
+              confirmLabel="Voltooien"
+              onConfirm={handleCompleteOrder}
+            />
+            <ConfirmActionDialog
+              open={showDeleteConfirmation}
+              onOpenChange={setShowDeleteConfirmation}
+              title="Bestelling permanent verwijderen?"
+              description={`Bestelling ${order.order_number} en alle gekoppelde gegevens worden verwijderd. Dit kan niet ongedaan worden gemaakt.`}
+              confirmLabel="Bestelling verwijderen"
+              destructive
+              onConfirm={handleDeleteOrder}
+            />
           </div>
         </div>
       </main>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { getFunctionErrorMessage } from "@/lib/functionErrors";
 
 interface Profile {
   id: string;
@@ -15,6 +16,8 @@ interface Profile {
   city: string;
   country: string;
   vat_number: string;
+  newsletter_subscribed: boolean;
+  account_welcome_email_sent_at: string | null;
 }
 
 interface AuthContextType {
@@ -29,6 +32,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<void>;
+  setNewsletterPreference: (active: boolean) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -98,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -107,6 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     if (error) throw error;
+
+    // Supabase can return an obfuscated user for an existing e-mail address.
+    // Only a response with a newly-created identity may request the welcome mail.
+    if (data.user?.id && (data.user.identities?.length ?? 0) > 0) {
+      const { error: welcomeError } = await supabase.functions.invoke("send-account-welcome", {
+        body: { userId: data.user.id },
+      });
+      if (welcomeError) {
+        console.warn("Account welcome email could not be sent:", welcomeError.message);
+      }
+    }
   };
 
   const signIn = async (email: string, password: string) => {
@@ -145,12 +160,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id);
   };
 
+  const setNewsletterPreference = async (active: boolean) => {
+    if (!user) throw new Error("Log in om uw nieuwsbriefvoorkeur te wijzigen.");
+    const { data, error } = await supabase.functions.invoke("manage-newsletter", {
+      body: { action: "set_preference", active },
+    });
+    if (error) throw new Error(await getFunctionErrorMessage(error, "De nieuwsbriefvoorkeur kon niet worden opgeslagen."));
+    if (!data?.success) throw new Error(data?.error || "De nieuwsbriefvoorkeur kon niet worden opgeslagen.");
+    await fetchProfile(user.id);
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user, session, profile, isAdmin, loading,
         signUp, signIn, signOut, resetPassword, updatePassword,
-        updateProfile, refreshProfile,
+        updateProfile, setNewsletterPreference, refreshProfile,
       }}
     >
       {children}

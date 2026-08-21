@@ -174,6 +174,57 @@ export type Database = {
           },
         ]
       }
+      email_campaigns: {
+        Row: {
+          audience: string
+          body: string
+          change_type: string | null
+          created_at: string
+          created_by: string
+          error_message: string | null
+          failed_count: number
+          id: string
+          recipient_count: number
+          sent_at: string | null
+          sent_count: number
+          status: string
+          subject: string
+          template_kind: string
+        }
+        Insert: {
+          audience: string
+          body: string
+          change_type?: string | null
+          created_at?: string
+          created_by: string
+          error_message?: string | null
+          failed_count?: number
+          id?: string
+          recipient_count?: number
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          subject: string
+          template_kind: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          change_type?: string | null
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          failed_count?: number
+          id?: string
+          recipient_count?: number
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          subject?: string
+          template_kind?: string
+        }
+        Relationships: []
+      }
       exported_orders: {
         Row: {
           completed_at: string | null
@@ -275,6 +326,48 @@ export type Database = {
           name?: string | null
           source?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      newsletter_subscriptions: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          id: string
+          source: string
+          subscribed_at: string
+          unsubscribed_at: string | null
+          updated_at: string
+          user_id: string | null
+          welcome_email_claimed_at: string | null
+          welcome_email_sent_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          source?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+          welcome_email_claimed_at?: string | null
+          welcome_email_sent_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          source?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+          welcome_email_claimed_at?: string | null
+          welcome_email_sent_at?: string | null
         }
         Relationships: []
       }
@@ -396,10 +489,13 @@ export type Database = {
         Row: {
           approved_at: string | null
           billing_address: string | null
+          catalog_items: Json
           city: string | null
           color: string | null
           company_name: string | null
           completed_at: string | null
+          confirmation_email_claimed_at: string | null
+          confirmation_email_sent_at: string | null
           country: string | null
           created_at: string | null
           customer_email: string
@@ -427,6 +523,7 @@ export type Database = {
           parts_per_plate: number | null
           parts_total: number | null
           phone: string | null
+          plate_print_statuses: Json
           plate_runs_completed: Json | null
           plate_runs_required: number | null
           plate_runs_required_per_plate: Json | null
@@ -443,6 +540,8 @@ export type Database = {
           submitted_at: string | null
           tikkie_link: string | null
           tracking_code: string | null
+          total_plates: number
+          total_products: number
           updated_at: string | null
           user_id: string | null
           vat_number: string | null
@@ -450,10 +549,13 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           billing_address?: string | null
+          catalog_items?: Json
           city?: string | null
           color?: string | null
           company_name?: string | null
           completed_at?: string | null
+          confirmation_email_claimed_at?: string | null
+          confirmation_email_sent_at?: string | null
           country?: string | null
           created_at?: string | null
           customer_email: string
@@ -481,6 +583,7 @@ export type Database = {
           parts_per_plate?: number | null
           parts_total?: number | null
           phone?: string | null
+          plate_print_statuses?: Json
           plate_runs_completed?: Json | null
           plate_runs_required?: number | null
           plate_runs_required_per_plate?: Json | null
@@ -497,6 +600,8 @@ export type Database = {
           submitted_at?: string | null
           tikkie_link?: string | null
           tracking_code?: string | null
+          total_plates?: number
+          total_products?: number
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
@@ -504,10 +609,13 @@ export type Database = {
         Update: {
           approved_at?: string | null
           billing_address?: string | null
+          catalog_items?: Json
           city?: string | null
           color?: string | null
           company_name?: string | null
           completed_at?: string | null
+          confirmation_email_claimed_at?: string | null
+          confirmation_email_sent_at?: string | null
           country?: string | null
           created_at?: string | null
           customer_email?: string
@@ -535,6 +643,7 @@ export type Database = {
           parts_per_plate?: number | null
           parts_total?: number | null
           phone?: string | null
+          plate_print_statuses?: Json
           plate_runs_completed?: Json | null
           plate_runs_required?: number | null
           plate_runs_required_per_plate?: Json | null
@@ -551,6 +660,8 @@ export type Database = {
           submitted_at?: string | null
           tikkie_link?: string | null
           tracking_code?: string | null
+          total_plates?: number
+          total_products?: number
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
@@ -561,6 +672,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          description: string
           id: string
           name: string
           sort_order: number
@@ -569,6 +681,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          description?: string
           id?: string
           name: string
           sort_order?: number
@@ -577,6 +690,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          description?: string
           id?: string
           name?: string
           sort_order?: number
@@ -626,11 +740,108 @@ export type Database = {
           },
         ]
       }
+      product_images: {
+        Row: {
+          alt_text: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          product_id: string
+          sort_order: number
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          alt_text?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id: string
+          sort_order?: number
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          alt_text?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id?: string
+          sort_order?: number
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_options: {
+        Row: {
+          active: boolean
+          choices: Json
+          created_at: string
+          description: string
+          id: string
+          label: string
+          max_length: number | null
+          product_id: string
+          required: boolean
+          sort_order: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          choices?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          label: string
+          max_length?: number | null
+          product_id: string
+          required?: boolean
+          sort_order?: number
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          choices?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          label?: string
+          max_length?: number | null
+          product_id?: string
+          required?: boolean
+          sort_order?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_options_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
           category_id: string | null
+          color_required: boolean
+          color_selection_mode: string
           colors: string[]
+          colors_configured: boolean
           created_at: string
           custom_fields: Json
           custom_text_enabled: boolean
@@ -640,7 +851,9 @@ export type Database = {
           description: string
           id: string
           material_fixed: boolean
+          material_mode: string
           materials: string[]
+          max_colors: number
           multicolor_allowed: boolean
           name: string
           photos: string[]
@@ -650,7 +863,10 @@ export type Database = {
         Insert: {
           active?: boolean
           category_id?: string | null
+          color_required?: boolean
+          color_selection_mode?: string
           colors?: string[]
+          colors_configured?: boolean
           created_at?: string
           custom_fields?: Json
           custom_text_enabled?: boolean
@@ -660,7 +876,9 @@ export type Database = {
           description?: string
           id?: string
           material_fixed?: boolean
+          material_mode?: string
           materials?: string[]
+          max_colors?: number
           multicolor_allowed?: boolean
           name: string
           photos?: string[]
@@ -670,7 +888,10 @@ export type Database = {
         Update: {
           active?: boolean
           category_id?: string | null
+          color_required?: boolean
+          color_selection_mode?: string
           colors?: string[]
+          colors_configured?: boolean
           created_at?: string
           custom_fields?: Json
           custom_text_enabled?: boolean
@@ -680,7 +901,9 @@ export type Database = {
           description?: string
           id?: string
           material_fixed?: boolean
+          material_mode?: string
           materials?: string[]
+          max_colors?: number
           multicolor_allowed?: boolean
           name?: string
           photos?: string[]
@@ -699,6 +922,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_welcome_email_claimed_at: string | null
+          account_welcome_email_sent_at: string | null
           billing_address: string | null
           city: string | null
           company_name: string | null
@@ -707,6 +932,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          newsletter_subscribed: boolean
           phone: string | null
           postal_code: string | null
           shipping_address: string | null
@@ -715,6 +941,8 @@ export type Database = {
           vat_number: string | null
         }
         Insert: {
+          account_welcome_email_claimed_at?: string | null
+          account_welcome_email_sent_at?: string | null
           billing_address?: string | null
           city?: string | null
           company_name?: string | null
@@ -723,6 +951,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          newsletter_subscribed?: boolean
           phone?: string | null
           postal_code?: string | null
           shipping_address?: string | null
@@ -731,6 +960,8 @@ export type Database = {
           vat_number?: string | null
         }
         Update: {
+          account_welcome_email_claimed_at?: string | null
+          account_welcome_email_sent_at?: string | null
           billing_address?: string | null
           city?: string | null
           company_name?: string | null
@@ -739,6 +970,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          newsletter_subscribed?: boolean
           phone?: string | null
           postal_code?: string | null
           shipping_address?: string | null
@@ -771,6 +1003,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_account_welcome: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      claim_newsletter_welcome: {
+        Args: { p_subscription_id: string }
+        Returns: boolean
+      }
+      claim_order_confirmation: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
+      claim_order_to_account: {
+        Args: { p_token: string }
+        Returns: boolean
+      }
+      create_guest_order: {
+        Args: { p_order: Json }
+        Returns: {
+          customer_order_token: string
+          id: string
+        }[]
+      }
       generate_order_number: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -781,6 +1036,26 @@ export type Database = {
       }
       increment_discount_usage: {
         Args: { code_text: string }
+        Returns: undefined
+      }
+      record_order_link_visit: {
+        Args: { p_token: string }
+        Returns: boolean
+      }
+      set_newsletter_subscription: {
+        Args: {
+          p_active: boolean
+          p_email: string
+          p_source: string
+          p_user_id?: string | null
+        }
+        Returns: {
+          subscription_id: string
+          welcome_needed: boolean
+        }[]
+      }
+      subscribe_to_newsletter: {
+        Args: { _email: string; _source?: string }
         Returns: undefined
       }
     }
