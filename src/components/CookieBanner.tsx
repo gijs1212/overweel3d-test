@@ -1,88 +1,113 @@
-"use client"
-
-import { useEffect, useState } from "react"
-
-export default function CookieBanner() {
-  const [showBanner, setShowBanner] = useState(false)
-  const [showNotifyPrompt, setShowNotifyPrompt] = useState(false)
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const accepted = localStorage.getItem("cookiesAccepted")
-      if (accepted !== "true") setShowBanner(true)
-    }
-  }, [])
-
-  const handleAccept = () => {
-    localStorage.setItem("cookiesAccepted", "true")
-    setShowBanner(false)
-    setShowNotifyPrompt(true)
-  }
-
-  const handleDecline = () => {
-    localStorage.setItem("cookiesAccepted", "false")
-    setShowBanner(false)
-  }
-
-  const handleNotifyYes = () => {
-    localStorage.setItem("receiveNotifications", "true")
-    setShowNotifyPrompt(false)
-  }
-
-  const handleNotifyNo = () => {
-    localStorage.removeItem("receiveNotifications")
-    setShowNotifyPrompt(false)
-  }
-
-  if (!showBanner && !showNotifyPrompt) return null
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center z-[1000]">
-      <div className="bg-white p-6 rounded shadow-md w-11/12 md:w-1/2">
-        {showBanner && (
-          <>
-            <h5 className="font-semibold mb-3">
-              We gebruiken cookies om uw ervaring te verbeteren.
-            </h5>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleAccept}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
-                Ja
-              </button>
-              <button
-                onClick={handleDecline}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                Nee
-              </button>
-            </div>
-          </>
-        )}
-        {showNotifyPrompt && (
-          <>
-            <h5 className="font-semibold mb-3">
-              Wilt u graag e‑mailmeldingen ontvangen voor nieuwe producten,
-              kleuren of kortingscodes?
-            </h5>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleNotifyYes}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
-                Ja
-              </button>
-              <button
-                onClick={handleNotifyNo}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                Nee
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+<!-- Cookie Consent Pop-up -->
+<div id="cookie-consent" class="cookie-consent">
+  <div class="cookie-content">
+    <h2>Cookie Notice</h2>
+    <p>We use cookies to enhance your browsing experience. By continuing to use our site, you agree to our <a href="/privacy">Cookie Policy</a>.</p>
+    <div class="cookie-buttons">
+      <button id="accept-cookies">Accept</button>
+      <button id="decline-cookies">Decline</button>
     </div>
-  )
+  </div>
+</div>
+
+<style>
+.cookie-consent {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
+
+.cookie-consent.show {
+  visibility: visible;
+  opacity: 1;
+}
+
+.cookie-content {
+  background-color: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  text-align: center;
+  max-width: 500px;
+  width: 90%;
+}
+
+.cookie-content h2 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.cookie-content p {
+  margin: 1rem 0;
+  font-size: 1rem;
+  color: #555;
+}
+
+.cookie-buttons {
+  margin-top: 1.5rem;
+}
+
+.cookie-buttons button {
+  padding: 0.6rem 1.2rem;
+  margin: 0 0.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+#accept-cookies {
+  background-color: #4CAF50;
+  color: white;
+}
+
+#decline-cookies {
+  background-color: #f44336;
+  color: white;
+}
+
+.cookie-content a {
+  color: #1a0dab;
+  text-decoration: underline;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const cookieConsent = document.getElementById("cookie-consent");
+  const acceptButton = document.getElementById("accept-cookies");
+  const declineButton = document.getElementById("decline-cookies");
+
+  // Check if cookie consent has already been given
+  function hasAcceptedCookies() {
+    return document.cookie.split(";").some(item => item.trim().startsWith("cookieConsent=accepted"));
+  }
+
+  // Show the cookie consent pop-up if not already accepted
+  if (!hasAcceptedCookies()) {
+    cookieConsent.classList.add("show");
+  }
+
+  // Handle accept button click
+  acceptButton.addEventListener("click", () => {
+    document.cookie = "cookieConsent=accepted; max-age=31536000; path=/";
+    cookieConsent.classList.remove("show");
+  });
+
+  // Handle decline button click
+  declineButton.addEventListener("click", () => {
+    document.cookie = "cookieConsent=declined; max-age=31536000; path=/";
+    cookieConsent.classList.remove("show");
+  });
+});
+</script>
