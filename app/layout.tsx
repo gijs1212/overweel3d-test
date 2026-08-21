@@ -4,7 +4,7 @@ import CookieBanner from '@/components/CookieBanner'
 
 export const metadata: Metadata = {
   title: 'Overweel 3D Print Services',
-  description: 'High‑quality 3D printing',
+  description: 'High quality 3D printing services',
 }
 
 export default function RootLayout({
