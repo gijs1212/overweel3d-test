@@ -469,6 +469,7 @@ export default function NewOrder() {
         notes: formData.notes,
         print_preferences: formData.print_preferences,
         instant_quote_price: estimatedTotal,
+        applied_discount_code: discountApplied?.code || null,
         file_links: sections.join("\n\n"),
         catalog_items: catalogItems,
         order_method: orderMethod,
@@ -772,7 +773,7 @@ export default function NewOrder() {
                           <TabsContent value="custom" className="mt-6 space-y-4">
                             <div className="space-y-2">
                               <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200">
-                                ⚠️ <strong>Ontwerpkosten:</strong> Ook bij niet-printen worden ontwerpkosten in rekening gebracht. Doorlooptijd kan langer zijn.
+                                ⚠️ <strong>Ontwerpkosten:</strong> Ook bij niet-printen worden ontwerpkosten in rekening gebracht.
                               </div>
                               <div>
                                 <Label className="text-sm mb-2 block">Foto's (optioneel)</Label>

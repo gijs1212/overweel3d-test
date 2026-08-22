@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "resend";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -98,6 +99,25 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const authorization = req.headers.get("Authorization") || "";
+    const accessToken = authorization.replace(/^Bearer\s+/i, "");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: authData } = accessToken
+      ? await supabase.auth.getUser(accessToken)
+      : { data: { user: null } };
+    const { data: requesterIsAdmin } = authData.user
+      ? await supabase.rpc("has_role", { _user_id: authData.user.id, _role: "admin" })
+      : { data: false };
+    if (requesterIsAdmin !== true) {
+      return new Response(JSON.stringify({ error: "Adminrechten vereist" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     const { orderDetails, customer }: OrderRequest = await req.json();
 
     if (!customer.name || !customer.email || !customer.address) {
@@ -139,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Admin email
     await resend.emails.send({
-      from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+      from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
       to: ["gijsoverweel@gmail.com"],
       subject: `🖨️ Nieuwe bestelling van ${customer.name}`,
       html: `<!DOCTYPE html><html><head><style>${sharedStyle}</style></head><body>
@@ -157,7 +177,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Customer confirmation email
     await resend.emails.send({
-      from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+      from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
       to: [customer.email],
       subject: `✅ Bevestiging van uw bestelling bij Overweel3D`,
       html: `<!DOCTYPE html><html><head><style>${sharedStyle}</style></head><body>

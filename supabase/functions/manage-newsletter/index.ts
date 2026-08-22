@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const mailFrom = "Overweel3D <nieuwsbrief@overweel3d.gijsoverweel.nl>";
+const mailFrom = "Overweel3D <info@overweel3d.gijsoverweel.nl>";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function jsonResponse(payload: Record<string, unknown>, status = 200) {

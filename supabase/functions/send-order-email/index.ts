@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-const mailFrom = "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>";
+const mailFrom = "Overweel3D <info@overweel3d.gijsoverweel.nl>";
 const adminEmail = "gijsoverweel@gmail.com";
 
 interface EmailOrder {

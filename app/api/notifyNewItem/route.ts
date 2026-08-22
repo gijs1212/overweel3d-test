@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     const emailPromises = (subscribers || []).map(async (sub) => {
       const emailPayload = {
-        from: 'info@overweel.com', // change as needed
+        from: 'Overweel3D <info@overweel3d.gijsoverweel.nl>',
         to: sub.email,
         subject: `Nieuw ${type === 'discount_code' ? 'Kortingscode' : type === 'color' ? 'Kleur' : 'Product'} toegevoegd`,
         html: `<p>Er is een nieuwe ${type} toegevoegd:</p><p><b>${

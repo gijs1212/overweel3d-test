@@ -5,7 +5,7 @@ const testimonials = [
   {
     name: "Thomas de Vries",
     role: "Hobbyist maker",
-    content: "Eindelijk een 3D-printservice die begrijpt wat ik nodig heb. Snelle levering en top kwaliteit!",
+    content: "Eindelijk een 3D-printservice die begrijpt wat ik nodig heb. Persoonlijke service en topkwaliteit!",
     rating: 5,
     avatar: "T",
   },
@@ -19,7 +19,7 @@ const testimonials = [
   {
     name: "Mark Bakker",
     role: "Startup founder",
-    content: "Prototypes bestellen was nog nooit zo makkelijk. Van upload tot product in 3 dagen!",
+    content: "Prototypes bestellen was nog nooit zo makkelijk. Van upload tot product verliep alles duidelijk!",
     rating: 5,
     avatar: "M",
   },

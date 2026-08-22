@@ -13,18 +13,44 @@ serve(async (req: Request) => {
     const { orderId, message, senderType } = await req.json();
     if (!orderId || !message || !senderType) throw new Error("Missing required fields");
 
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      serviceRoleKey
     );
+
+    const authorization = req.headers.get("Authorization") || "";
+    const accessToken = authorization.replace(/^Bearer\s+/i, "");
+    const isInternalRequest = accessToken === serviceRoleKey;
+    const { data: authData } = !isInternalRequest && accessToken
+      ? await supabase.auth.getUser(accessToken)
+      : { data: { user: null } };
+    const { data: requesterIsAdmin } = authData.user
+      ? await supabase.rpc("has_role", { _user_id: authData.user.id, _role: "admin" })
+      : { data: false };
 
     const { data: order } = await supabase
       .from("orders")
-      .select("order_number, customer_email, customer_name")
+      .select("order_number, customer_email, customer_name, user_id")
       .eq("id", orderId)
       .single();
 
     if (!order) throw new Error("Order not found");
+
+    const isOwner = Boolean(authData.user && order.user_id === authData.user.id);
+    if (!isInternalRequest && !isOwner && requesterIsAdmin !== true) {
+      return new Response(JSON.stringify({ error: "Geen toegang tot deze bestelling" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (senderType === "admin" && !isInternalRequest && requesterIsAdmin !== true) {
+      return new Response(JSON.stringify({ error: "Adminrechten vereist" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
@@ -35,7 +61,7 @@ serve(async (req: Request) => {
     if (senderType === "customer") {
       // Notify admin
       await resend.emails.send({
-        from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+        from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
         to: ["gijsoverweel@gmail.com"],
         subject: `💬 Nieuw bericht bij ${order.order_number}`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
@@ -51,7 +77,7 @@ serve(async (req: Request) => {
       // Notify customer
       const orderLink = `https://overweel3d.gijsoverweel.nl/order/${orderId}`;
       await resend.emails.send({
-        from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+        from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
         subject: `💬 Nieuw bericht bij bestelling ${order.order_number}`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">

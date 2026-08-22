@@ -66,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send notification email to Overweel3D
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: "Overweel3D <onboarding@resend.dev>",
+      from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
       to: ["gijsoverweel@gmail.com"],
       reply_to: cleanEmail,
       subject: `💬 Nieuw bericht: ${cleanSubject}`,

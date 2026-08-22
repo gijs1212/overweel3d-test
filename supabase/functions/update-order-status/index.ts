@@ -47,7 +47,7 @@ serve(async (req: Request) => {
 
       // Email to customer
       await resend.emails.send({
-        from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+        from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
         to: [order.customer_email],
        subject: `✅ Bestelling ${order.order_number} geaccepteerd`,
         html: buildAcceptEmailCustomer(order, orderLink),
@@ -55,7 +55,7 @@ serve(async (req: Request) => {
 
       // Email to admin
       await resend.emails.send({
-        from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+        from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
         to: ["gijsoverweel@gmail.com"],
         subject: `✅ ${order.customer_name} heeft bestelling ${order.order_number} geaccepteerd`,
         html: buildAcceptEmailAdmin(order),
@@ -75,7 +75,7 @@ serve(async (req: Request) => {
 
       // Email to admin
       await resend.emails.send({
-        from: "Overweel3D <bestellingen@overweel3d.gijsoverweel.nl>",
+        from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
         to: ["gijsoverweel@gmail.com"],
         subject: `❌ ${order.customer_name} heeft bestelling ${order.order_number} afgewezen`,
         html: `<h2>Bestelling afgewezen</h2><p><strong>${order.customer_name}</strong> (${order.customer_email}) heeft bestelling <strong>${order.order_number}</strong> afgewezen.</p><p>Definitieve prijs was: €${order.final_price}</p>`,

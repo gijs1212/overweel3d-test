@@ -6,7 +6,7 @@ const steps = [
   { icon: Search, title: "Controle", description: "Wij beoordelen printbaarheid, maat en materiaalkeuze." },
   { icon: FileText, title: "Vrijblijvende offerte", description: "U ontvangt een helder voorstel, zonder verrassingen." },
   { icon: Cog, title: "Productie", description: "Professionele fabricage met modern machinepark." },
-  { icon: Truck, title: "Levering of afhalen", description: "Zorgvuldig verpakt en snel bij u — of persoonlijk opgehaald." },
+  { icon: Truck, title: "Levering of afhalen", description: "Zorgvuldig verpakt voor verzending — of persoonlijk opgehaald." },
 ];
 
 export function Steps() {

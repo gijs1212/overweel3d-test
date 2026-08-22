@@ -31,6 +31,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    const authorization = req.headers.get('Authorization') || '';
+    const accessToken = authorization.replace(/^Bearer\s+/i, '');
+    const { data: authData } = accessToken
+      ? await supabase.auth.getUser(accessToken)
+      : { data: { user: null } };
+    if (!authData.user) {
+      return new Response(JSON.stringify({ error: 'Inloggen is verplicht' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { data: code } = await supabase
       .from('discount_codes')
       .select('*')
@@ -51,13 +63,46 @@ Deno.serve(async (req) => {
 
     const { data: order } = await supabase
       .from('orders')
-      .select('id, order_number, instant_quote_price, final_price, customer_email')
+      .select('id, user_id, order_number, instant_quote_price, final_price, customer_email, applied_discount_code')
       .eq('id', order_id)
       .maybeSingle();
 
     if (!order) {
       return new Response(JSON.stringify({ error: 'order-not-found' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: requesterIsAdmin } = await supabase.rpc('has_role', {
+      _user_id: authData.user.id,
+      _role: 'admin',
+    });
+    if (order.user_id !== authData.user.id && requesterIsAdmin !== true) {
+      return new Response(JSON.stringify({ error: 'Geen toegang tot deze bestelling' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (order.applied_discount_code?.toUpperCase() !== code.code.toUpperCase()) {
+      return new Response(JSON.stringify({ error: 'Deze referralcode is niet op de bestelling toegepast' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: existingReward } = await supabase
+      .from('discount_codes')
+      .select('code, discount_value')
+      .eq('source_order_id', order.id)
+      .maybeSingle();
+    if (existingReward) {
+      return new Response(JSON.stringify({
+        ok: true,
+        skipped: 'reward-already-created',
+        reward: Number(existingReward.discount_value),
+        code: existingReward.code,
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -103,8 +148,14 @@ Deno.serve(async (req) => {
       expires_at: expiresAt.toISOString(),
       assigned_to_email: code.owner_email,
       parent_code_id: code.id,
+      source_order_id: order.id,
     });
 
+    if (insertErr?.code === '23505') {
+      return new Response(JSON.stringify({ ok: true, skipped: 'reward-already-created' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     if (insertErr) throw insertErr;
 
     // Email owner via Resend gateway
@@ -134,7 +185,7 @@ Deno.serve(async (req) => {
           'X-Connection-Api-Key': RESEND_API_KEY,
         },
         body: JSON.stringify({
-          from: 'Overweel3D <onboarding@resend.dev>',
+          from: 'Overweel3D <info@overweel3d.gijsoverweel.nl>',
           to: [code.owner_email],
           subject: 'U heeft een beloning ontvangen van Overweel3D',
           html,

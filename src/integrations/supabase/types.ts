@@ -125,6 +125,7 @@ export type Database = {
           owner_name: string | null
           parent_code_id: string | null
           reward_percentage: number | null
+          source_order_id: string | null
           times_used: number
           updated_at: string
         }
@@ -143,6 +144,7 @@ export type Database = {
           owner_name?: string | null
           parent_code_id?: string | null
           reward_percentage?: number | null
+          source_order_id?: string | null
           times_used?: number
           updated_at?: string
         }
@@ -161,6 +163,7 @@ export type Database = {
           owner_name?: string | null
           parent_code_id?: string | null
           reward_percentage?: number | null
+          source_order_id?: string | null
           times_used?: number
           updated_at?: string
         }
@@ -487,6 +490,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          applied_discount_code: string | null
           approved_at: string | null
           billing_address: string | null
           catalog_items: Json
@@ -547,6 +551,7 @@ export type Database = {
           vat_number: string | null
         }
         Insert: {
+          applied_discount_code?: string | null
           approved_at?: string | null
           billing_address?: string | null
           catalog_items?: Json
@@ -607,6 +612,7 @@ export type Database = {
           vat_number?: string | null
         }
         Update: {
+          applied_discount_code?: string | null
           approved_at?: string | null
           billing_address?: string | null
           catalog_items?: Json

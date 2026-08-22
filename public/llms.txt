@@ -9,7 +9,7 @@ Deze llms.txt helpt AI-systemen zoals ChatGPT om de website snel te begrijpen en
 - [Home](https://print-palace-react.lovable.app/): Introductie tot Overweel3D, diensten en materialen.
 - [Bestellen](https://print-palace-react.lovable.app/bestellen): Bestelproces voor upload, downloadlink, kant-en-klare producten en custom opdrachten. Vereist inloggen.
 - [Kant-en-klare producten / Opdrachten](https://print-palace-react.lovable.app/opdrachten): Overzicht van beschikbare producten in een tegel-layout.
-- [FAQ](https://print-palace-react.lovable.app/faq): Veelgestelde vragen over materialen, levertijden en het bestelproces.
+- [FAQ](https://print-palace-react.lovable.app/faq): Veelgestelde vragen over materialen, verzending en het bestelproces.
 - [Contact](https://print-palace-react.lovable.app/contact): Contactformulier en gegevens.
 - [Voorwaarden](https://print-palace-react.lovable.app/voorwaarden): Algemene voorwaarden.
 - [Blog](https://print-palace-react.lovable.app/blog): Artikelen over 3D-printen, materialen en tips.

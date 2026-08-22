@@ -7,7 +7,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HelpCircle, Package, Clock, CreditCard, Printer, AlertCircle, Palette, FileType } from "lucide-react";
+import { HelpCircle, Package, Truck, CreditCard, Printer, AlertCircle, Palette, FileType } from "lucide-react";
 
 const faqData = [
   {
@@ -69,13 +69,9 @@ const faqData = [
     ],
   },
   {
-    category: "Levertijd",
-    icon: Clock,
+    category: "Verzending",
+    icon: Truck,
     questions: [
-      {
-        q: "Hoe lang duurt het voordat ik mijn print heb?",
-        a: "Gemiddeld 3-5 werkdagen, afhankelijk van de grootte van de bestelling. Spoedorders? Neem contact op, we kijken wat er mogelijk is.",
-      },
       {
         q: "Kan ik mijn bestelling tracken?",
         a: "Ja! Zodra uw pakket onderweg is, krijgt u een track & trace code. U kunt live meekijken hoe uw print naar u toe reist.",
@@ -145,7 +141,7 @@ export default function FAQ() {
                 Hoe kunnen we helpen?
               </h1>
               <p className="text-lg text-muted-foreground">
-                Van bestandsformaten tot levertijden – hier vindt u antwoord op de meest gestelde vragen.
+                Van bestandsformaten tot verzending – hier vindt u antwoord op de meest gestelde vragen.
               </p>
             </motion.div>
           </div>
