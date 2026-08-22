@@ -36,4 +36,19 @@ describe("automatic newsletters", () => {
     expect(mocks.invoke).toHaveBeenCalledWith("send-marketing-email", { body: event });
     expect(result).toEqual({ campaignsSent: 1, recipientsReached: 1, errors: [] });
   });
+
+  it("verstuurd openbare kortingscodes via het kortingscodesjabloon", async () => {
+    mocks.invoke.mockResolvedValue({ data: { success: true, sentCount: 4 }, error: null });
+    const event = {
+      templateKind: "discount" as const,
+      changeType: "new" as const,
+      itemName: "ZOMER10",
+      details: "Gebruik code ZOMER10 voor 10% korting.",
+    };
+
+    const result = await sendAutomaticNewsletters([event]);
+
+    expect(mocks.invoke).toHaveBeenCalledWith("send-marketing-email", { body: event });
+    expect(result).toEqual({ campaignsSent: 1, recipientsReached: 4, errors: [] });
+  });
 });

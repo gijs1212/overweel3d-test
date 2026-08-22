@@ -27,6 +27,7 @@ interface Order {
   shipping_address: string; postal_code: string; city: string; country: string;
   vat_number: string; material: string; color: string; quantity: number; notes: string;
   print_preferences: string; instant_quote_price: number; final_price: number | null;
+  applied_discount_code: string | null;
   tikkie_link: string | null; status: OrderStatus; customer_order_token: string;
   customer_visible_notes: string; internal_notes: string; file_links: string;
   order_method: string; submitted_at: string; approved_at: string | null;
@@ -634,6 +635,7 @@ export default function AdminOrderEdit() {
                 <div>
                   <Label>Definitieve prijs (€)</Label>
                   <Input type="number" step="0.01" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} placeholder="0.00" />
+                  {order.applied_discount_code && <p className="text-xs text-muted-foreground mt-1">Toegepaste kortingscode: <span className="font-mono font-semibold">{order.applied_discount_code}</span></p>}
                 </div>
                 <div className="md:col-span-2">
                   <Label>Tikkie betaallink</Label>

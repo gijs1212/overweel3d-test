@@ -10,7 +10,7 @@ const mailFrom = "Overweel3D <info@overweel3d.gijsoverweel.nl>";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const pageSize = 1_000;
 
-type TemplateKind = "color" | "material" | "article" | "custom";
+type TemplateKind = "color" | "material" | "article" | "discount" | "custom";
 type ChangeType = "new" | "removed";
 type Audience = "newsletter" | "all_customers";
 
@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
       message?: string;
     };
     const templateKind = body.templateKind;
-    if (!templateKind || !["color", "material", "article", "custom"].includes(templateKind)) {
+    if (!templateKind || !["color", "material", "article", "discount", "custom"].includes(templateKind)) {
       return jsonResponse({ error: "Kies een geldig e-mailsjabloon." }, 400);
     }
 
@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
       const details = String(body.details || "").trim();
       const itemUrl = normalizeOptionalUrl(body.itemUrl);
       if (itemName.length < 1 || itemName.length > 160) {
-        return jsonResponse({ error: "Vul de naam van de kleur, het materiaal of het artikel in." }, 400);
+        return jsonResponse({ error: "Vul de naam van de kleur, het materiaal, het artikel of de kortingscode in." }, 400);
       }
       if (details.length > 5_000) return jsonResponse({ error: "De toelichting is te lang." }, 400);
       const standard = buildStandardTemplate(
@@ -248,16 +248,20 @@ function buildStandardTemplate(
   itemUrl: string,
   temporarilyUnavailable = false,
 ) {
-  const labels = { color: "kleur", material: "materiaal", article: "artikel" } as const;
+  const labels = { color: "kleur", material: "materiaal", article: "artikel", discount: "kortingscode" } as const;
   const label = labels[kind];
   const isNew = change === "new";
   const isTemporary = kind === "color" && change === "removed" && temporarilyUnavailable;
-  const subject = isTemporary
+  const subject = kind === "discount" && isNew
+    ? `Nieuwe kortingscode bij Overweel3D: ${itemName}`
+    : isTemporary
     ? `Kleur tijdelijk niet beschikbaar: ${itemName}`
     : isNew
       ? `Nieuw ${label} bij Overweel3D: ${itemName}`
       : `${capitalize(label)} niet meer beschikbaar: ${itemName}`;
-  const intro = isTemporary
+  const intro = kind === "discount" && isNew
+    ? `Er is een nieuwe openbare kortingscode beschikbaar: ${itemName}.`
+    : isTemporary
     ? `${itemName} is tijdelijk niet beschikbaar. Deze kleur komt waarschijnlijk later weer terug in ons aanbod.`
     : isNew
       ? `Goed nieuws: ${itemName} is nieuw toegevoegd aan ons aanbod.`

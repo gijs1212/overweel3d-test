@@ -120,6 +120,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_referral: boolean
+          is_public: boolean
           max_uses: number | null
           owner_email: string | null
           owner_name: string | null
@@ -139,6 +140,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_referral?: boolean
+          is_public?: boolean
           max_uses?: number | null
           owner_email?: string | null
           owner_name?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_referral?: boolean
+          is_public?: boolean
           max_uses?: number | null
           owner_email?: string | null
           owner_name?: string | null

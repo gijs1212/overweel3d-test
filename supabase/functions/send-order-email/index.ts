@@ -24,6 +24,7 @@ interface EmailOrder {
   quantity: number | null;
   instant_quote_price: number | null;
   final_price: number | null;
+  applied_discount_code: string | null;
   billing_address: string | null;
   shipping_address: string | null;
   postal_code: string | null;
@@ -235,6 +236,9 @@ function buildAdminCreatedConfirmationEmail(order: EmailOrder, orderLink: string
   const price = order.final_price == null
     ? ""
     : `<p><strong>Definitieve prijs:</strong> €${Number(order.final_price).toFixed(2)}</p>`;
+  const discount = order.applied_discount_code
+    ? `<p><strong>Toegepaste kortingscode:</strong> ${escapeHtml(order.applied_discount_code)}</p>`
+    : "";
   return `<!DOCTYPE html><html><body style="font-family:'Segoe UI',sans-serif;color:#1B365D;max-width:600px;margin:0 auto;line-height:1.6">
     <div style="background:#1B365D;color:white;padding:30px;text-align:center"><h1 style="margin:0">Bedankt voor uw bestelling!</h1></div>
     <div style="padding:30px;background:#f8fafc">
@@ -246,6 +250,7 @@ function buildAdminCreatedConfirmationEmail(order: EmailOrder, orderLink: string
         ${order.color ? `<p><strong>Kleur:</strong> ${escapeHtml(order.color)}</p>` : ""}
         <p><strong>Totaal producten:</strong> ${escapeHtml(order.total_products ?? order.quantity ?? 0)}</p>
         <p><strong>Aantal platen:</strong> ${escapeHtml(order.total_plates ?? 0)}</p>
+        ${discount}
         ${price}
       </div>
       <p style="text-align:center;margin:28px 0"><a href="${escapeHtml(orderLink)}" style="display:inline-block;background:#00b4d8;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600">Bekijk uw bestelling</a></p>

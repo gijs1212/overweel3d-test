@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
 
 interface DiscountCode {
   id: string;
@@ -24,6 +25,7 @@ interface DiscountCode {
   active: boolean;
   created_at: string;
   is_referral?: boolean;
+  is_public: boolean;
   owner_email?: string | null;
   owner_name?: string | null;
   reward_percentage?: number | null;
@@ -50,6 +52,7 @@ export default function AdminDiscountCodes() {
     max_uses: "" as string,
     expires_at: "",
     is_referral: false,
+    is_public: false,
     owner_email: "",
     owner_name: "",
     reward_percentage: 10,
@@ -97,15 +100,37 @@ export default function AdminDiscountCodes() {
         max_uses: form.max_uses ? parseInt(form.max_uses) : null,
         expires_at: form.expires_at || null,
         is_referral: form.is_referral,
+        is_public: form.is_public,
         owner_email: form.is_referral ? form.owner_email.trim().toLowerCase() : null,
         owner_name: form.is_referral ? form.owner_name.trim() || null : null,
         reward_percentage: form.is_referral ? form.reward_percentage : null,
       };
-      const { error } = await supabase.from("discount_codes").insert(payload);
+      const { data: createdCode, error } = await supabase.from("discount_codes").insert(payload).select("code,discount_type,discount_value,expires_at,is_public").single();
       if (error) throw error;
-      toast({ title: "Kortingscode aangemaakt ✅" });
-      setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, owner_email: "", owner_name: "", reward_percentage: 10 });
-      fetchCodes();
+      let newsletterError = "";
+      if (createdCode.is_public) {
+        const valueLabel = createdCode.discount_type === "percentage"
+          ? `${Number(createdCode.discount_value)}% korting`
+          : `€${Number(createdCode.discount_value).toFixed(2)} korting`;
+        const expiryLabel = createdCode.expires_at
+          ? ` Geldig tot en met ${new Date(createdCode.expires_at).toLocaleDateString("nl-NL")}.`
+          : "";
+        const newsletter = await sendAutomaticNewsletters([{
+          templateKind: "discount",
+          changeType: "new",
+          itemName: createdCode.code,
+          details: `Gebruik code ${createdCode.code} voor ${valueLabel}.${expiryLabel}`,
+          itemUrl: `${window.location.origin}/bestellen`,
+        }]);
+        newsletterError = newsletter.errors[0] || "";
+      }
+      toast({
+        title: newsletterError ? "Kortingscode aangemaakt, nieuwsbrief mislukt" : "Kortingscode aangemaakt ✅",
+        description: newsletterError || (createdCode.is_public ? "De kortingscode is naar de nieuwsbriefabonnees gestuurd." : "Privécode: er is geen nieuwsbrief verstuurd."),
+        variant: newsletterError ? "destructive" : "default",
+      });
+      setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, is_public: false, owner_email: "", owner_name: "", reward_percentage: 10 });
+      await fetchCodes();
     } catch (error: unknown) {
       toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" });
     } finally { setSaving(false); }
@@ -150,6 +175,12 @@ export default function AdminDiscountCodes() {
               <Switch id="is_referral" checked={form.is_referral} onCheckedChange={(v) => setForm({ ...form, is_referral: v })} />
               <Label htmlFor="is_referral" className="cursor-pointer flex items-center gap-2">
                 <Users className="w-4 h-4" /> Referral code (eigenaar ontvangt beloning per gebruik)
+              </Label>
+            </div>
+            <div className="flex items-center gap-3 mb-4 p-3 rounded-xl border">
+              <Switch id="is_public" checked={form.is_public} onCheckedChange={(is_public) => setForm({ ...form, is_public })} />
+              <Label htmlFor="is_public" className="cursor-pointer">
+                {form.is_public ? "Openbaar – direct versturen naar de nieuwsbrief" : "Privé – geen nieuwsbrief versturen"}
               </Label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -229,6 +260,9 @@ export default function AdminDiscountCodes() {
                             <Users className="w-3 h-3" /> Referral · {c.reward_percentage}%
                           </span>
                         )}
+                        <span className={`text-xs px-2 py-0.5 rounded ${c.is_public ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>
+                          {c.is_public ? "Openbaar" : "Privé"}
+                        </span>
                         {c.assigned_to_email && (
                           <span className="text-xs bg-muted px-2 py-0.5 rounded">Persoonlijk: {c.assigned_to_email}</span>
                         )}

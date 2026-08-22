@@ -8,13 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Loader2, ArrowLeft } from "lucide-react";
+import { Save, Loader2, ArrowLeft, Tag, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus, MATERIALS } from "@/lib/constants";
 import { normalizePlatePrintQuantities } from "@/lib/plateTracking";
 import { availableFilamentColorsForMaterial, FilamentColor } from "@/lib/productCatalog";
+import { calculateDiscount, discountValidationError, type ApplicableDiscount } from "@/lib/discounts";
 
 export default function AdminNewOrder() {
   const { isAdmin, loading: authLoading } = useAuth();
@@ -34,6 +35,12 @@ export default function AdminNewOrder() {
   const [status, setStatus] = useState<OrderStatus>("submitted");
   const [internalNotes, setInternalNotes] = useState("");
   const [filamentColors, setFilamentColors] = useState<FilamentColor[]>([]);
+  const [discountCode, setDiscountCode] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState<ApplicableDiscount | null>(null);
+  const [checkingDiscount, setCheckingDiscount] = useState(false);
+
+  const baseFinalPrice = Number(finalPrice);
+  const discountPricing = calculateDiscount(baseFinalPrice, appliedDiscount);
 
   useEffect(() => {
     if (authLoading || !isAdmin) return;
@@ -96,6 +103,41 @@ export default function AdminNewOrder() {
     )));
   };
 
+  const applyDiscountCode = async () => {
+    if (!discountCode.trim()) return;
+    if (!Number.isFinite(baseFinalPrice) || baseFinalPrice <= 0) {
+      toast({ title: "Vul eerst een definitieve prijs in", variant: "destructive" });
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(customerEmail.trim())) {
+      toast({ title: "Vul eerst een geldig e-mailadres van de klant in", variant: "destructive" });
+      return;
+    }
+    setCheckingDiscount(true);
+    try {
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .select("code,discount_type,discount_value,active,expires_at,max_uses,times_used,assigned_to_email,is_referral")
+        .eq("code", discountCode.toUpperCase().trim())
+        .maybeSingle();
+      if (error) throw error;
+      const candidate = data as ApplicableDiscount | null;
+      const validationError = discountValidationError(candidate, customerEmail);
+      if (validationError) {
+        setAppliedDiscount(null);
+        toast({ title: validationError, variant: "destructive" });
+        return;
+      }
+      setAppliedDiscount(candidate);
+      setDiscountCode(candidate!.code);
+      toast({ title: `Kortingscode ${candidate!.code} toegepast` });
+    } catch (error) {
+      toast({ title: "Kortingscode controleren mislukt", description: error instanceof Error ? error.message : "Onbekende fout", variant: "destructive" });
+    } finally {
+      setCheckingDiscount(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!customerName.trim() || !customerEmail.trim()) {
       toast({ title: "Naam en e-mail van klant zijn verplicht", variant: "destructive" });
@@ -115,6 +157,23 @@ export default function AdminNewOrder() {
     const normalizedPrintQuantities = normalizePlatePrintQuantities(platePrintQuantities, parsedPlates);
     setSaving(true);
     try {
+      let verifiedDiscount: ApplicableDiscount | null = null;
+      if (appliedDiscount) {
+        const { data, error: discountError } = await supabase
+          .from("discount_codes")
+          .select("code,discount_type,discount_value,active,expires_at,max_uses,times_used,assigned_to_email,is_referral")
+          .eq("code", appliedDiscount.code)
+          .maybeSingle();
+        if (discountError) throw discountError;
+        verifiedDiscount = data as ApplicableDiscount | null;
+        const validationError = discountValidationError(verifiedDiscount, customerEmail);
+        if (validationError) throw new Error(validationError);
+      }
+      const parsedFinalPrice = finalPrice ? Number(finalPrice) : null;
+      if (parsedFinalPrice !== null && (!Number.isFinite(parsedFinalPrice) || parsedFinalPrice < 0)) throw new Error("Vul een geldige definitieve prijs in.");
+      if (verifiedDiscount && (!parsedFinalPrice || parsedFinalPrice <= 0)) throw new Error("Een kortingscode kan alleen op een prijs groter dan €0 worden toegepast.");
+      const finalPricing = calculateDiscount(parsedFinalPrice || 0, verifiedDiscount);
+
       const { data: orderNumData, error: orderNumError } = await supabase.rpc("generate_order_number");
       if (orderNumError) throw orderNumError;
       const orderNumber = orderNumData as string;
@@ -139,7 +198,8 @@ export default function AdminNewOrder() {
           plate_print_statuses: Array.from({ length: parsedPlates }, () => false),
           plate_runs_required_per_plate: normalizedPrintQuantities,
           notes: filenames ? `Bestandsnamen: ${filenames}` : "",
-          final_price: finalPrice ? parseFloat(finalPrice) : null,
+          final_price: parsedFinalPrice === null ? null : finalPricing.total,
+          applied_discount_code: verifiedDiscount?.code || null,
           instant_quote_price: 0,
           status,
           internal_notes: internalNotes,
@@ -148,6 +208,18 @@ export default function AdminNewOrder() {
         .single();
 
       if (error) throw error;
+
+      let discountUsageWarning = "";
+      if (verifiedDiscount) {
+        const { error: usageError } = await supabase.rpc("increment_discount_usage", { code_text: verifiedDiscount.code });
+        if (usageError) discountUsageWarning = ` Het gebruik van kortingscode ${verifiedDiscount.code} kon niet worden bijgewerkt.`;
+        if (verifiedDiscount.is_referral) {
+          const { error: referralError } = await supabase.functions.invoke("process-referral-reward", {
+            body: { order_id: order.id, discount_code: verifiedDiscount.code },
+          });
+          if (referralError) discountUsageWarning += " De referralbeloning kon niet automatisch worden verwerkt.";
+        }
+      }
 
       const { data: mailData, error: mailError } = await supabase.functions.invoke("send-order-email", {
         body: { type: "admin_order_created", orderId: order.id },
@@ -162,7 +234,7 @@ export default function AdminNewOrder() {
       } else {
         toast({
           title: `Bestelling ${orderNumber} aangemaakt`,
-          description: "De klant heeft één bedankmail ontvangen.",
+          description: `De klant heeft één bedankmail ontvangen.${discountUsageWarning}`,
         });
       }
       navigate(`/admin/order/${order.id}`);
@@ -199,7 +271,7 @@ export default function AdminNewOrder() {
                 </div>
                 <div>
                   <Label>E-mail klant *</Label>
-                  <Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="klant@email.nl" />
+                  <Input type="email" value={customerEmail} onChange={(e) => { setCustomerEmail(e.target.value); setAppliedDiscount(null); }} placeholder="klant@email.nl" />
                 </div>
               </div>
 
@@ -296,6 +368,26 @@ export default function AdminNewOrder() {
               <div>
                 <Label>Definitieve prijs (€)</Label>
                 <Input type="number" step="0.01" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} placeholder="0.00" />
+              </div>
+
+              <div className="rounded-xl border p-4 space-y-3">
+                <Label className="flex items-center gap-2"><Tag className="w-4 h-4" /> Kortingscode klant</Label>
+                {appliedDiscount ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-emerald/10 p-3">
+                    <div className="text-sm">
+                      <strong>{appliedDiscount.code}</strong> · {appliedDiscount.discount_type === "percentage" ? `${Number(appliedDiscount.discount_value)}%` : `€${Number(appliedDiscount.discount_value).toFixed(2)}`} korting
+                      <p className="text-muted-foreground mt-1">Korting: €{discountPricing.discountAmount.toFixed(2)} · Nieuwe prijs: €{discountPricing.total.toFixed(2)}</p>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setAppliedDiscount(null); setDiscountCode(""); }}><X className="w-4 h-4" /> Verwijderen</Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="Voer kortingscode in" />
+                    <Button type="button" variant="outline" onClick={applyDiscountCode} disabled={checkingDiscount || !discountCode.trim()}>
+                      {checkingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Toepassen"}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div>

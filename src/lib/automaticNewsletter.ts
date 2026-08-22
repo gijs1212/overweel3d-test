@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getFunctionErrorMessage } from "@/lib/functionErrors";
 
-export type AutomaticNewsletterKind = "color" | "material" | "article";
+export type AutomaticNewsletterKind = "color" | "material" | "article" | "discount";
 export type AutomaticNewsletterChange = "new" | "removed";
 
 export interface AutomaticNewsletterEvent {

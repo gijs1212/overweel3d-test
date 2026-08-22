@@ -28,6 +28,7 @@ interface Order {
   notes: string;
   instant_quote_price: number;
   final_price: number | null;
+  applied_discount_code: string | null;
   tikkie_link: string | null;
   status: OrderStatus;
   customer_visible_notes: string;
@@ -381,6 +382,12 @@ export default function OrderDetail() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Definitieve prijs</span>
                       <span className="font-semibold text-accent">€{Number(order.final_price).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.applied_discount_code && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Kortingscode</span>
+                      <span className="font-mono font-semibold">{order.applied_discount_code}</span>
                     </div>
                   )}
                   {(order.shipping_cost || 0) > 0 && (
