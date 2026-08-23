@@ -37,6 +37,8 @@ import AdminReviews from "./pages/AdminReviews";
 import AdminGiftCards from "./pages/AdminGiftCards";
 import AdminFilamentInventoryPage from "./pages/AdminFilamentInventoryPage";
 import AdminPriceCalculatorPage from "./pages/AdminPriceCalculatorPage";
+import AdminOrderFiles from "./pages/AdminOrderFiles";
+import AdminAssignments from "./pages/AdminAssignments";
 import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
@@ -83,6 +85,8 @@ const App = () => (
             <Route path="/admin/gift-cards" element={<AdminGiftCards />} />
             <Route path="/admin/filament-inventory" element={<AdminFilamentInventoryPage />} />
             <Route path="/admin/price-calculator" element={<AdminPriceCalculatorPage />} />
+            <Route path="/admin/order-files" element={<AdminOrderFiles />} />
+            <Route path="/admin/assignments" element={<AdminAssignments />} />
             <Route path="/kleuren" element={<Kleuren />} />
             <Route path="/blog" element={<Blog />} />
 

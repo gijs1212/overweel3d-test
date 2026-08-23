@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator, Upload, ImagePlus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -221,8 +221,8 @@ export default function AdminDashboard() {
             <div className="mb-5"><p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Beheer</p><h2 className="mt-1 text-xl font-semibold">Alle onderdelen</h2></div>
             <div className="grid gap-3 md:grid-cols-2">
             {[
-              ["Bestellingen & klanten", [["Klanten", "/admin/customers", Users], ["Nieuwe bestelling", "/admin/new-order", Plus]]],
-              ["Catalogus", [["Producten & varianten", "/admin/products", ShoppingBag], ["Materialen", "/admin/materials", Layers3], ["Kleuren", "/admin/colors", Palette], ["Reviews", "/admin/reviews", Star]]],
+              ["Bestellingen & klanten", [["Klanten", "/admin/customers", Users], ["Nieuwe bestelling", "/admin/new-order", Plus], ["Bestanden uploaden", "/admin/order-files", Upload]]],
+              ["Catalogus", [["Opdrachten", "/admin/assignments", ImagePlus], ["Producten & varianten", "/admin/products", ShoppingBag], ["Materialen", "/admin/materials", Layers3], ["Kleuren", "/admin/colors", Palette], ["Reviews", "/admin/reviews", Star]]],
               ["Marketing", [["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Loyaliteitsprogramma", "/admin#loyaliteitsprogramma", Gift], ["Blog & content", "/admin/blog", FileText]]],
               ["Productie & inzicht", [["Printers & plaatkoppeling", "/admin/production", Printer], ["Filamentvoorraad", "/admin/filament-inventory", Boxes], ["Automatische prijsberekening", "/admin/price-calculator", Calculator], ["Kostenrapportage", "/admin/reports", BarChart3], ["Websitecontent", "/admin/content", Megaphone]]],
             ].map(([title, items]) => <section key={title as string} className="rounded-xl border border-black/10 bg-neutral-50 p-4"><h3 className="mb-2 text-sm font-bold">{title as string}</h3><div className="space-y-1">{(items as [string,string,typeof Package][]).map(([label,to,Icon]) => <Link key={to} to={to} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-black/65 transition-colors hover:bg-black hover:text-white"><Icon className="w-4 h-4"/><span className="flex-1">{label}</span><ChevronRight className="w-4 h-4 opacity-40"/></Link>)}</div></section>)}
@@ -359,9 +359,14 @@ export default function AdminDashboard() {
                             {new Date(order.submitted_at).toLocaleDateString("nl-NL")}
                           </td>
                           <td className="p-4 text-right">
-                            <Link to={`/admin/order/${order.id}`}>
-                              <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /> Bekijken</Button>
-                            </Link>
+                            <div className="flex items-center justify-end gap-1">
+                              <Link to={`/admin/order-files?order=${order.id}`}>
+                                <Button variant="ghost" size="sm"><Upload className="w-4 h-4" /> Uploaden</Button>
+                              </Link>
+                              <Link to={`/admin/order/${order.id}`}>
+                                <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /> Bekijken</Button>
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       );

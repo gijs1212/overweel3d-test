@@ -188,32 +188,40 @@ export default function AdminProduction() {
       return;
     }
     setCheckingJobId(request.id);
-    const [jobResult, printerResult] = await Promise.all([
-      supabase.from("print_jobs").select("*").eq("order_id", request.order_id),
-      supabase.from("printers").select("*"),
+    const refreshResult = await supabase.rpc("refresh_order_plate_data", { p_order_id: request.order_id });
+    const [printerResult, jobResult, slotResult, orderResult] = await Promise.all([
+      supabase.from("printers").select("*").order("name"),
+      supabase.from("print_jobs").select("*").order("created_at", { ascending: false }),
+      supabase.from("printer_ams_slots").select("*").order("ams_unit").order("slot_number"),
+      supabase.from("orders").select("id,order_number,customer_name,total_plates,plate_runs_required_per_plate").not("status", "in", "(completed,cancelled)").order("submitted_at", { ascending: false }),
     ]);
     setCheckingJobId(null);
-    const error = jobResult.error || printerResult.error;
+    const error = refreshResult.error || jobResult.error || printerResult.error || slotResult.error || orderResult.error;
     if (error) {
       toast({ title: "Opnieuw controleren mislukt", description: error.message, variant: "destructive" });
       return;
     }
     const freshJobs = jobResult.data || [];
     const freshPrinters = printerResult.data || [];
-    setJobs((current) => [...current.filter((job) => job.order_id !== request.order_id), ...freshJobs]);
+    const freshSlots = slotResult.data || [];
+    const freshOrders = orderResult.data || [];
+    setJobs(freshJobs);
     setPrinters(freshPrinters);
+    setSlots(freshSlots);
+    setOrders(freshOrders);
     const freshRequest = freshJobs.find((job) => job.id === request.id) || request;
+    const freshOrder = freshOrders.find((item) => item.id === request.order_id);
     const printer = findPlateRequestPrinter(freshRequest, freshPrinters);
-    const target = freshJobs.find((job) => job.plate_number === plate);
+    const target = freshJobs.find((job) => job.order_id === request.order_id && job.plate_number === plate);
     if (!target) {
       toast({ title: "Plaatkoppeling ontbreekt", description: `Plaat ${plate} staat niet in de 3MF-koppelingen van deze bestelling.`, variant: "destructive" });
     } else if (target.status === "completed" || target.runs_completed >= target.runs_required) {
-      toast({ title: "Plaat al geprint", description: `Plaat ${plate} is al volledig geprint. Er is niets gewijzigd.` });
+      toast({ title: "Plaat al geprint", description: `Alle plaat-, bestelling-, printer- en AMS-gegevens zijn vernieuwd. Plaat ${plate} is al volledig geprint; er is niets gewijzigd.` });
     } else if (!printer || !printFileMatch(freshRequest.expected_file_name, printer.current_file || freshRequest.observed_file_name || "")) {
       toast({ title: "Controle wijkt af", description: "Het actieve printerbestand komt niet overeen met deze bestelling. Er is niets gewijzigd.", variant: "destructive" });
     } else {
       const remaining = Math.max(target.runs_required - target.runs_completed, 0);
-      toast({ title: "Controle klopt", description: `${order.order_number} · plaat ${plate} heeft nog ${remaining} printrun${remaining === 1 ? "" : "s"} nodig. Er is niets gewijzigd.` });
+      toast({ title: "Alle gegevens vernieuwd", description: `${freshOrder?.order_number || order.order_number} · plaat ${plate} heeft nog ${remaining} printrun${remaining === 1 ? "" : "s"} nodig. Plaat-, bestelling-, printer- en AMS-gegevens zijn opnieuw geladen.` });
     }
   };
 
@@ -274,7 +282,7 @@ export default function AdminProduction() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => void recheckSuggestion(job)} disabled={!selectedPlateValid || checkingJobId === job.id}>{checkingJobId === job.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Opnieuw controleren</Button>
+                  <Button variant="outline" onClick={() => void recheckSuggestion(job)} disabled={!selectedPlateValid || checkingJobId === job.id}>{checkingJobId === job.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Alles opnieuw checken</Button>
                   <Button onClick={() => targetComplete ? toast({ title: "Plaat al geprint", description: `Plaat ${selectedPlate} is al volledig geprint. Er is niets gewijzigd.` }) : setApproveJob(job)} disabled={!canApprove}><CheckCircle2 className="w-4 h-4" /> Goedkeuren voor ‘geprint’</Button>
                 </div>
               </article>

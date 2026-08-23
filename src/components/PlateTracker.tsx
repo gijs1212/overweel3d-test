@@ -268,23 +268,29 @@ export function PlateTracker({
         setStoredThreeMf({ storagePath, filename: file.name });
 
         const [{ data: orderData, error: orderError }, { data: existingJobs, error: jobsError }] = await Promise.all([
-          supabase.from("orders").select("plate_runs_completed,plate_runs_required_per_plate").eq("id", orderId).single(),
+          supabase.from("orders").select("plate_print_statuses,plate_runs_completed,plate_runs_required_per_plate").eq("id", orderId).single(),
           supabase.from("print_jobs").select("id,plate_number,runs_completed,status").eq("order_id", orderId),
         ]);
         if (orderError || jobsError) throw orderError || jobsError;
 
         const completedRuns = Array.isArray(orderData?.plate_runs_completed) ? orderData.plate_runs_completed : [];
+        const completedStatuses = Array.isArray(orderData?.plate_print_statuses) ? orderData.plate_print_statuses : [];
         const storedRequired = Array.isArray(orderData?.plate_runs_required_per_plate) ? orderData.plate_runs_required_per_plate : [];
         for (let index = 0; index < result.plateCount; index += 1) {
           const plateNumber = index + 1;
           const currentRuns = Math.max(0, Number(completedRuns[index]) || 0);
           const requiredRuns = Math.max(1, Number(localQuantities[index] ?? storedRequired[index]) || 1, currentRuns);
           const existing = existingJobs?.find((job) => job.plate_number === plateNumber);
+          const plateCompleted = completedStatuses[index] === true || currentRuns >= requiredRuns;
+          const synchronizedRuns = plateCompleted ? requiredRuns : Math.max(currentRuns, existing?.runs_completed || 0);
           const values = {
             expected_file_name: file.name,
             three_mf_storage_path: storagePath,
             source_order_file_id: orderFile.id,
             runs_required: requiredRuns,
+            runs_completed: synchronizedRuns,
+            status: synchronizedRuns >= requiredRuns ? "completed" : "queued",
+            completed_at: synchronizedRuns >= requiredRuns ? new Date().toISOString() : null,
           };
           const { error: jobError } = existing
             ? await supabase.from("print_jobs").update(values).eq("id", existing.id)
@@ -343,14 +349,8 @@ export function PlateTracker({
     setApplying(true);
     try {
       await onUpdate(update);
-      for (let index = 0; index < update.totalPlates; index += 1) {
-        const { data: job } = await supabase.from("print_jobs").select("id,runs_completed").eq("order_id", orderId).eq("plate_number", index + 1).maybeSingle();
-        if (job) {
-          await supabase.from("print_jobs").update({
-            runs_required: Math.max(update.platePrintQuantities[index] || 1, job.runs_completed),
-          }).eq("id", job.id);
-        }
-      }
+      // The database trigger atomically synchronizes these order-level choices
+      // to every print job, including runs_completed and completed status.
     } finally {
       setApplying(false);
     }

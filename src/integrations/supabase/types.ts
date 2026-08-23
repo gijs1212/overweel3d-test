@@ -1933,6 +1933,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      refresh_order_plate_data: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       record_order_link_visit: { Args: { p_token: string }; Returns: boolean }
       redeem_gift_card: {
         Args: {
