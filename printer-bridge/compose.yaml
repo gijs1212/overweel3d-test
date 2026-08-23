@@ -1,0 +1,17 @@
+services:
+  bambu-bridge:
+    build:
+      context: /mnt/data/supervisor/share/overweel3d
+      dockerfile: Dockerfile
+    volumes:
+      - /mnt/data/supervisor/share/overweel3d/data:/data:rw
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

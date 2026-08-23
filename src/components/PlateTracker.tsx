@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, Loader2, Upload } from "lucide-react";
+import { AlertCircle, Check, Eye, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StoredThreeMfViewerDialog } from "@/components/StoredThreeMfViewerDialog";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   createPlateTrackingUpdate,
   detectBambuPlateCount,
@@ -12,6 +14,8 @@ import {
 } from "@/lib/plateTracking";
 
 interface PlateTrackerProps {
+  orderId: string;
+  orderNumber: string;
   totalProducts: number;
   totalPlates: number;
   platePrintStatuses: boolean[];
@@ -28,6 +32,11 @@ interface PlateTrackerProps {
 interface Parse3MFResult {
   plateCount: number;
   details: string;
+}
+
+interface StoredThreeMf {
+  storagePath: string;
+  filename: string;
 }
 
 interface ZipEntry {
@@ -163,6 +172,8 @@ async function parse3MFForPlateInfo(
 }
 
 export function PlateTracker({
+  orderId,
+  orderNumber,
   totalProducts,
   totalPlates,
   platePrintStatuses,
@@ -180,6 +191,9 @@ export function PlateTracker({
   );
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [storedThreeMf, setStoredThreeMf] = useState<StoredThreeMf | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
@@ -188,6 +202,31 @@ export function PlateTracker({
     setLocalStatuses(normalizePlateStatuses(platePrintStatuses, totalPlates));
     setLocalQuantities(normalizePlatePrintQuantities(platePrintQuantities, totalPlates));
   }, [platePrintQuantities, platePrintStatuses, totalPlates, totalProducts]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      supabase.from("order_files")
+        .select("storage_path,original_filename")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: false })
+        .limit(25),
+      supabase.from("print_jobs")
+        .select("three_mf_storage_path")
+        .eq("order_id", orderId)
+        .not("three_mf_storage_path", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1),
+    ]).then(([fileResult, jobResult]) => {
+        if (cancelled) return;
+        const latest = fileResult.data?.find((item) => item.original_filename.toLowerCase().endsWith(".3mf"));
+        const legacyPath = jobResult.data?.[0]?.three_mf_storage_path;
+        setStoredThreeMf(latest
+          ? { storagePath: latest.storage_path, filename: latest.original_filename }
+          : legacyPath ? { storagePath: legacyPath, filename: legacyPath.split("/").pop() || "model.3mf" } : null);
+      });
+    return () => { cancelled = true; };
+  }, [orderId]);
 
   const parsedPlateTotal = Math.max(0, Number.parseInt(localTotalPlates, 10) || 0);
 
@@ -208,7 +247,67 @@ export function PlateTracker({
       toast({ title: "3MF verwerken mislukt", description: result.error, variant: "destructive" });
     } else {
       setLocalTotalPlates(String(result.plateCount));
-      toast({ title: "3MF verwerkt", description: result.details });
+      try {
+        const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
+        const storagePath = `${orderNumber}/production/${crypto.randomUUID()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage.from("orders").upload(storagePath, file, { upsert: false });
+        if (uploadError) throw uploadError;
+
+        const { data: orderFile, error: fileError } = await supabase.from("order_files").insert({
+          order_id: orderId,
+          storage_path: storagePath,
+          original_filename: file.name,
+          file_size: file.size,
+          mime_type: file.type || "model/3mf",
+        }).select("id").single();
+        if (fileError) {
+          await supabase.storage.from("orders").remove([storagePath]);
+          throw fileError;
+        }
+        setPreviewFile(file);
+        setStoredThreeMf({ storagePath, filename: file.name });
+
+        const [{ data: orderData, error: orderError }, { data: existingJobs, error: jobsError }] = await Promise.all([
+          supabase.from("orders").select("plate_runs_completed,plate_runs_required_per_plate").eq("id", orderId).single(),
+          supabase.from("print_jobs").select("id,plate_number,runs_completed,status").eq("order_id", orderId),
+        ]);
+        if (orderError || jobsError) throw orderError || jobsError;
+
+        const completedRuns = Array.isArray(orderData?.plate_runs_completed) ? orderData.plate_runs_completed : [];
+        const storedRequired = Array.isArray(orderData?.plate_runs_required_per_plate) ? orderData.plate_runs_required_per_plate : [];
+        for (let index = 0; index < result.plateCount; index += 1) {
+          const plateNumber = index + 1;
+          const currentRuns = Math.max(0, Number(completedRuns[index]) || 0);
+          const requiredRuns = Math.max(1, Number(localQuantities[index] ?? storedRequired[index]) || 1, currentRuns);
+          const existing = existingJobs?.find((job) => job.plate_number === plateNumber);
+          const values = {
+            expected_file_name: file.name,
+            three_mf_storage_path: storagePath,
+            source_order_file_id: orderFile.id,
+            runs_required: requiredRuns,
+          };
+          const { error: jobError } = existing
+            ? await supabase.from("print_jobs").update(values).eq("id", existing.id)
+            : await supabase.from("print_jobs").insert({
+                order_id: orderId,
+                plate_number: plateNumber,
+                plate_name: `Plaat ${plateNumber}`,
+                runs_completed: currentRuns,
+                status: currentRuns >= requiredRuns ? "completed" : "queued",
+                ...values,
+              });
+          if (jobError) throw jobError;
+        }
+
+        toast({
+          title: "3MF verwerkt en gekoppeld",
+          description: `${result.details} Het bestand is opgeslagen; Bambu Connect kan nu automatisch een koppelvoorstel doen.`,
+        });
+      } catch (error) {
+        const description = error instanceof Error ? error.message : "Opslaan van de 3MF is mislukt.";
+        setParseError(description);
+        toast({ title: "3MF opslaan mislukt", description, variant: "destructive" });
+      }
     }
 
     setParsing(false);
@@ -244,6 +343,14 @@ export function PlateTracker({
     setApplying(true);
     try {
       await onUpdate(update);
+      for (let index = 0; index < update.totalPlates; index += 1) {
+        const { data: job } = await supabase.from("print_jobs").select("id,runs_completed").eq("order_id", orderId).eq("plate_number", index + 1).maybeSingle();
+        if (job) {
+          await supabase.from("print_jobs").update({
+            runs_required: Math.max(update.platePrintQuantities[index] || 1, job.runs_completed),
+          }).eq("id", job.id);
+        }
+      }
     } finally {
       setApplying(false);
     }
@@ -264,7 +371,7 @@ export function PlateTracker({
           <input type="file" accept=".3mf" onChange={handle3MFUpload} className="hidden" disabled={parsing} />
         </label>
         <p className="text-xs text-muted-foreground mt-1">
-          Alleen het aantal Bambu-platen wordt lokaal gelezen; productaantallen worden nooit uit objecten op een plaat afgeleid.
+          Platen, kleuren en voorbeelden worden direct lokaal uitgelezen; productaantallen worden nooit uit objecten op een plaat afgeleid.
         </p>
         {parseError && (
           <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
@@ -272,7 +379,10 @@ export function PlateTracker({
             <p className="text-xs text-destructive">{parseError}</p>
           </div>
         )}
+        {(storedThreeMf || previewFile) && <Button type="button" variant="outline" className="mt-3" onClick={() => setViewerOpen(true)}><Eye className="w-4 h-4" /> 3MF-viewer</Button>}
       </div>
+
+      <StoredThreeMfViewerDialog open={viewerOpen} onOpenChange={setViewerOpen} storagePath={storedThreeMf?.storagePath} filename={storedThreeMf?.filename} localFile={previewFile} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>

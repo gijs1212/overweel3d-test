@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          description: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           author_name: string
@@ -59,6 +86,24 @@ export type Database = {
           tags?: string[] | null
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -113,69 +158,153 @@ export type Database = {
         Row: {
           active: boolean
           assigned_to_email: string | null
+          category_id: string | null
           code: string
           created_at: string
           discount_type: string
           discount_value: number
           expires_at: string | null
           id: string
-          is_referral: boolean
           is_public: boolean
+          is_referral: boolean
           max_uses: number | null
+          minimum_order_amount: number
           owner_email: string | null
           owner_name: string | null
           parent_code_id: string | null
+          per_customer_limit: number | null
+          product_id: string | null
           reward_percentage: number | null
           source_order_id: string | null
+          stackable: boolean
+          starts_at: string | null
           times_used: number
           updated_at: string
         }
         Insert: {
           active?: boolean
           assigned_to_email?: string | null
+          category_id?: string | null
           code: string
           created_at?: string
           discount_type?: string
           discount_value?: number
           expires_at?: string | null
           id?: string
-          is_referral?: boolean
           is_public?: boolean
+          is_referral?: boolean
           max_uses?: number | null
+          minimum_order_amount?: number
           owner_email?: string | null
           owner_name?: string | null
           parent_code_id?: string | null
+          per_customer_limit?: number | null
+          product_id?: string | null
           reward_percentage?: number | null
           source_order_id?: string | null
+          stackable?: boolean
+          starts_at?: string | null
           times_used?: number
           updated_at?: string
         }
         Update: {
           active?: boolean
           assigned_to_email?: string | null
+          category_id?: string | null
           code?: string
           created_at?: string
           discount_type?: string
           discount_value?: number
           expires_at?: string | null
           id?: string
-          is_referral?: boolean
           is_public?: boolean
+          is_referral?: boolean
           max_uses?: number | null
+          minimum_order_amount?: number
           owner_email?: string | null
           owner_name?: string | null
           parent_code_id?: string | null
+          per_customer_limit?: number | null
+          product_id?: string | null
           reward_percentage?: number | null
           source_order_id?: string | null
+          stackable?: boolean
+          starts_at?: string | null
           times_used?: number
           updated_at?: string
         }
         Relationships: [
           {
+            foreignKeyName: "discount_codes_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "discount_codes_parent_code_id_fkey"
             columns: ["parent_code_id"]
             isOneToOne: false
             referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_codes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_codes_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discount_redemptions: {
+        Row: {
+          created_at: string
+          customer_email: string
+          discount_amount: number
+          discount_code_id: string
+          id: string
+          order_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email: string
+          discount_amount?: number
+          discount_code_id: string
+          id?: string
+          order_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string
+          discount_amount?: number
+          discount_code_id?: string
+          id?: string
+          order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_redemptions_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_redemptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -303,6 +432,131 @@ export type Database = {
           sort_order?: number
           updated_at?: string
         }
+        Relationships: []
+      }
+      gift_card_redemptions: {
+        Row: {
+          amount: number
+          created_at: string
+          gift_card_id: string
+          id: string
+          order_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          gift_card_id: string
+          id?: string
+          order_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          gift_card_id?: string
+          id?: string
+          order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gift_card_redemptions_gift_card_id_fkey"
+            columns: ["gift_card_id"]
+            isOneToOne: false
+            referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_card_redemptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gift_cards: {
+        Row: {
+          active: boolean
+          assigned_to_email: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          current_balance: number
+          expires_at: string | null
+          id: string
+          initial_balance: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          assigned_to_email?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_balance: number
+          expires_at?: string | null
+          id?: string
+          initial_balance: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          assigned_to_email?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_balance?: number
+          expires_at?: string | null
+          id?: string
+          initial_balance?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      loyalty_transactions: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          kind: string
+          order_id: string | null
+          points: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          kind: string
+          order_id?: string | null
+          points: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          kind?: string
+          order_id?: string | null
+          points?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      materials: {
+        Row: { active: boolean; created_at: string; id: string; name: string; price_per_gram: number; sort_order: number; updated_at: string }
+        Insert: { active?: boolean; created_at?: string; id: string; name: string; price_per_gram?: number; sort_order?: number; updated_at?: string }
+        Update: { active?: boolean; created_at?: string; id?: string; name?: string; price_per_gram?: number; sort_order?: number; updated_at?: string }
         Relationships: []
       }
       newsletter_subscribers: {
@@ -514,16 +768,21 @@ export type Database = {
           customer_visible_notes: string | null
           delivery_email: string | null
           filament_price_per_kg: number | null
+          filament_used_g: number | null
           filament_weight_g: number | null
           file_links: string | null
           final_price: number | null
+          gift_card_amount: number
+          gift_card_code: string | null
           id: string
           instant_quote_price: number | null
           internal_notes: string | null
           link_first_viewed_at: string | null
           link_last_viewed_at: string | null
           link_view_count: number
+          loyalty_points_awarded: number
           material: string | null
+          material_cost: number | null
           notes: string | null
           order_method: string
           order_number: string
@@ -536,6 +795,7 @@ export type Database = {
           plate_runs_required_per_plate: Json | null
           plates_completed: number | null
           postal_code: string | null
+          print_duration_minutes: number | null
           print_preferences: string | null
           quantity: number | null
           rejected_at: string | null
@@ -546,9 +806,9 @@ export type Database = {
           status: Database["public"]["Enums"]["order_status"]
           submitted_at: string | null
           tikkie_link: string | null
-          tracking_code: string | null
           total_plates: number
           total_products: number
+          tracking_code: string | null
           updated_at: string | null
           user_id: string | null
           vat_number: string | null
@@ -575,16 +835,21 @@ export type Database = {
           customer_visible_notes?: string | null
           delivery_email?: string | null
           filament_price_per_kg?: number | null
+          filament_used_g?: number | null
           filament_weight_g?: number | null
           file_links?: string | null
           final_price?: number | null
+          gift_card_amount?: number
+          gift_card_code?: string | null
           id?: string
           instant_quote_price?: number | null
           internal_notes?: string | null
           link_first_viewed_at?: string | null
           link_last_viewed_at?: string | null
           link_view_count?: number
+          loyalty_points_awarded?: number
           material?: string | null
+          material_cost?: number | null
           notes?: string | null
           order_method?: string
           order_number: string
@@ -597,6 +862,7 @@ export type Database = {
           plate_runs_required_per_plate?: Json | null
           plates_completed?: number | null
           postal_code?: string | null
+          print_duration_minutes?: number | null
           print_preferences?: string | null
           quantity?: number | null
           rejected_at?: string | null
@@ -607,9 +873,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"]
           submitted_at?: string | null
           tikkie_link?: string | null
-          tracking_code?: string | null
           total_plates?: number
           total_products?: number
+          tracking_code?: string | null
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
@@ -636,16 +902,21 @@ export type Database = {
           customer_visible_notes?: string | null
           delivery_email?: string | null
           filament_price_per_kg?: number | null
+          filament_used_g?: number | null
           filament_weight_g?: number | null
           file_links?: string | null
           final_price?: number | null
+          gift_card_amount?: number
+          gift_card_code?: string | null
           id?: string
           instant_quote_price?: number | null
           internal_notes?: string | null
           link_first_viewed_at?: string | null
           link_last_viewed_at?: string | null
           link_view_count?: number
+          loyalty_points_awarded?: number
           material?: string | null
+          material_cost?: number | null
           notes?: string | null
           order_method?: string
           order_number?: string
@@ -658,6 +929,7 @@ export type Database = {
           plate_runs_required_per_plate?: Json | null
           plates_completed?: number | null
           postal_code?: string | null
+          print_duration_minutes?: number | null
           print_preferences?: string | null
           quantity?: number | null
           rejected_at?: string | null
@@ -668,12 +940,311 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"]
           submitted_at?: string | null
           tikkie_link?: string | null
-          tracking_code?: string | null
           total_plates?: number
           total_products?: number
+          tracking_code?: string | null
           updated_at?: string | null
           user_id?: string | null
           vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_applied_discount_code_fkey"
+            columns: ["applied_discount_code"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      print_jobs: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          colors: Json
+          comparison: Json
+          completed_at: string | null
+          created_at: string
+          estimated_duration_minutes: number | null
+          estimated_filament_grams: number | null
+          expected_file_name: string
+          id: string
+          material: string | null
+          observed_file_name: string | null
+          order_id: string
+          plate_name: string
+          plate_number: number
+          printer_id: string | null
+          runs_completed: number
+          runs_required: number
+          scheduled_at: string | null
+          source_order_file_id: string | null
+          started_at: string | null
+          status: string
+          suggested_at: string | null
+          three_mf_signature: string | null
+          three_mf_storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          colors?: Json
+          comparison?: Json
+          completed_at?: string | null
+          created_at?: string
+          estimated_duration_minutes?: number | null
+          estimated_filament_grams?: number | null
+          expected_file_name?: string
+          id?: string
+          material?: string | null
+          observed_file_name?: string | null
+          order_id: string
+          plate_name?: string
+          plate_number: number
+          printer_id?: string | null
+          runs_completed?: number
+          runs_required?: number
+          scheduled_at?: string | null
+          source_order_file_id?: string | null
+          started_at?: string | null
+          status?: string
+          suggested_at?: string | null
+          three_mf_signature?: string | null
+          three_mf_storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          colors?: Json
+          comparison?: Json
+          completed_at?: string | null
+          created_at?: string
+          estimated_duration_minutes?: number | null
+          estimated_filament_grams?: number | null
+          expected_file_name?: string
+          id?: string
+          material?: string | null
+          observed_file_name?: string | null
+          order_id?: string
+          plate_name?: string
+          plate_number?: number
+          printer_id?: string | null
+          runs_completed?: number
+          runs_required?: number
+          scheduled_at?: string | null
+          source_order_file_id?: string | null
+          started_at?: string | null
+          status?: string
+          suggested_at?: string | null
+          three_mf_signature?: string | null
+          three_mf_storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_jobs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_jobs_source_order_file_id_fkey"
+            columns: ["source_order_file_id"]
+            isOneToOne: false
+            referencedRelation: "order_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_jobs_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "printers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      print_runs: {
+        Row: {
+          completed_at: string | null
+          filament_used_grams: number | null
+          id: string
+          observed_file_name: string | null
+          print_job_id: string
+          printer_id: string
+          raw_status: Json
+          run_number: number
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          filament_used_grams?: number | null
+          id?: string
+          observed_file_name?: string | null
+          print_job_id: string
+          printer_id: string
+          raw_status?: Json
+          run_number: number
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          filament_used_grams?: number | null
+          id?: string
+          observed_file_name?: string | null
+          print_job_id?: string
+          printer_id?: string
+          raw_status?: Json
+          run_number?: number
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_runs_print_job_id_fkey"
+            columns: ["print_job_id"]
+            isOneToOne: false
+            referencedRelation: "print_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_runs_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "printers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      printer_ams_slots: {
+        Row: {
+          ams_unit: number
+          color_hex: string | null
+          color_name: string | null
+          id: string
+          material: string | null
+          printer_id: string
+          raw_status: Json
+          remaining_grams: number | null
+          remaining_percent: number | null
+          slot_number: number
+          spool_capacity_grams: number
+          tray_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          ams_unit?: number
+          color_hex?: string | null
+          color_name?: string | null
+          id?: string
+          material?: string | null
+          printer_id: string
+          raw_status?: Json
+          remaining_grams?: number | null
+          remaining_percent?: number | null
+          slot_number: number
+          spool_capacity_grams?: number
+          tray_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ams_unit?: number
+          color_hex?: string | null
+          color_name?: string | null
+          id?: string
+          material?: string | null
+          printer_id?: string
+          raw_status?: Json
+          remaining_grams?: number | null
+          remaining_percent?: number | null
+          slot_number?: number
+          spool_capacity_grams?: number
+          tray_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "printer_ams_slots_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "printers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      printers: {
+        Row: {
+          bed_temperature: number | null
+          bridge_token_hash: string | null
+          connection_mode: string
+          chamber_temperature: number | null
+          created_at: string
+          current_file: string | null
+          current_layer: number | null
+          current_plate: number | null
+          device_serial: string
+          id: string
+          last_seen_at: string | null
+          maintenance_note: string
+          model: string
+          name: string
+          nozzle_temperature: number | null
+          progress: number
+          raw_status: Json
+          remaining_minutes: number | null
+          status: string
+          total_layers: number | null
+          updated_at: string
+        }
+        Insert: {
+          bed_temperature?: number | null
+          bridge_token_hash?: string | null
+          connection_mode?: string
+          chamber_temperature?: number | null
+          created_at?: string
+          current_file?: string | null
+          current_layer?: number | null
+          current_plate?: number | null
+          device_serial: string
+          id?: string
+          last_seen_at?: string | null
+          maintenance_note?: string
+          model?: string
+          name: string
+          nozzle_temperature?: number | null
+          progress?: number
+          raw_status?: Json
+          remaining_minutes?: number | null
+          status?: string
+          total_layers?: number | null
+          updated_at?: string
+        }
+        Update: {
+          bed_temperature?: number | null
+          bridge_token_hash?: string | null
+          connection_mode?: string
+          chamber_temperature?: number | null
+          created_at?: string
+          current_file?: string | null
+          current_layer?: number | null
+          current_plate?: number | null
+          device_serial?: string
+          id?: string
+          last_seen_at?: string | null
+          maintenance_note?: string
+          model?: string
+          name?: string
+          nozzle_temperature?: number | null
+          progress?: number
+          raw_status?: Json
+          remaining_minutes?: number | null
+          status?: string
+          total_layers?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -754,34 +1325,43 @@ export type Database = {
           alt_text: string
           created_at: string
           id: string
+          is_main: boolean | null
           is_primary: boolean
           media_type: string
+          order: number | null
           product_id: string
           sort_order: number
           storage_path: string
           updated_at: string
+          url: string | null
         }
         Insert: {
           alt_text?: string
           created_at?: string
           id?: string
+          is_main?: boolean | null
           is_primary?: boolean
           media_type?: string
+          order?: number | null
           product_id: string
           sort_order?: number
           storage_path: string
           updated_at?: string
+          url?: string | null
         }
         Update: {
           alt_text?: string
           created_at?: string
           id?: string
+          is_main?: boolean | null
           is_primary?: boolean
           media_type?: string
+          order?: number | null
           product_id?: string
           sort_order?: number
           storage_path?: string
           updated_at?: string
+          url?: string | null
         }
         Relationships: [
           {
@@ -797,11 +1377,15 @@ export type Database = {
         Row: {
           active: boolean
           choices: Json
+          color_slot_labels: Json
+          color_slots: number
           created_at: string
           description: string
           id: string
+          is_addon: boolean
           label: string
           max_length: number | null
+          price_adjustment: number
           product_id: string
           required: boolean
           sort_order: number
@@ -811,11 +1395,15 @@ export type Database = {
         Insert: {
           active?: boolean
           choices?: Json
+          color_slot_labels?: Json
+          color_slots?: number
           created_at?: string
           description?: string
           id?: string
+          is_addon?: boolean
           label: string
           max_length?: number | null
+          price_adjustment?: number
           product_id: string
           required?: boolean
           sort_order?: number
@@ -825,11 +1413,15 @@ export type Database = {
         Update: {
           active?: boolean
           choices?: Json
+          color_slot_labels?: Json
+          color_slots?: number
           created_at?: string
           description?: string
           id?: string
+          is_addon?: boolean
           label?: string
           max_length?: number | null
+          price_adjustment?: number
           product_id?: string
           required?: boolean
           sort_order?: number
@@ -839,6 +1431,116 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "product_options_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_reviews: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          order_id: string
+          photos: Json
+          product_id: string
+          rating: number
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          id?: string
+          order_id: string
+          photos?: Json
+          product_id: string
+          rating: number
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          photos?: Json
+          product_id?: string
+          rating?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variants: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          material_id: string | null
+          name: string
+          price_adjustment: number
+          product_id: string
+          size_label: string | null
+          sku: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          material_id?: string | null
+          name: string
+          price_adjustment?: number
+          product_id: string
+          size_label?: string | null
+          sku?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          material_id?: string | null
+          name?: string
+          price_adjustment?: number
+          product_id?: string
+          size_label?: string | null
+          sku?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
@@ -947,6 +1649,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          loyalty_points: number
           newsletter_subscribed: boolean
           phone: string | null
           postal_code: string | null
@@ -966,6 +1669,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          loyalty_points?: number
           newsletter_subscribed?: boolean
           phone?: string | null
           postal_code?: string | null
@@ -985,6 +1689,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          loyalty_points?: number
           newsletter_subscribed?: boolean
           phone?: string | null
           postal_code?: string | null
@@ -992,6 +1697,48 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           vat_number?: string | null
+        }
+        Relationships: []
+      }
+      saved_carts: {
+        Row: {
+          checkout_at: string | null
+          created_at: string
+          email: string
+          id: string
+          items: Json
+          reminder_count: number
+          reminder_sent_at: string | null
+          status: string
+          subtotal: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkout_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          items?: Json
+          reminder_count?: number
+          reminder_sent_at?: string | null
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checkout_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          items?: Json
+          reminder_count?: number
+          reminder_sent_at?: string | null
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1018,10 +1765,48 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_account_welcome: {
-        Args: { p_user_id: string }
-        Returns: boolean
+      approve_and_count_print_job_run: {
+        Args: { p_plate_number: number; p_suggestion_job_id: string }
+        Returns: Json
       }
+      complete_print_job_run: {
+        Args: {
+          p_job_id: string
+          p_observed_file_name: string
+          p_printer_id: string
+          p_raw_status?: Json
+        }
+        Returns: Json
+      }
+      check_discount_code: {
+        Args: { code_text: string; email_text: string; order_amount: number }
+        Returns: {
+          assigned_to_email: string
+          category_id: string
+          code: string
+          discount_type: string
+          discount_value: number
+          expires_at: string
+          id: string
+          is_referral: boolean
+          max_uses: number
+          minimum_order_amount: number
+          per_customer_limit: number
+          product_id: string
+          stackable: boolean
+          starts_at: string
+          times_used: number
+        }[]
+      }
+      check_gift_card: {
+        Args: { code_text: string; email_text: string }
+        Returns: {
+          code: string
+          current_balance: number
+          expires_at: string
+        }[]
+      }
+      claim_account_welcome: { Args: { p_user_id: string }; Returns: boolean }
       claim_newsletter_welcome: {
         Args: { p_subscription_id: string }
         Returns: boolean
@@ -1030,9 +1815,10 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
-      claim_order_to_account: {
-        Args: { p_token: string }
-        Returns: boolean
+      claim_order_to_account: { Args: { p_token: string }; Returns: boolean }
+      convert_loyalty_points: {
+        Args: { points_to_redeem: number }
+        Returns: string
       }
       create_guest_order: {
         Args: { p_order: Json }
@@ -1053,16 +1839,29 @@ export type Database = {
         Args: { code_text: string }
         Returns: undefined
       }
-      record_order_link_visit: {
-        Args: { p_token: string }
+      record_discount_redemption: {
+        Args: {
+          code_text: string
+          discount_amount_value: number
+          order_id_value: string
+        }
         Returns: boolean
+      }
+      record_order_link_visit: { Args: { p_token: string }; Returns: boolean }
+      redeem_gift_card: {
+        Args: {
+          code_text: string
+          order_id_value: string
+          requested_amount: number
+        }
+        Returns: number
       }
       set_newsletter_subscription: {
         Args: {
           p_active: boolean
           p_email: string
           p_source: string
-          p_user_id?: string | null
+          p_user_id?: string
         }
         Returns: {
           subscription_id: string

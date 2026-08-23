@@ -1,0 +1,16 @@
+name: Overweel3D Bambu Bridge
+version: "1.0.0"
+slug: overweel3d_bambu
+description: Leest de Bambu P1S-cloudstatus en stuurt deze naar Overweel3D.
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+apparmor: true
+options:
+  email_code: ""
+schema:
+  email_code: str
+

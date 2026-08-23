@@ -2,7 +2,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "./Logo";
 import { Button } from "./ui/button";
-import { ThemeToggle } from "./ThemeToggle";
 import { Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,8 +36,9 @@ export function Navbar() {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to="/">
+          <Link to="/" className="flex items-center gap-2">
             <Logo size="md" />
+            <span className="md:hidden font-bold text-primary tracking-tight">Overweel3D</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -62,9 +62,8 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* Auth + Theme */}
+          {/* Account */}
           <div className="hidden md:flex items-center gap-2">
-            <ThemeToggle />
             {user ? (
               <div className="flex items-center gap-2">
                 <Link to="/dashboard">

@@ -24,6 +24,8 @@ import {
 } from "@/lib/productCatalog";
 import { isHeicFile, prepareImageFileForUpload } from "@/lib/imageUploads";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
+import { ProductReviews } from "@/components/ProductReviews";
+import { useMaterials } from "@/hooks/useMaterials";
 
 export interface PrebuiltOptions {
   materialId: string;
@@ -32,6 +34,9 @@ export interface PrebuiltOptions {
   quantity: number;
   optionAnswers: ProductOptionAnswer[];
   optionFiles: Array<{ optionId: string; label: string; files: File[] }>;
+  variantId: string | null;
+  variantName: string | null;
+  unitPrice: number;
 }
 
 interface ProductDetailDialogProps {
@@ -43,13 +48,17 @@ interface ProductDetailDialogProps {
 }
 
 export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd }: ProductDetailDialogProps) {
+  const databaseMaterials = useMaterials();
   const [material, setMaterial] = useState("");
   const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
+  const [variantId, setVariantId] = useState("");
   const [activePhoto, setActivePhoto] = useState(0);
   const [mediaItems, setMediaItems] = useState<Array<{ path: string; mediaType: "image" | "video"; url: string }>>([]);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [files, setFiles] = useState<Record<string, File[]>>({});
+  const [addonEnabled, setAddonEnabled] = useState<Record<string, boolean>>({});
+  const [addonColors, setAddonColors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
 
   const options = useMemo(() => {
@@ -59,6 +68,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
       activeOptions.unshift({
         id: "legacy-custom-text", product_id: product.id, type: "text", label: product.custom_text_label,
         description: "", required: false, choices: [], max_length: product.custom_text_max_length, sort_order: -1, active: true,
+        is_addon: false, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
       });
     }
     if (product.customer_photo_required && !activeOptions.some((option) => option.type === "photo")) {
@@ -66,12 +76,17 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
         id: "required-customer-photo", product_id: product.id, type: "photo", label: "Foto voor dit product",
         description: "Upload minimaal één foto die we voor deze bestelling nodig hebben.", required: true,
         choices: [], max_length: null, sort_order: activeOptions.length, active: true,
+        is_addon: false, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
       });
     }
     return activeOptions;
   }, [product]);
 
-  const materials = useMemo(() => product ? availableMaterialsForProduct(product) : [], [product]);
+  const materials = useMemo(() => product ? availableMaterialsForProduct(product, databaseMaterials) : [], [product, databaseMaterials]);
+  const variants = useMemo(() => [...(product?.product_variants || [])].filter((variant) => variant.active).sort((a, b) => a.sort_order - b.sort_order), [product]);
+  const selectedVariant = variants.find((variant) => variant.id === variantId) || null;
+  const unitPrice = Number(product?.price || 0) + Number(selectedVariant?.price_adjustment || 0)
+    + options.filter((option) => option.is_addon && addonEnabled[option.id]).reduce((total, option) => total + Number(option.price_adjustment || 0), 0);
   const materialColors = useMemo(() => {
     if (!product || !material) return [];
     const explicitlyAllowed = new Set(product.colors || []);
@@ -87,14 +102,17 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
 
   useEffect(() => {
     if (!product) return;
-    const available = availableMaterialsForProduct(product);
+    const available = availableMaterialsForProduct(product, databaseMaterials);
     const initialMaterial = product.material_mode === "fixed" || available.length === 1 ? available[0]?.id || "" : "";
     setMaterial(initialMaterial);
     setSelectedColorIds([]);
     setQuantity(1);
+    setVariantId("");
     setActivePhoto(0);
     setValues({});
     setFiles({});
+    setAddonEnabled({});
+    setAddonColors({});
     setError(null);
     const productMedia = orderedProductImages(product);
     Promise.all(productMedia.map(async (media) => ({
@@ -102,7 +120,12 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
       mediaType: isVideoProductMedia(media.storage_path, media.media_type) ? "video" as const : "image" as const,
       url: await getProductPhotoUrl(media.storage_path),
     }))).then(setMediaItems);
-  }, [product]);
+  }, [product, databaseMaterials]);
+
+  useEffect(() => {
+    if (!selectedVariant?.material_id) return;
+    setMaterial(selectedVariant.material_id);
+  }, [selectedVariant]);
 
   useEffect(() => {
     setSelectedColorIds([]);
@@ -131,12 +154,21 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   };
 
   const validate = () => {
+    if (variants.length > 0 && !selectedVariant) return "Kies een productvariant.";
     if (!material) return "Kies een materiaal.";
     const chosenColorIds = selectedColorIds.filter(Boolean);
-    if (product.color_selection_mode === "multiple" && product.color_required && !selectedColorIds[0]) return `${productColorSlotTitle(product, 0)} is verplicht.`;
+    if (product.color_selection_mode === "multiple" && product.color_required) {
+      const missingIndex = Array.from({ length: product.max_colors }).findIndex((_, index) => !selectedColorIds[index]);
+      if (missingIndex >= 0) return `${productColorSlotTitle(product, missingIndex)} is verplicht.`;
+    }
     const colorError = validateCatalogColorSelection(product, chosenColorIds, materialColors.map((color) => color.id));
     if (colorError) return colorError;
     for (const option of options) {
+      if (option.is_addon && !addonEnabled[option.id]) continue;
+      if (option.is_addon) {
+        const chosen = addonColors[option.id] || [];
+        if (Array.from({ length: option.color_slots }).some((_, index) => !chosen[index])) return `Vul elk kleurvak van “${option.label}” in.`;
+      }
       if (!option.required) continue;
       if (option.type === "photo" && !(files[option.id]?.length)) return `Upload minimaal één foto bij “${option.label}”.`;
       if (option.type === "checkbox" && values[option.id] !== true) return `Bevestig “${option.label}”.`;
@@ -158,14 +190,24 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
         slotLabel: product.color_selection_mode === "multiple" ? productColorSlotTitle(product, index) : undefined,
       }] : [];
     });
-    const optionAnswers = buildProductOptionAnswers(options, values);
+    const optionAnswers = buildProductOptionAnswers(options.filter((option) => !option.is_addon || addonEnabled[option.id]), values);
+    options.filter((option) => option.is_addon && addonEnabled[option.id]).forEach((option) => {
+      optionAnswers.push({ optionId: option.id, label: option.label, type: option.type, value: "Ja" });
+      (addonColors[option.id] || []).forEach((colorId, index) => {
+        const color = materialColors.find((item) => item.id === colorId);
+        if (color) optionAnswers.push({ optionId: `${option.id}:color:${index}`, label: option.color_slot_labels[index] || `Kleur ${index + 1}`, type: "select", value: color.name });
+      });
+    });
     onAdd(product, {
       materialId: material,
-      material: materialLabel(material),
+      material: materials.find((item) => item.id === material)?.name || materialLabel(material),
       colors: selectedColors,
       quantity: Math.max(1, Math.floor(quantity)),
       optionAnswers,
       optionFiles: options.filter((option) => option.type === "photo" && files[option.id]?.length).map((option) => ({ optionId: option.id, label: option.label, files: files[option.id] })),
+      variantId: selectedVariant?.id || null,
+      variantName: selectedVariant?.name || null,
+      unitPrice,
     });
     onOpenChange(false);
   };
@@ -185,18 +227,20 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-2xl">{product.name}</DialogTitle></DialogHeader>
     <div className="grid md:grid-cols-2 gap-6">
       <div><div className="aspect-square bg-muted rounded-lg overflow-hidden">{mediaItems[activePhoto]?.url ? mediaItems[activePhoto].mediaType === "video" ? <video src={mediaItems[activePhoto].url} aria-label={product.name} controls playsInline preload="metadata" className="w-full h-full object-contain" /> : <img src={mediaItems[activePhoto].url} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Geen media</div>}</div>{mediaItems.length > 1 && <div className="flex gap-2 mt-2 overflow-x-auto">{mediaItems.map((media, index) => <button type="button" key={media.path} onClick={() => setActivePhoto(index)} className={`relative w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${index === activePhoto ? "border-accent" : "border-border"}`}>{media.mediaType === "video" ? <video src={media.url} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={media.url} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />}</button>)}</div>}</div>
-      <div className="space-y-4"><div className="text-2xl font-bold text-accent">€{Number(product.price).toFixed(2)}</div>{product.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>}
+      <div className="space-y-4"><div className="text-2xl font-bold text-accent">€{unitPrice.toFixed(2)}</div>{product.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>}
+        {variants.length > 0 && <div><Label>Variant *</Label><Select value={variantId} onValueChange={setVariantId}><SelectTrigger><SelectValue placeholder="Kies formaat of uitvoering" /></SelectTrigger><SelectContent>{variants.map((variant) => <SelectItem key={variant.id} value={variant.id}>{variant.name}{variant.price_adjustment ? ` (${variant.price_adjustment > 0 ? "+" : ""}€${Number(variant.price_adjustment).toFixed(2)})` : ""}</SelectItem>)}</SelectContent></Select></div>}
         <div><Label>Materiaal *</Label>{product.material_mode === "fixed" ? <div className="mt-1 rounded-lg border bg-muted/40 p-3"><p className="font-medium">{materialLabel(material)}</p><p className="text-xs text-muted-foreground">Vast materiaal voor dit product</p></div> : <Select value={material} onValueChange={setMaterial}><SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger><SelectContent>{materials.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>}</div>
         <div><Label>{product.color_selection_mode === "multiple" ? "Kleuren per onderdeel" : "Kleur"}{product.color_required ? " *" : ""}</Label>{!material ? <p className="text-xs text-muted-foreground mt-1">Kies eerst een materiaal.</p> : materialColors.length === 0 ? <p className="text-xs text-destructive mt-1">Voor dit materiaal zijn momenteel geen kleuren beschikbaar.</p> : product.color_selection_mode === "single" ? <Select value={selectedColorIds[0] || ""} onValueChange={(value) => setSelectedColorIds([value])}><SelectTrigger><SelectValue placeholder={product.color_required ? "Kies een kleur" : "Geen kleur gekozen"} /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select> : <div className="space-y-3 mt-2">{Array.from({ length: product.max_colors }, (_, index) => {
           const noneValue = `none-${index}`;
-          const required = product.color_required && index === 0;
+          const required = product.color_required;
           return <div key={index}><Label className="text-xs">{productColorSlotTitle(product, index)}{required ? " *" : ""}</Label><Select value={selectedColorIds[index] || noneValue} onValueChange={(value) => setColorSlot(index, value === noneValue ? "" : value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!required && <SelectItem value={noneValue}>Geen kleur</SelectItem>}{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select></div>;
         })}</div>}</div>
         <div><Label>Aantal</Label><Input type="number" min={1} step={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))} /></div>
-        {options.map((option) => <div key={option.id}><Label>{option.label}{option.required ? " *" : ""}</Label>{option.description && <p className="text-xs text-muted-foreground mb-1">{option.description}</p>}{renderOption(option)}{option.max_length && ["text", "textarea"].includes(option.type) && <p className="text-[10px] text-muted-foreground mt-1">{String(values[option.id] || "").length}/{option.max_length} tekens</p>}</div>)}
+        {options.map((option) => option.is_addon ? <div key={option.id} className="rounded-xl border-2 border-accent/30 p-4 space-y-3"><div><Label>{option.label}{option.price_adjustment ? ` (+€${Number(option.price_adjustment).toFixed(2)})` : ""}</Label>{option.description && <p className="text-xs text-muted-foreground">{option.description}</p>}</div><div className="grid grid-cols-2 gap-2"><Button type="button" variant={addonEnabled[option.id] ? "default" : "outline"} onClick={() => setAddonEnabled((current) => ({ ...current, [option.id]: true }))}>Ja, toevoegen</Button><Button type="button" variant={!addonEnabled[option.id] ? "default" : "outline"} onClick={() => setAddonEnabled((current) => ({ ...current, [option.id]: false }))}>Nee</Button></div>{addonEnabled[option.id] && <div className="space-y-3">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label className="text-xs">{option.color_slot_labels[index] || `Kleur ${index + 1}`} *</Label><Select value={addonColors[option.id]?.[index] || ""} onValueChange={(value) => setAddonColors((current) => { const selected = [...(current[option.id] || [])]; selected[index] = value; return { ...current, [option.id]: selected }; })}><SelectTrigger><SelectValue placeholder="Kies een kleur" /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select></div>)}{option.type !== "checkbox" && renderOption(option)}</div>}</div> : <div key={option.id}><Label>{option.label}{option.required ? " *" : ""}</Label>{option.description && <p className="text-xs text-muted-foreground mb-1">{option.description}</p>}{renderOption(option)}{option.max_length && ["text", "textarea"].includes(option.type) && <p className="text-[10px] text-muted-foreground mt-1">{String(values[option.id] || "").length}/{option.max_length} tekens</p>}</div>)}
         {error && <p role="alert" className="text-sm text-destructive rounded-lg bg-destructive/10 p-3">{error}</p>}
-        <Button onClick={handleAdd} disabled={!material || (product.color_required && !selectedColorIds[0])} className="w-full" size="lg"><Plus className="w-4 h-4" /> Toevoegen aan winkelwagen</Button>
+        <Button onClick={handleAdd} disabled={(variants.length > 0 && !variantId) || !material || (product.color_required && !selectedColorIds[0])} className="w-full" size="lg"><Plus className="w-4 h-4" /> Toevoegen aan winkelwagen</Button>
       </div>
     </div>
+    <ProductReviews productId={product.id} />
   </DialogContent></Dialog>;
 }

@@ -677,6 +677,8 @@ export default function AdminOrderEdit() {
                 {/* Plate tracking */}
                 <div className="md:col-span-2">
                   <PlateTracker
+                    orderId={order.id}
+                    orderNumber={order.order_number}
                     totalProducts={totalProducts}
                     totalPlates={totalPlates}
                     platePrintStatuses={platePrintStatuses}

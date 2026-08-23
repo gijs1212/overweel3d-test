@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -7,15 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package, Upload, Eye, Link2, LogIn } from "lucide-react";
+import { Check, X, Loader2, FileText, Download, ExternalLink, AlertCircle, PartyPopper, Send, MessageCircle, Calendar, Clock, Truck, Package, Upload, Eye, Link2, LogIn, Repeat2 } from "lucide-react";
 import { CustomPhotosSection } from "@/components/CustomPhotosSection";
 import { PrintProgress } from "@/components/PrintProgress";
 import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { ModelViewer } from "@/components/ModelViewer";
+import { ThreeMfOrderPreview } from "@/components/ThreeMfOrderPreview";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 interface Order {
   id: string;
@@ -62,6 +64,7 @@ interface Message { id: string; sender_type: string; message: string; created_at
 interface Appointment { id: string; proposed_date: string; proposed_time_slot: string; status: string; proposed_by: string; customer_notes: string; admin_notes: string; created_at: string; }
 
 export default function OrderDetail() {
+  const navigate = useNavigate();
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const isSuccess = searchParams.get("success") === "true";
@@ -86,6 +89,7 @@ export default function OrderDetail() {
   const [previewFiles, setPreviewFiles] = useState<Record<string, File>>({});
   const [fileLoadingId, setFileLoadingId] = useState<string | null>(null);
   const [claimingOrder, setClaimingOrder] = useState(false);
+  const [repeatConfirmationOpen, setRepeatConfirmationOpen] = useState(false);
   const fetchOrder = useCallback(async (registerVisit = true) => {
     if (!token) return;
     const { data, error } = await supabase.functions.invoke("get-order-by-token", {
@@ -347,9 +351,16 @@ export default function OrderDetail() {
                   Geplaatst op {new Date(order.submitted_at).toLocaleDateString("nl-NL", { dateStyle: "long" })}
                 </p>
               </div>
-              <span className={`inline-block mt-2 md:mt-0 px-4 py-2 rounded-full text-sm font-medium ${statusInfo.color}`}>
-                {statusInfo.label}
-              </span>
+              <div className="mt-3 flex flex-wrap items-center gap-2 md:mt-0">
+                {order.linked_to_current_user && (
+                  <Button variant="outline" onClick={() => setRepeatConfirmationOpen(true)}>
+                    <Repeat2 className="h-4 w-4" /> Opnieuw bestellen
+                  </Button>
+                )}
+                <span className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${statusInfo.color}`}>
+                  {statusInfo.label}
+                </span>
+              </div>
             </div>
 
             {/* Productievoortgang uses independent product and plate totals. */}
@@ -545,7 +556,7 @@ export default function OrderDetail() {
                               <span className="text-sm truncate">{file.original_filename}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              {/\.(stl|obj)$/i.test(file.original_filename) && (
+                              {/\.(stl|obj|3mf)$/i.test(file.original_filename) && (
                                 <Button variant="ghost" size="sm" onClick={() => void togglePreview(file)} disabled={fileLoadingId === file.id} aria-label={`Preview van ${file.original_filename}`}>
                                   {fileLoadingId === file.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                                 </Button>
@@ -557,7 +568,11 @@ export default function OrderDetail() {
                           </div>
                           {previewFileId === file.id && (
                             <div className="mt-3">
-                              <ModelViewer file={previewFiles[file.id]} filename={file.original_filename} height={240} />
+                              {/\.3mf$/i.test(file.original_filename) ? (
+                                <ThreeMfOrderPreview file={previewFiles[file.id]} />
+                              ) : (
+                                <ModelViewer file={previewFiles[file.id]} filename={file.original_filename} height={240} />
+                              )}
                             </div>
                           )}
                         </div>
@@ -772,6 +787,14 @@ export default function OrderDetail() {
         </div>
       </main>
       <Footer />
+      <ConfirmActionDialog
+        open={repeatConfirmationOpen}
+        onOpenChange={setRepeatConfirmationOpen}
+        title="Deze bestelling opnieuw bestellen?"
+        description="Prijs kan veranderen, u zal hierover geïnformeerd worden. Alleen nog beschikbare kant-en-klare artikelen worden overgenomen."
+        confirmLabel="Opnieuw bestellen"
+        onConfirm={() => navigate(`/bestellen?repeat=${order.id}`)}
+      />
     </div>
   );
 }

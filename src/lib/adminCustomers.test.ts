@@ -18,4 +18,13 @@ describe("admin customer helpers", () => {
     expect(customers[0]).toMatchObject({ firstName: "Saar", lastName: "de Wit", orderCount: 2, totalSpent: 35 });
     expect(customers[0].address).toBe("Dorpsstraat 1, 1234 AB Hoorn, Nederland");
   });
+
+  it("includes customers that only occur in an admin-created order", () => {
+    const customers = buildAdminCustomers([], [{
+      user_id: null, customer_email: "klant@example.nl", customer_name: "Piet Jansen",
+      billing_address: "Markt 2", shipping_address: null, postal_code: "1000 AA", city: "Amsterdam", country: "Nederland",
+      final_price: 30, shipping_cost: 5, status: "in_production",
+    }]);
+    expect(customers[0]).toMatchObject({ firstName: "Piet", lastName: "Jansen", email: "klant@example.nl", orderCount: 1, totalSpent: 35, source: "admin_order" });
+  });
 });

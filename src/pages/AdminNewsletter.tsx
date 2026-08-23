@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +67,8 @@ export default function AdminNewsletter() {
   const [mailAudience, setMailAudience] = useState<MailAudience>("newsletter");
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [sendingCampaign, setSendingCampaign] = useState(false);
+  const [newsletterEnabled, setNewsletterEnabled] = useState(true);
+  const [savingEnabled, setSavingEnabled] = useState(false);
 
   const fetchSubscriptions = useCallback(async () => {
     setIsLoading(true);
@@ -84,9 +87,26 @@ export default function AdminNewsletter() {
   }, [toast]);
 
   useEffect(() => {
-    if (!authLoading && isAdmin) void fetchSubscriptions();
+    if (!authLoading && isAdmin) {
+      void fetchSubscriptions();
+      void supabase.from("app_settings").select("value").eq("key", "newsletter_enabled").maybeSingle().then(({ data }) => setNewsletterEnabled(data?.value !== false));
+    }
     if (!authLoading && !isAdmin) setIsLoading(false);
   }, [authLoading, fetchSubscriptions, isAdmin]);
+
+  const setNewsletterMaster = async (enabled: boolean) => {
+    setSavingEnabled(true);
+    const previous = newsletterEnabled;
+    setNewsletterEnabled(enabled);
+    const { error } = await supabase.from("app_settings").update({ value: enabled }).eq("key", "newsletter_enabled");
+    if (error) {
+      setNewsletterEnabled(previous);
+      toast({ title: "Instelling opslaan mislukt", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: enabled ? "Nieuwsbrief ingeschakeld" : "Nieuwsbrief gepauzeerd" });
+    }
+    setSavingEnabled(false);
+  };
 
   const filteredSubscriptions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -139,6 +159,10 @@ export default function AdminNewsletter() {
       if (error) throw new Error(await getFunctionErrorMessage(error, "De mail kon niet worden verzonden."));
       if (!data?.success) {
         throw new Error(data?.error || `${data?.failedCount || 0} mails konden niet worden verzonden.`);
+      }
+      if (data?.skipped) {
+        toast({ title: "Nieuwsbrief staat uit", description: "Er is niets verzonden. Zet de hoofdschakelaar eerst aan." });
+        return;
       }
 
       toast({
@@ -241,6 +265,11 @@ export default function AdminNewsletter() {
           <div className="text-center">
             <h1 className="mb-2 text-2xl font-bold text-primary">Geen toegang</h1>
             <p className="text-muted-foreground">U heeft geen adminrechten.</p>
+          </div>
+
+          <div className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border p-5 ${newsletterEnabled ? "border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20"}`}>
+            <div><p className="font-semibold">Nieuwsbriefverzending {newsletterEnabled ? "actief" : "gepauzeerd"}</p><p className="text-sm text-muted-foreground">Deze schakelaar stopt zowel handmatige als automatische campagnes.</p></div>
+            <Switch checked={newsletterEnabled} onCheckedChange={setNewsletterMaster} disabled={savingEnabled} aria-label="Nieuwsbrief in- of uitschakelen" />
           </div>
         </main>
         <Footer />
@@ -372,7 +401,7 @@ export default function AdminNewsletter() {
                   <p className="text-sm text-muted-foreground">
                     Ontvangers: <strong className="text-foreground">{mailTemplate === "custom" && mailAudience === "all_customers" ? "alle klanten" : `${activeCount} actieve nieuwsbriefabonnees`}</strong>
                   </p>
-                  <Button disabled={!canPrepareCampaign || sendingCampaign} onClick={() => setSendConfirmOpen(true)}>
+                  <Button disabled={!newsletterEnabled || !canPrepareCampaign || sendingCampaign} onClick={() => setSendConfirmOpen(true)}>
                     {sendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     Mail versturen
                   </Button>

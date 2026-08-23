@@ -34,6 +34,22 @@ export interface ProductOption {
   max_length: number | null;
   sort_order: number;
   active: boolean;
+  is_addon: boolean;
+  price_adjustment: number;
+  color_slots: number;
+  color_slot_labels: string[];
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  name: string;
+  sku: string | null;
+  size_label: string | null;
+  material_id: string | null;
+  price_adjustment: number;
+  active: boolean;
+  sort_order: number;
 }
 
 export interface FilamentColor {
@@ -78,6 +94,7 @@ export interface CatalogProduct {
   product_categories?: ProductCategory | null;
   product_images?: ProductImage[];
   product_options?: ProductOption[];
+  product_variants?: ProductVariant[];
 }
 
 export interface ProductOptionAnswer {
@@ -97,6 +114,8 @@ export interface CatalogOrderItem {
   unitPrice: number;
   totalPrice: number;
   answers: ProductOptionAnswer[];
+  variantId?: string | null;
+  variantName?: string | null;
 }
 
 export const normalizeMaterialId = (value: string) => {
@@ -139,10 +158,10 @@ export const orderedProductImages = (product: Pick<CatalogProduct, "product_imag
 export const isVideoProductMedia = (path: string, mediaType?: ProductMediaType) =>
   mediaType === "video" || /\.(mp4|webm|mov|m4v)(?:\?.*)?$/i.test(path);
 
-export const availableMaterialsForProduct = (product: CatalogProduct) => {
-  if (product.material_mode === "all") return MATERIALS;
+export const availableMaterialsForProduct = (product: CatalogProduct, materials = MATERIALS) => {
+  if (product.material_mode === "all") return materials;
   const allowed = new Set((product.materials || []).map(normalizeMaterialId));
-  return MATERIALS.filter((material) => allowed.has(material.id));
+  return materials.filter((material) => allowed.has(material.id));
 };
 
 export const productColorSlotTitle = (

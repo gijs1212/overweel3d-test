@@ -13,6 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
+import { buildDiscountNewsletterDetails } from "@/lib/discounts";
+
+interface DiscountProduct {
+  id: string;
+  name: string;
+}
+interface DiscountCategory { id: string; name: string }
 
 interface DiscountCode {
   id: string;
@@ -31,6 +38,12 @@ interface DiscountCode {
   reward_percentage?: number | null;
   assigned_to_email?: string | null;
   parent_code_id?: string | null;
+  product_id: string | null;
+  category_id: string | null;
+  minimum_order_amount: number;
+  stackable: boolean;
+  per_customer_limit: number | null;
+  starts_at: string | null;
 }
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Onbekende fout";
@@ -40,6 +53,8 @@ export default function AdminDiscountCodes() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
+  const [products, setProducts] = useState<DiscountProduct[]>([]);
+  const [categories, setCategories] = useState<DiscountCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -56,15 +71,28 @@ export default function AdminDiscountCodes() {
     owner_email: "",
     owner_name: "",
     reward_percentage: 10,
+    product_id: "",
+    category_id: "",
+    minimum_order_amount: 0,
+    per_customer_limit: "1",
+    starts_at: "",
+    stackable: false,
   });
 
   const fetchCodes = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from("discount_codes").select("*").order("created_at", { ascending: false });
+    const [codeResult, productResult, categoryResult] = await Promise.all([
+      supabase.from("discount_codes").select("*").order("created_at", { ascending: false }),
+      supabase.from("products").select("id,name").eq("active", true).order("name"),
+      supabase.from("product_categories").select("id,name").eq("active", true).order("name"),
+    ]);
+    const error = codeResult.error || productResult.error || categoryResult.error;
     if (error) {
       toast({ title: "Kortingscodes laden mislukt", description: error.message, variant: "destructive" });
     } else {
-      setCodes((data as DiscountCode[]) || []);
+      setCodes((codeResult.data as DiscountCode[]) || []);
+      setProducts((productResult.data as DiscountProduct[]) || []);
+      setCategories((categoryResult.data as DiscountCategory[]) || []);
     }
     setLoading(false);
   }, [toast]);
@@ -91,6 +119,14 @@ export default function AdminDiscountCodes() {
       toast({ title: "Maximaal gebruik moet minimaal 1 zijn", variant: "destructive" });
       return;
     }
+    if (form.product_id && !form.expires_at) {
+      toast({ title: "Kies een vervaldatum", description: "Een artikelkorting moet tijdelijk zijn.", variant: "destructive" });
+      return;
+    }
+    if (form.starts_at && form.expires_at && new Date(form.starts_at) >= new Date(form.expires_at)) {
+      toast({ title: "De einddatum moet na de startdatum liggen", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -100,26 +136,41 @@ export default function AdminDiscountCodes() {
         max_uses: form.max_uses ? parseInt(form.max_uses) : null,
         expires_at: form.expires_at || null,
         is_referral: form.is_referral,
-        is_public: form.is_public,
+        is_public: form.product_id ? true : form.is_public,
         owner_email: form.is_referral ? form.owner_email.trim().toLowerCase() : null,
         owner_name: form.is_referral ? form.owner_name.trim() || null : null,
         reward_percentage: form.is_referral ? form.reward_percentage : null,
+        product_id: form.product_id || null,
+        category_id: form.category_id || null,
+        minimum_order_amount: Math.max(0, Number(form.minimum_order_amount) || 0),
+        per_customer_limit: form.per_customer_limit ? Math.max(1, Number(form.per_customer_limit)) : null,
+        starts_at: form.starts_at || null,
+        stackable: form.stackable,
       };
-      const { data: createdCode, error } = await supabase.from("discount_codes").insert(payload).select("code,discount_type,discount_value,expires_at,is_public").single();
+      const { data: createdCode, error } = await supabase.from("discount_codes").insert(payload).select("code,discount_type,discount_value,expires_at,max_uses,is_public,product_id,category_id,minimum_order_amount,starts_at,per_customer_limit").single();
       if (error) throw error;
       let newsletterError = "";
       if (createdCode.is_public) {
-        const valueLabel = createdCode.discount_type === "percentage"
-          ? `${Number(createdCode.discount_value)}% korting`
-          : `€${Number(createdCode.discount_value).toFixed(2)} korting`;
-        const expiryLabel = createdCode.expires_at
-          ? ` Geldig tot en met ${new Date(createdCode.expires_at).toLocaleDateString("nl-NL")}.`
-          : "";
+        const productName = products.find((product) => product.id === createdCode.product_id)?.name || null;
+        const categoryName = categories.find((category) => category.id === createdCode.category_id)?.name || null;
+        const ruleDetails = [
+          createdCode.starts_at ? `Start op ${new Date(createdCode.starts_at).toLocaleString("nl-NL")}.` : "Direct geldig.",
+          createdCode.minimum_order_amount > 0 ? `Minimale bestelwaarde €${Number(createdCode.minimum_order_amount).toFixed(2)}.` : "",
+          createdCode.per_customer_limit ? `Maximaal ${createdCode.per_customer_limit} keer per klant.` : "",
+          categoryName ? `Alleen voor categorie ${categoryName}.` : "",
+        ].filter(Boolean).join(" ");
         const newsletter = await sendAutomaticNewsletters([{
           templateKind: "discount",
           changeType: "new",
           itemName: createdCode.code,
-          details: `Gebruik code ${createdCode.code} voor ${valueLabel}.${expiryLabel}`,
+          details: `${buildDiscountNewsletterDetails({
+            code: createdCode.code,
+            discountType: createdCode.discount_type,
+            discountValue: Number(createdCode.discount_value),
+            expiresAt: createdCode.expires_at,
+            maxUses: createdCode.max_uses,
+            productName,
+          })} ${ruleDetails}`,
           itemUrl: `${window.location.origin}/bestellen`,
         }]);
         newsletterError = newsletter.errors[0] || "";
@@ -129,7 +180,7 @@ export default function AdminDiscountCodes() {
         description: newsletterError || (createdCode.is_public ? "De kortingscode is naar de nieuwsbriefabonnees gestuurd." : "Privécode: er is geen nieuwsbrief verstuurd."),
         variant: newsletterError ? "destructive" : "default",
       });
-      setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, is_public: false, owner_email: "", owner_name: "", reward_percentage: 10 });
+      setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, is_public: false, owner_email: "", owner_name: "", reward_percentage: 10, product_id: "", category_id: "", minimum_order_amount: 0, per_customer_limit: "1", starts_at: "", stackable: false });
       await fetchCodes();
     } catch (error: unknown) {
       toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" });
@@ -178,9 +229,11 @@ export default function AdminDiscountCodes() {
               </Label>
             </div>
             <div className="flex items-center gap-3 mb-4 p-3 rounded-xl border">
-              <Switch id="is_public" checked={form.is_public} onCheckedChange={(is_public) => setForm({ ...form, is_public })} />
+              <Switch id="is_public" checked={form.is_public || Boolean(form.product_id)} disabled={Boolean(form.product_id)} onCheckedChange={(is_public) => setForm({ ...form, is_public })} />
               <Label htmlFor="is_public" className="cursor-pointer">
-                {form.is_public ? "Openbaar – direct versturen naar de nieuwsbrief" : "Privé – geen nieuwsbrief versturen"}
+                {form.product_id
+                  ? "Artikelkorting – automatisch openbaar en direct versturen naar de nieuwsbrief"
+                  : form.is_public ? "Openbaar – direct versturen naar de nieuwsbrief" : "Privé – geen nieuwsbrief versturen"}
               </Label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -207,9 +260,31 @@ export default function AdminDiscountCodes() {
                 <Input type="number" value={form.max_uses} onChange={e => setForm({ ...form, max_uses: e.target.value })} placeholder="Onbeperkt" />
               </div>
               <div>
+                <Label>Geldig vanaf (leeg = direct)</Label>
+                <Input type="datetime-local" value={form.starts_at} onChange={e => setForm({ ...form, starts_at: e.target.value })} />
+              </div>
+              <div>
                 <Label>Verloopt op (leeg = nooit)</Label>
                 <Input type="datetime-local" value={form.expires_at} onChange={e => setForm({ ...form, expires_at: e.target.value })} />
               </div>
+              <div>
+                <Label>Geldig voor</Label>
+                <Select value={form.product_id ? `product:${form.product_id}` : form.category_id ? `category:${form.category_id}` : "all"} onValueChange={scope => {
+                  const [kind, id] = scope.split(":");
+                  setForm({ ...form, product_id: kind === "product" ? id : "", category_id: kind === "category" ? id : "", is_public: kind === "product" ? true : form.is_public });
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Volledige bestelling</SelectItem>
+                    {categories.map(category => <SelectItem key={category.id} value={`category:${category.id}`}>Categorie: {category.name}</SelectItem>)}
+                    {products.map(product => <SelectItem key={product.id} value={`product:${product.id}`}>Artikel: {product.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {form.product_id && <p className="text-xs text-muted-foreground mt-1">Artikelkorting: een vervaldatum is verplicht.</p>}
+              </div>
+              <div><Label>Minimale bestelwaarde (€)</Label><Input type="number" min={0} step="0.01" value={form.minimum_order_amount} onChange={e => setForm({ ...form, minimum_order_amount: Number(e.target.value) || 0 })} /></div>
+              <div><Label>Maximaal per klant (leeg = onbeperkt)</Label><Input type="number" min={1} value={form.per_customer_limit} onChange={e => setForm({ ...form, per_customer_limit: e.target.value })} /></div>
+              <div className="flex items-end gap-3 rounded-lg border p-3"><Switch id="stackable" checked={form.stackable} onCheckedChange={stackable => setForm({ ...form, stackable })} /><Label htmlFor="stackable">Combineerbaar met cadeaubon</Label></div>
               <div className="flex items-end">
                 <Button onClick={handleSave} disabled={saving} className="w-full">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -266,12 +341,21 @@ export default function AdminDiscountCodes() {
                         {c.assigned_to_email && (
                           <span className="text-xs bg-muted px-2 py-0.5 rounded">Persoonlijk: {c.assigned_to_email}</span>
                         )}
+                        {c.product_id && (
+                          <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded">
+                            Alleen {products.find(product => product.id === c.product_id)?.name || "geselecteerd artikel"}
+                          </span>
+                        )}
+                        {c.category_id && <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded">Categorie {categories.find(category => category.id === c.category_id)?.name || "onbekend"}</span>}
                         {isExpired && <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">Verlopen</span>}
                         {isMaxed && <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">Max bereikt</span>}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1 flex gap-4">
                         <span>Gebruikt: {c.times_used}{c.max_uses !== null ? `/${c.max_uses}` : "x"}</span>
                         {c.expires_at && <span>Verloopt: {new Date(c.expires_at).toLocaleDateString("nl-NL")}</span>}
+                        {c.starts_at && <span>Start: {new Date(c.starts_at).toLocaleDateString("nl-NL")}</span>}
+                        {c.minimum_order_amount > 0 && <span>Vanaf €{Number(c.minimum_order_amount).toFixed(2)}</span>}
+                        {c.per_customer_limit && <span>Max. {c.per_customer_limit}× per klant</span>}
                         {c.is_referral && c.owner_email && <span>Eigenaar: {c.owner_email}</span>}
                       </div>
                     </div>

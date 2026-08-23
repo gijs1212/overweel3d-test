@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { MATERIALS } from "@/lib/constants";
+import { useMaterials } from "@/hooks/useMaterials";
 import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
 import {
   CatalogProduct,
@@ -29,10 +29,11 @@ import {
   ProductImage,
   ProductOption,
   ProductOptionType,
+  ProductVariant,
 } from "@/lib/productCatalog";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 
-type ProductForm = Omit<CatalogProduct, "id" | "product_categories" | "product_images" | "product_options">;
+type ProductForm = Omit<CatalogProduct, "id" | "product_categories" | "product_images" | "product_options" | "product_variants">;
 type PendingImage = { key: string; file: File; previewUrl: string; media_type: "image" | "video" };
 type DeleteTarget = { type: "product"; value: CatalogProduct } | { type: "category"; value: ProductCategory };
 
@@ -68,6 +69,7 @@ function SignedMedia({ path, alt, mediaType, className }: { path: string; alt: s
 const sanitizeFilename = (name: string) => name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-");
 
 export default function AdminProducts() {
+  const MATERIALS = useMaterials(true);
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -84,6 +86,7 @@ export default function AdminProducts() {
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [primaryKey, setPrimaryKey] = useState("");
   const [options, setOptions] = useState<ProductOption[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
@@ -96,7 +99,7 @@ export default function AdminProducts() {
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
     const [productResult, categoryResult, colorResult, availabilityResult] = await Promise.all([
-      supabase.from("products").select("*, product_categories(*), product_images(*), product_options(*)").order("created_at", { ascending: false }),
+      supabase.from("products").select("*, product_categories(*), product_images(*), product_options(*), product_variants(*)").order("created_at", { ascending: false }),
       supabase.from("product_categories").select("*").order("sort_order").order("name"),
       supabase.from("filament_colors").select("*").order("material").order("sort_order").order("name"),
       supabase.from("product_color_availability").select("product_id,color_id,available"),
@@ -110,6 +113,7 @@ export default function AdminProducts() {
         ...product,
         product_images: orderedProductImages(product),
         product_options: [...(product.product_options || [])].sort((a, b) => a.sort_order - b.sort_order),
+        product_variants: [...(product.product_variants || [])].sort((a, b) => a.sort_order - b.sort_order),
         colors: productAvailability.length
           ? productAvailability.filter((row) => row.available).map((row) => row.color_id)
           : product.colors,
@@ -127,7 +131,7 @@ export default function AdminProducts() {
   const resetEditor = () => {
     pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     setEditingId(null); setForm({ ...emptyForm, materials: [], colors: [], photos: [] }); setImages([]);
-    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setSelectedColorIds([]); setShowEditor(false);
+    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setVariants([]); setSelectedColorIds([]); setShowEditor(false);
   };
   const openNew = () => { resetEditor(); setShowEditor(true); };
   const openEdit = (product: CatalogProduct) => {
@@ -140,11 +144,11 @@ export default function AdminProducts() {
       color_selection_mode: product.color_selection_mode || (product.multicolor_allowed ? "multiple" : "single"),
       max_colors: Math.max(1, product.max_colors || (product.multicolor_allowed ? 2 : 1)),
       color_slot_labels: product.color_slot_labels || [],
-      product_categories: undefined, product_images: undefined, product_options: undefined,
+      product_categories: undefined, product_images: undefined, product_options: undefined, product_variants: undefined,
     } as ProductForm);
     setImages(productImages); setPendingImages([]); setRemovedPaths([]);
     setPrimaryKey(productImages.find((image) => image.is_primary)?.id || productImages[0]?.id || "");
-    setOptions([...(product.product_options || [])]); setSelectedColorIds([...(product.colors || [])]); setShowEditor(true);
+    setOptions([...(product.product_options || [])]); setVariants([...(product.product_variants || [])]); setSelectedColorIds([...(product.colors || [])]); setShowEditor(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -205,8 +209,18 @@ export default function AdminProducts() {
   const addOption = () => setOptions((current) => [...current, {
     id: crypto.randomUUID(), product_id: editingId || "", type: "text", label: "", description: "", required: false,
     choices: [], max_length: 100, sort_order: current.length, active: true,
+    is_addon: false, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
+  }]);
+  const addAddon = () => setOptions((current) => [...current, {
+    id: crypto.randomUUID(), product_id: editingId || "", type: "text", label: "Nieuwe add-on", description: "", required: false,
+    choices: [], max_length: 100, sort_order: current.length, active: true, is_addon: true, price_adjustment: 0, color_slots: 1, color_slot_labels: ["Kleur add-on"],
   }]);
   const updateOption = (id: string, patch: Partial<ProductOption>) => setOptions((current) => current.map((option) => option.id === id ? { ...option, ...patch } : option));
+  const addVariant = () => setVariants((current) => [...current, {
+    id: crypto.randomUUID(), product_id: editingId || "", name: "", sku: null, size_label: null,
+    material_id: null, price_adjustment: 0, active: true, sort_order: current.length,
+  }]);
+  const updateVariant = (id: string, patch: Partial<ProductVariant>) => setVariants((current) => current.map((variant) => variant.id === id ? { ...variant, ...patch } : variant));
 
   const validateProduct = () => {
     if (!form.name.trim()) return "Vul een productnaam in.";
@@ -220,7 +234,10 @@ export default function AdminProducts() {
       if (!option.label.trim()) return "Iedere extra optie heeft een label nodig.";
       if (["select", "radio"].includes(option.type) && option.choices.filter((choice) => choice.trim()).length < 2) return `Voeg minimaal twee keuzes toe bij “${option.label}”.`;
       if (["text", "textarea"].includes(option.type) && option.max_length !== null && (!Number.isInteger(option.max_length) || option.max_length < 1 || option.max_length > 5000)) return `Kies bij “${option.label}” een tekstlimiet tussen 1 en 5000.`;
+      if (option.is_addon && Array.from({ length: option.color_slots }).some((_, index) => !option.color_slot_labels[index]?.trim())) return `Geef ieder kleurvak van add-on “${option.label}” een naam.`;
     }
+    if (variants.some((variant) => !variant.name.trim())) return "Iedere productvariant heeft een naam nodig.";
+    if (new Set(variants.map((variant) => variant.name.trim().toLowerCase())).size !== variants.length) return "Variantnamen moeten uniek zijn.";
     return null;
   };
 
@@ -275,6 +292,16 @@ export default function AdminProducts() {
         const { error } = await supabase.from("product_options").insert(options.map((option, index) => ({
           product_id: productId!, type: option.type, label: option.label.trim(), description: option.description.trim(), required: option.required,
           choices: option.choices.map((choice) => choice.trim()).filter(Boolean), max_length: ["text", "textarea"].includes(option.type) ? option.max_length : null, sort_order: index, active: true,
+          is_addon: option.is_addon, price_adjustment: Number(option.price_adjustment) || 0, color_slots: option.is_addon ? option.color_slots : 0, color_slot_labels: option.is_addon ? option.color_slot_labels : [],
+        })));
+        if (error) throw error;
+      }
+      const { error: deleteVariantsError } = await supabase.from("product_variants").delete().eq("product_id", productId); if (deleteVariantsError) throw deleteVariantsError;
+      if (variants.length) {
+        const { error } = await supabase.from("product_variants").insert(variants.map((variant, index) => ({
+          product_id: productId!, name: variant.name.trim(), sku: variant.sku?.trim() || null,
+          size_label: variant.size_label?.trim() || null, material_id: variant.material_id || null,
+          price_adjustment: Number(variant.price_adjustment) || 0, active: variant.active, sort_order: index,
         })));
         if (error) throw error;
       }
@@ -392,7 +419,7 @@ export default function AdminProducts() {
         <div className="grid lg:grid-cols-2 gap-6 border-t pt-6">
           <div><Label>Materiaalkeuze</Label><Select value={form.material_mode} onValueChange={(value) => setMaterialMode(value as MaterialMode)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Vast materiaal</SelectItem><SelectItem value="selected">Klant kiest uit geselecteerde materialen</SelectItem><SelectItem value="all">Klant kiest uit alle materialen</SelectItem></SelectContent></Select>{form.material_mode !== "all" && <div className="flex flex-wrap gap-2 mt-3">{MATERIALS.map((material) => <button type="button" key={material.id} onClick={() => toggleMaterial(material.id)} className={`px-3 py-1.5 text-sm rounded-full border ${form.materials.includes(material.id) ? "bg-accent text-accent-foreground border-accent" : ""}`}>{material.name}</button>)}</div>}{form.material_mode === "fixed" && <p className="text-xs text-muted-foreground mt-2">De klant ziet het gekozen materiaal, maar kan dit niet aanpassen.</p>}</div>
           <div>
-            <div className="flex items-center gap-2"><Switch checked={form.color_required} onCheckedChange={(color_required) => setForm({ ...form, color_required })} /><Label>Minimaal één kleur verplicht</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={form.color_required} onCheckedChange={(color_required) => setForm({ ...form, color_required })} /><Label>Elk ingesteld kleurvak verplicht</Label></div>
             <div className="mt-3"><Label>Kleurkeuze</Label><Select value={form.color_selection_mode} onValueChange={(value) => setForm({ ...form, color_selection_mode: value as "single" | "multiple", max_colors: value === "single" ? 1 : Math.max(2, form.max_colors) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="single">Eén kleur</SelectItem><SelectItem value="multiple">Meerdere kleuren (multicolor)</SelectItem></SelectContent></Select></div>
             {form.color_selection_mode === "multiple" && <div className="mt-3 space-y-3">
               <div><Label>Aantal kleurposities</Label><Input type="number" min={2} max={12} value={form.max_colors} onChange={(event) => setForm({ ...form, max_colors: Math.min(12, Math.max(2, Number(event.target.value) || 2)) })} /></div>
@@ -416,7 +443,13 @@ export default function AdminProducts() {
 
         <div><Label>Beschikbare kleuren *</Label><p className="text-xs text-muted-foreground mb-3">Kleuren komen uit Kleurenbeheer en worden per product opgeslagen.</p>{availableColors.length === 0 ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p> : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{availableColors.map((color) => <label key={color.id} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="text-sm truncate">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}</div>
 
-        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Extra keuzes en personalisatie</Label><p className="text-xs text-muted-foreground">Voeg zoveel tekstvelden en keuzes toe als nodig.</p></div><Button type="button" variant="outline" size="sm" className="ml-auto" onClick={addOption}><Plus className="w-4 h-4" /> Optie toevoegen</Button></div><div className="space-y-4">
+        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Productvarianten</Label><p className="text-xs text-muted-foreground">Formaten, uitvoeringen, materiaal en prijsverschil per variant.</p></div><Button type="button" variant="outline" size="sm" className="ml-auto" onClick={addVariant}><Plus className="w-4 h-4" /> Variant toevoegen</Button></div><div className="space-y-3">
+          {variants.map((variant, index) => <div key={variant.id} className="rounded-xl border p-4 grid md:grid-cols-5 gap-3"><div><Label>Naam *</Label><Input value={variant.name} onChange={(event) => updateVariant(variant.id, { name: event.target.value })} placeholder="Bijv. Groot" /></div><div><Label>Formaat</Label><Input value={variant.size_label || ""} onChange={(event) => updateVariant(variant.id, { size_label: event.target.value })} placeholder="20 × 20 cm" /></div><div><Label>Materiaal</Label><Select value={variant.material_id || "default"} onValueChange={(value) => updateVariant(variant.id, { material_id: value === "default" ? null : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="default">Productkeuze</SelectItem>{MATERIALS.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Prijsverschil (€)</Label><Input type="number" step="0.01" value={variant.price_adjustment} onChange={(event) => updateVariant(variant.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div className="flex items-end gap-2"><Switch checked={variant.active} onCheckedChange={(active) => updateVariant(variant.id, { active })} /><Label>Actief</Label><Button type="button" variant="ghost" size="sm" onClick={() => setVariants((current) => current.filter((item) => item.id !== variant.id))}><Trash2 className="w-4 h-4 text-destructive" /></Button></div><div className="md:col-span-5 text-xs text-muted-foreground">Variant {index + 1}</div></div>)}
+          {variants.length === 0 && <p className="text-sm text-muted-foreground">Geen varianten: het product gebruikt de standaardprijs.</p>}
+        </div></div>
+
+        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Extra keuzes, personalisatie en add-ons</Label><p className="text-xs text-muted-foreground">Een add-on begint voor de klant altijd met een directe ja/nee-keuze.</p></div><div className="ml-auto flex gap-2"><Button type="button" variant="outline" size="sm" onClick={addOption}><Plus className="w-4 h-4" /> Optie</Button><Button type="button" size="sm" onClick={addAddon}><Plus className="w-4 h-4" /> Add-on</Button></div></div><div className="space-y-4">
+          {options.filter((option) => option.is_addon).map((option) => <div key={`addon-${option.id}`} className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 grid md:grid-cols-3 gap-3"><div><Label>Add-onprijs (€)</Label><Input type="number" min={0} step="0.01" value={option.price_adjustment} onChange={(event) => updateOption(option.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div><Label>Verplichte kleurvakken</Label><Input type="number" min={0} max={12} value={option.color_slots} onChange={(event) => { const color_slots = Math.min(12, Math.max(0, Number(event.target.value) || 0)); updateOption(option.id, { color_slots, color_slot_labels: Array.from({ length: color_slots }, (_, index) => option.color_slot_labels[index] || `Kleur ${index + 1}`) }); }} /></div><div className="md:col-span-3 grid sm:grid-cols-2 gap-2">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label>Naam kleurvak {index + 1} *</Label><Input value={option.color_slot_labels[index] || ""} onChange={(event) => { const color_slot_labels = [...option.color_slot_labels]; color_slot_labels[index] = event.target.value; updateOption(option.id, { color_slot_labels }); }} /></div>)}</div></div>)}
           {options.map((option, index) => <div key={option.id} className="rounded-xl border p-4 grid md:grid-cols-2 gap-3"><div><Label>Type</Label><Select value={option.type} onValueChange={(type) => updateOption(option.id, { type: type as ProductOptionType, choices: ["select", "radio"].includes(type) ? option.choices : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{optionTypes.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent></Select></div><div><Label>Label *</Label><Input value={option.label} onChange={(event) => updateOption(option.id, { label: event.target.value })} placeholder="Bijv. Tekst op voorkant" /></div><div className="md:col-span-2"><Label>Uitleg voor de klant</Label><Input value={option.description} onChange={(event) => updateOption(option.id, { description: event.target.value })} placeholder="Bijv. Welke tekst moet op de voorkant?" /></div>{["select", "radio"].includes(option.type) && <div className="md:col-span-2"><Label>Keuzes (één per regel)</Label><Textarea rows={3} value={option.choices.join("\n")} onChange={(event) => updateOption(option.id, { choices: event.target.value.split("\n") })} placeholder={"Klein\nMiddel\nGroot"} /></div>}{["text", "textarea"].includes(option.type) && <div><Label>Maximaal tekens</Label><Input type="number" min={1} max={5000} value={option.max_length || ""} onChange={(event) => updateOption(option.id, { max_length: Number(event.target.value) || null })} /></div>}<div className="flex items-end gap-2"><Switch checked={option.required} onCheckedChange={(required) => updateOption(option.id, { required })} /><Label>Verplicht</Label></div><div className="md:col-span-2 flex justify-between items-center"><span className="text-xs text-muted-foreground">Optie {index + 1}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOptions((current) => current.filter((item) => item.id !== option.id))}><Trash2 className="w-4 h-4 text-destructive" /> Verwijderen</Button></div></div>)}
           {options.length === 0 && <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">Geen extra opties. Klanten kiezen alleen materiaal, kleur en aantal.</p>}
         </div></div>

@@ -6,12 +6,14 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, Power, ChevronRight, Euro, Layers3 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
 import { getFunctionErrorMessage } from "@/lib/functionErrors";
+import { Switch } from "@/components/ui/switch";
+import { PlateApprovalRequests } from "@/components/PlateApprovalRequests";
 
 interface AdminOrder {
   id: string;
@@ -30,7 +32,7 @@ interface AdminOrder {
 
 export default function AdminDashboard() {
   const [searchParams] = useSearchParams();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, user } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,11 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [customerFilter, setCustomerFilter] = useState<string>(() => searchParams.get("customer")?.trim().toLowerCase() || "all");
   const [sendingTestMail, setSendingTestMail] = useState(false);
+  const [newsletterEnabled, setNewsletterEnabled] = useState(true);
+  const [savingNewsletter, setSavingNewsletter] = useState(false);
+  const [printerSummary, setPrinterSummary] = useState({ total: 0, active: 0 });
+  const [loyaltySettings, setLoyaltySettings] = useState({ pointsPerEuro: 1, eurosPerPoint: 0.05 });
+  const [savingLoyalty, setSavingLoyalty] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -47,21 +54,65 @@ export default function AdminDashboard() {
     }
 
     const fetchOrders = async () => {
-      const { data, error } = await supabase
+      const [{ data, error }, settingResult, loyaltyResult, printersResult] = await Promise.all([
+        supabase
         .from("orders")
         .select("id, order_number, customer_name, customer_email, status, instant_quote_price, final_price, submitted_at, material, link_first_viewed_at, link_last_viewed_at, link_view_count")
-        .order("submitted_at", { ascending: false });
+        .order("submitted_at", { ascending: false }),
+        supabase.from("app_settings").select("value").eq("key", "newsletter_enabled").maybeSingle(),
+        supabase.from("app_settings").select("key,value").in("key", ["loyalty_points_per_euro", "loyalty_euros_per_point"]),
+        supabase.from("printers").select("status"),
+      ]);
       if (error) {
         toast({ title: "Bestellingen laden mislukt", description: error.message, variant: "destructive" });
         setOrders([]);
       } else {
         setOrders((data as AdminOrder[]) || []);
       }
+      setNewsletterEnabled(settingResult.data?.value !== false);
+      const loyaltyValues = new Map((loyaltyResult.data || []).map((setting) => [setting.key, Number(setting.value)]));
+      setLoyaltySettings({
+        pointsPerEuro: loyaltyValues.get("loyalty_points_per_euro") ?? 1,
+        eurosPerPoint: loyaltyValues.get("loyalty_euros_per_point") ?? 0.05,
+      });
+      setPrinterSummary({
+        total: printersResult.data?.length || 0,
+        active: printersResult.data?.filter((printer) => printer.status === "printing").length || 0,
+      });
       setLoading(false);
     };
 
     void fetchOrders();
   }, [authLoading, isAdmin, toast]);
+
+  const saveLoyaltySettings = async () => {
+    if (!Number.isFinite(loyaltySettings.pointsPerEuro) || loyaltySettings.pointsPerEuro < 0 || !Number.isFinite(loyaltySettings.eurosPerPoint) || loyaltySettings.eurosPerPoint <= 0) {
+      toast({ title: "Vul geldige loyaliteitswaarden in", description: "Punten per euro mag nul zijn; euro korting per punt moet groter zijn dan nul.", variant: "destructive" });
+      return;
+    }
+    setSavingLoyalty(true);
+    const { error } = await supabase.from("app_settings").upsert([
+      { key: "loyalty_points_per_euro", value: loyaltySettings.pointsPerEuro, description: "Aantal loyaliteitspunten per uitgegeven euro.", updated_by: user?.id || null },
+      { key: "loyalty_euros_per_point", value: loyaltySettings.eurosPerPoint, description: "Aantal euro korting per ingewisseld loyaliteitspunt.", updated_by: user?.id || null },
+    ]);
+    setSavingLoyalty(false);
+    if (error) toast({ title: "Puntenregeling opslaan mislukt", description: error.message, variant: "destructive" });
+    else toast({ title: "Puntenregeling opgeslagen", description: `Klanten ontvangen ${loyaltySettings.pointsPerEuro} punt(en) per euro; één punt is €${loyaltySettings.eurosPerPoint.toFixed(3)} korting.` });
+  };
+
+  const toggleNewsletter = async (enabled: boolean) => {
+    setSavingNewsletter(true);
+    const previous = newsletterEnabled;
+    setNewsletterEnabled(enabled);
+    const { error } = await supabase.from("app_settings").update({ value: enabled }).eq("key", "newsletter_enabled");
+    if (error) {
+      setNewsletterEnabled(previous);
+      toast({ title: "Instelling opslaan mislukt", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: enabled ? "Nieuwsbrief ingeschakeld" : "Nieuwsbrief tijdelijk uitgeschakeld", description: enabled ? "Automatische en handmatige nieuwsbrieven worden weer verzonden." : "Nieuwe nieuwsbriefcampagnes worden centraal tegengehouden." });
+    }
+    setSavingNewsletter(false);
+  };
 
   const handleSendTestMail = async () => {
     setSendingTestMail(true);
@@ -135,44 +186,44 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="pt-20 pb-16">
+      <main className="pt-20 pb-16 bg-muted/20">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-primary">🔒 Admin Dashboard</h1>
-              <p className="text-muted-foreground">{orders.length} bestellingen totaal</p>
+              <p className="text-sm font-medium text-accent">Overweel3D beheer</p>
+              <h1 className="text-3xl font-bold text-primary">Admin dashboard</h1>
+              <p className="text-muted-foreground">Bestellingen, productie, klanten en marketing op één plek.</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" onClick={handleSendTestMail} disabled={sendingTestMail}>
-                {sendingTestMail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                Testmail sturen
-              </Button>
-              <Link to="/admin/blog">
-                <Button variant="outline"><FileText className="w-4 h-4" /> Blog</Button>
-              </Link>
-              <Link to="/admin/products">
-                <Button variant="outline"><ShoppingBag className="w-4 h-4" /> Producten</Button>
-              </Link>
-              <Link to="/admin/content">
-                <Button variant="outline"><Megaphone className="w-4 h-4" /> Content</Button>
-              </Link>
-              <Link to="/admin/discounts">
-                <Button variant="outline"><Tag className="w-4 h-4" /> Kortingscodes</Button>
-              </Link>
-              <Link to="/admin/colors">
-                <Button variant="outline">🎨 Kleuren</Button>
-              </Link>
-              <Link to="/admin/newsletter">
-                <Button variant="outline"><MailPlus className="w-4 h-4" /> Nieuwsbrief</Button>
-              </Link>
-              <Link to="/admin/customers">
-                <Button variant="outline"><Users className="w-4 h-4" /> Klanten</Button>
-              </Link>
-              <Link to="/admin/new-order">
-                <Button><Plus className="w-4 h-4" /> Bestelling aanmaken</Button>
-              </Link>
-            </div>
+            <Link to="/admin/new-order"><Button size="lg"><Plus className="w-4 h-4" /> Bestelling aanmaken</Button></Link>
           </div>
+
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <div className="bg-card border rounded-2xl p-5"><Package className="text-accent mb-3"/><p className="text-sm text-muted-foreground">Bestellingen</p><p className="text-2xl font-bold">{orders.length}</p></div>
+            <div className="bg-card border rounded-2xl p-5"><Euro className="text-accent mb-3"/><p className="text-sm text-muted-foreground">Totale orderwaarde</p><p className="text-2xl font-bold">€{orders.reduce((sum, order) => sum + Number(order.final_price ?? order.instant_quote_price ?? 0), 0).toFixed(2)}</p></div>
+            <div className="bg-card border rounded-2xl p-5"><Printer className="text-accent mb-3"/><p className="text-sm text-muted-foreground">Printers actief</p><p className="text-2xl font-bold">{printerSummary.active} / {printerSummary.total}</p></div>
+            <div className="bg-card border rounded-2xl p-5"><MailPlus className="text-accent mb-3"/><div className="flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Nieuwsbrief</p><p className="text-lg font-bold">{newsletterEnabled ? "Actief" : "Gepauzeerd"}</p></div><Switch checked={newsletterEnabled} onCheckedChange={toggleNewsletter} disabled={savingNewsletter} aria-label="Nieuwsbrief in- of uitschakelen" /></div></div>
+          </div>
+
+          <PlateApprovalRequests />
+
+          <section className="bg-card border rounded-2xl p-5 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+              <div className="flex-1"><h2 className="font-semibold flex items-center gap-2"><Gift className="w-4 h-4 text-accent" /> Loyaliteitsprogramma</h2><p className="text-sm text-muted-foreground">Deze waarden gelden voor nieuwe voltooide bestellingen en nieuw ingewisselde kortingscodes.</p></div>
+              <div className="grid sm:grid-cols-2 gap-3 lg:w-[430px]"><div><label className="text-sm font-medium">Punten per euro</label><Input type="number" min={0} step="0.1" value={loyaltySettings.pointsPerEuro} onChange={(event) => setLoyaltySettings((current) => ({ ...current, pointsPerEuro: Number(event.target.value) }))} /></div><div><label className="text-sm font-medium">Euro korting per punt</label><Input type="number" min={0.0001} step="0.001" value={loyaltySettings.eurosPerPoint} onChange={(event) => setLoyaltySettings((current) => ({ ...current, eurosPerPoint: Number(event.target.value) }))} /></div></div>
+              <Button onClick={saveLoyaltySettings} disabled={savingLoyalty}>{savingLoyalty ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />} Opslaan</Button>
+            </div>
+          </section>
+
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+            {[
+              ["Bestellingen & klanten", [["Klanten", "/admin/customers", Users], ["Nieuwe bestelling", "/admin/new-order", Plus]]],
+              ["Catalogus", [["Producten & varianten", "/admin/products", ShoppingBag], ["Materialen", "/admin/materials", Layers3], ["Kleuren", "/admin/colors", Palette], ["Reviews", "/admin/reviews", Star]]],
+              ["Marketing", [["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Blog & content", "/admin/blog", FileText]]],
+              ["Productie & inzicht", [["Printers & plaatkoppeling", "/admin/production", Printer], ["Kostenrapportage", "/admin/reports", BarChart3], ["Websitecontent", "/admin/content", Megaphone]]],
+            ].map(([title, items]) => <section key={title as string} className="bg-card border rounded-2xl p-5"><h2 className="font-semibold mb-3">{title as string}</h2><div className="space-y-1">{(items as [string,string,typeof Package][]).map(([label,to,Icon]) => <Link key={to} to={to} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"><Icon className="w-4 h-4 text-accent"/><span className="flex-1 text-sm">{label}</span><ChevronRight className="w-4 h-4 text-muted-foreground"/></Link>)}</div></section>)}
+          </div>
+
+          <div className="flex items-center justify-between mb-4"><div><h2 className="text-xl font-bold">Bestellingen</h2><p className="text-sm text-muted-foreground">Zoek en filter alle binnengekomen orders.</p></div><Button variant="outline" onClick={handleSendTestMail} disabled={sendingTestMail}>{sendingTestMail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Testmail</Button></div>
 
           {/* Filters */}
           <div className="flex flex-col md:flex-row gap-4 mb-6">

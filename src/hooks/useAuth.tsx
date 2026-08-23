@@ -18,6 +18,7 @@ interface Profile {
   vat_number: string;
   newsletter_subscribed: boolean;
   account_welcome_email_sent_at: string | null;
+  loyalty_points: number;
 }
 
 interface AuthContextType {

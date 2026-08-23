@@ -12,12 +12,14 @@ import { Save, Loader2, ArrowLeft, Tag, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ORDER_STATUSES, OrderStatus, MATERIALS } from "@/lib/constants";
+import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
+import { useMaterials } from "@/hooks/useMaterials";
 import { normalizePlatePrintQuantities } from "@/lib/plateTracking";
 import { availableFilamentColorsForMaterial, FilamentColor } from "@/lib/productCatalog";
 import { calculateDiscount, discountValidationError, type ApplicableDiscount } from "@/lib/discounts";
 
 export default function AdminNewOrder() {
+  const MATERIALS = useMaterials();
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -117,12 +119,17 @@ export default function AdminNewOrder() {
     try {
       const { data, error } = await supabase
         .from("discount_codes")
-        .select("code,discount_type,discount_value,active,expires_at,max_uses,times_used,assigned_to_email,is_referral")
+        .select("code,discount_type,discount_value,active,expires_at,starts_at,max_uses,times_used,assigned_to_email,is_referral,product_id,category_id,minimum_order_amount,stackable,per_customer_limit")
         .eq("code", discountCode.toUpperCase().trim())
         .maybeSingle();
       if (error) throw error;
       const candidate = data as ApplicableDiscount | null;
-      const validationError = discountValidationError(candidate, customerEmail);
+      if (candidate?.product_id || candidate?.category_id) {
+        setAppliedDiscount(null);
+        toast({ title: "Dit is een artikelkorting", description: "Deze code kan alleen bij het bijbehorende kant-en-klare product in de webshop worden gebruikt.", variant: "destructive" });
+        return;
+      }
+      const validationError = discountValidationError(candidate, customerEmail, new Date(), baseFinalPrice);
       if (validationError) {
         setAppliedDiscount(null);
         toast({ title: validationError, variant: "destructive" });
@@ -161,12 +168,13 @@ export default function AdminNewOrder() {
       if (appliedDiscount) {
         const { data, error: discountError } = await supabase
           .from("discount_codes")
-          .select("code,discount_type,discount_value,active,expires_at,max_uses,times_used,assigned_to_email,is_referral")
+          .select("code,discount_type,discount_value,active,expires_at,starts_at,max_uses,times_used,assigned_to_email,is_referral,product_id,category_id,minimum_order_amount,stackable,per_customer_limit")
           .eq("code", appliedDiscount.code)
           .maybeSingle();
         if (discountError) throw discountError;
         verifiedDiscount = data as ApplicableDiscount | null;
-        const validationError = discountValidationError(verifiedDiscount, customerEmail);
+        if (verifiedDiscount?.product_id || verifiedDiscount?.category_id) throw new Error("Een artikel- of categoriekorting kan niet op een handmatig aangemaakte adminbestelling worden toegepast.");
+        const validationError = discountValidationError(verifiedDiscount, customerEmail, new Date(), Number(finalPrice));
         if (validationError) throw new Error(validationError);
       }
       const parsedFinalPrice = finalPrice ? Number(finalPrice) : null;
@@ -211,7 +219,7 @@ export default function AdminNewOrder() {
 
       let discountUsageWarning = "";
       if (verifiedDiscount) {
-        const { error: usageError } = await supabase.rpc("increment_discount_usage", { code_text: verifiedDiscount.code });
+        const { error: usageError } = await supabase.rpc("record_discount_redemption", { code_text: verifiedDiscount.code, order_id_value: order.id, discount_amount_value: finalPricing.discountAmount });
         if (usageError) discountUsageWarning = ` Het gebruik van kortingscode ${verifiedDiscount.code} kon niet worden bijgewerkt.`;
         if (verifiedDiscount.is_referral) {
           const { error: referralError } = await supabase.functions.invoke("process-referral-reward", {

@@ -1,0 +1,5 @@
+configuration:
+  email_code:
+    name: E-mailcode
+    description: De eenmalige code die Bambu naar het ingestelde account stuurt.
+

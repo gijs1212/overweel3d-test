@@ -8,15 +8,33 @@ export interface ApplicableDiscount {
   times_used: number;
   assigned_to_email?: string | null;
   is_referral?: boolean;
+  product_id?: string | null;
+  category_id?: string | null;
+  minimum_order_amount?: number;
+  stackable?: boolean;
+  per_customer_limit?: number | null;
+  starts_at?: string | null;
+}
+
+interface DiscountNewsletterDetails {
+  code: string;
+  discountType: string;
+  discountValue: number;
+  expiresAt: string | null;
+  maxUses: number | null;
+  productName?: string | null;
 }
 
 export function discountValidationError(
   discount: ApplicableDiscount | null,
   customerEmail: string,
   now = new Date(),
+  orderAmount?: number,
 ) {
   if (!discount || !discount.active) return "Ongeldige kortingscode.";
   if (discount.expires_at && new Date(discount.expires_at) < now) return "Deze kortingscode is verlopen.";
+  if (discount.starts_at && new Date(discount.starts_at) > now) return "Deze kortingscode is nog niet actief.";
+  if (orderAmount !== undefined && orderAmount < Number(discount.minimum_order_amount || 0)) return `Deze kortingscode geldt vanaf €${Number(discount.minimum_order_amount).toFixed(2)}.`;
   if (discount.max_uses !== null && discount.times_used >= discount.max_uses) return "Deze kortingscode is al maximaal gebruikt.";
   if (discount.assigned_to_email && discount.assigned_to_email.toLowerCase() !== customerEmail.trim().toLowerCase()) {
     return "Deze persoonlijke kortingscode hoort bij een ander e-mailadres.";
@@ -35,4 +53,53 @@ export function calculateDiscount(basePrice: number, discount: Pick<ApplicableDi
     ? Math.min(safeBasePrice, safeBasePrice * (value / 100))
     : Math.min(safeBasePrice, value);
   return { discountAmount, total: Math.max(0, safeBasePrice - discountAmount) };
+}
+
+export function eligibleDiscountSubtotal(
+  lines: ReadonlyArray<{ amount: number; productId?: string | null; categoryId?: string | null }>,
+  productId: string | null,
+  categoryId: string | null = null,
+) {
+  return lines.reduce((total, line) => {
+    if (productId && line.productId !== productId) return total;
+    if (categoryId && line.categoryId !== categoryId) return total;
+    const amount = Number(line.amount);
+    return total + (Number.isFinite(amount) ? Math.max(0, amount) : 0);
+  }, 0);
+}
+
+export function discountScopeLabel(
+  discount: Pick<ApplicableDiscount, "product_id" | "category_id" | "minimum_order_amount">,
+  names: { productName?: string | null; categoryName?: string | null } = {},
+) {
+  const parts: string[] = [];
+  if (discount.product_id) parts.push(`alleen voor ${names.productName || "het geselecteerde artikel"}`);
+  else if (discount.category_id) parts.push(`voor categorie ${names.categoryName || "geselecteerde categorie"}`);
+  else parts.push("voor de hele bestelling");
+  if ((discount.minimum_order_amount || 0) > 0) parts.push(`vanaf €${Number(discount.minimum_order_amount).toFixed(2)}`);
+  return parts.join(" · ");
+}
+
+export function buildDiscountNewsletterDetails({
+  code,
+  discountType,
+  discountValue,
+  expiresAt,
+  maxUses,
+  productName,
+}: DiscountNewsletterDetails) {
+  const valueLabel = discountType === "percentage"
+    ? `${Number(discountValue)}%`
+    : `€${Number(discountValue).toFixed(2)}`;
+  const expiryLabel = expiresAt
+    ? `Vervalt op ${new Date(expiresAt).toLocaleDateString("nl-NL")}.`
+    : "Geen vervaldatum.";
+  const usageLabel = maxUses === null
+    ? "Onbeperkt te gebruiken."
+    : `Maximaal ${maxUses} keer te gebruiken.`;
+  const scopeLabel = productName
+    ? `Deze tijdelijke korting geldt alleen voor het artikel ${productName}.`
+    : "Deze korting geldt voor de volledige bestelling.";
+
+  return `Code: ${code}. Korting: ${valueLabel}. ${expiryLabel} ${usageLabel} ${scopeLabel}`;
 }

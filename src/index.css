@@ -66,45 +66,6 @@
     --sidebar-ring: 211 46% 43%;
   }
 
-  .dark {
-    /* Overweel3D — Premium Navy Bento (Dark, matches prototype) */
-    --background: 222 63% 15%;              /* #0f1b3d */
-    --foreground: 210 40% 98%;
-
-    --card: 216 51% 20%;                    /* darker navy mid */
-    --card-foreground: 210 40% 98%;
-
-    --popover: 216 51% 20%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 211 46% 55%;
-    --primary-foreground: 222 63% 12%;
-
-    --secondary: 216 51% 24%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 216 51% 22%;
-    --muted-foreground: 220 30% 75%;
-
-    --accent: 158 78% 45%;
-    --accent-foreground: 222 63% 12%;
-
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 211 40% 30% / 0.4;
-    --input: 216 51% 24%;
-    --ring: 211 46% 55%;
-
-    --sidebar-background: 222 63% 12%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 211 46% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 216 51% 22%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 216 51% 24%;
-    --sidebar-ring: 211 46% 55%;
-  }
 }
 
 @layer base {

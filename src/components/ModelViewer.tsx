@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +16,7 @@ type Props = {
   className?: string;
 };
 
-const SUPPORTED = [".stl", ".obj"];
+const SUPPORTED = [".stl", ".obj", ".3mf"];
 
 function extOf(name: string) {
   const i = name.toLowerCase().lastIndexOf(".");
@@ -101,18 +102,21 @@ export function ModelViewer({ file, storagePath, filename, height = 240, classNa
         } else if (ext === ".obj") {
           const text = new TextDecoder().decode(buf);
           const obj = new OBJLoader().parse(text);
-          obj.traverse((c: any) => {
-            if (c.isMesh) {
-              c.material = new THREE.MeshStandardMaterial({ color: 0x00b4d8, metalness: 0.1, roughness: 0.6 });
+          obj.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.material = new THREE.MeshStandardMaterial({ color: 0x00b4d8, metalness: 0.1, roughness: 0.6 });
             }
           });
           mesh = obj;
+          scene.add(mesh);
+        } else if (ext === ".3mf") {
+          mesh = new ThreeMFLoader().parse(buf);
           scene.add(mesh);
         }
         if (mesh) fitToObject(mesh);
         setLoading(false);
         animate();
-      } catch (e: any) {
+      } catch {
         setError("Kon model niet laden");
         setLoading(false);
       }
@@ -129,7 +133,7 @@ export function ModelViewer({ file, storagePath, filename, height = 240, classNa
           const buf = await data.arrayBuffer();
           if (!disposed) loadFromArrayBuffer(buf);
         }
-      } catch (e: any) {
+      } catch {
         if (!disposed) {
           setError("Kon model niet laden");
           setLoading(false);
@@ -157,11 +161,11 @@ export function ModelViewer({ file, storagePath, filename, height = 240, classNa
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
       }
-      scene.traverse((obj: any) => {
-        if (obj.geometry) obj.geometry.dispose?.();
-        if (obj.material) {
-          if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose?.());
-          else obj.material.dispose?.();
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          object.geometry.dispose();
+          if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
+          else object.material.dispose();
         }
       });
     };

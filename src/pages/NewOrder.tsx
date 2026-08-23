@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -10,12 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag, Tag, ShoppingCart, Eye } from "lucide-react";
+import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag, Tag, ShoppingCart, Eye, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { MATERIALS, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
+import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
+import { useMaterials } from "@/hooks/useMaterials";
 import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 import { ProductTile } from "@/components/ProductTile";
@@ -30,6 +31,7 @@ import {
   ProductOptionAnswer,
 } from "@/lib/productCatalog";
 import { createOrderConfirmationRequest } from "@/lib/orderConfirmation";
+import { calculateDiscount, discountScopeLabel, eligibleDiscountSubtotal, type ApplicableDiscount } from "@/lib/discounts";
 
 type ProductItem = CatalogProduct;
 
@@ -67,6 +69,9 @@ type PrebuiltLine = {
   quantity: number;
   price: number; // total for this line
   unitPrice: number;
+  categoryId: string | null;
+  variantId: string | null;
+  variantName: string | null;
   optionAnswers: ProductOptionAnswer[];
   optionFiles: Array<{ optionId: string; label: string; files: File[] }>;
 };
@@ -83,14 +88,18 @@ type CartLine = FileLine | LinkLine | PrebuiltLine | CustomLine;
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
 export default function NewOrder() {
+  const MATERIALS = useMaterials();
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const repeatLoaded = useRef(false);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [catalogColors, setCatalogColors] = useState<FilamentColor[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [catalogSearch, setCatalogSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"link" | "file" | "prebuilt" | "custom">("link");
 
   // Unified cart
@@ -107,7 +116,19 @@ export default function NewOrder() {
 
   // Discount
   const [discountCode, setDiscountCode] = useState("");
-  const [discountApplied, setDiscountApplied] = useState<{ type: string; value: number; code: string } | null>(null);
+  const [discountApplied, setDiscountApplied] = useState<{
+    type: string;
+    value: number;
+    code: string;
+    productId: string | null;
+    productName: string | null;
+    categoryId: string | null;
+    categoryName: string | null;
+    stackable: boolean;
+    minimumOrderAmount: number;
+  } | null>(null);
+  const [giftCardApplied, setGiftCardApplied] = useState<{ code: string; balance: number } | null>(null);
+  const [publicDiscounts, setPublicDiscounts] = useState<ApplicableDiscount[]>([]);
   const [checkingDiscount, setCheckingDiscount] = useState(false);
 
   // Form
@@ -145,7 +166,7 @@ export default function NewOrder() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from("products").select("*, product_categories(*), product_images(*), product_options(*)").eq("active", true),
+      supabase.from("products").select("*, product_categories(*), product_images(*), product_options(*), product_variants(*)").eq("active", true),
       supabase.from("filament_colors").select("*").eq("active", true).order("material").order("sort_order"),
       supabase.from("product_color_availability").select("product_id,color_id,available"),
     ]).then(([productResult, colorResult, availabilityResult]) => {
@@ -165,8 +186,97 @@ export default function NewOrder() {
     });
   }, [toast]);
 
+  useEffect(() => {
+    supabase.from("discount_codes")
+      .select("code,discount_type,discount_value,active,expires_at,starts_at,max_uses,times_used,assigned_to_email,is_referral,product_id,category_id,minimum_order_amount,stackable,per_customer_limit")
+      .eq("is_public", true)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setPublicDiscounts((data || []) as ApplicableDiscount[]));
+  }, []);
+
+  useEffect(() => {
+    const orderId = searchParams.get("repeat");
+    if (!orderId || !user || !products.length || repeatLoaded.current) return;
+    repeatLoaded.current = true;
+    supabase.from("orders").select("catalog_items,order_number,file_links,material,color,quantity,notes,print_preferences").eq("id", orderId).eq("user_id", user.id).maybeSingle().then(({ data, error }) => {
+      if (error || !data) {
+        toast({ title: "Herhaalbestelling laden mislukt", description: error?.message || "Bestelling niet gevonden.", variant: "destructive" });
+        return;
+      }
+      const items = Array.isArray(data.catalog_items) ? data.catalog_items as unknown as CatalogOrderItem[] : [];
+      const repeated: CartLine[] = items.flatMap((item): PrebuiltLine[] => {
+        const product = products.find((candidate) => candidate.id === item.productId && candidate.active);
+        if (!product) return [];
+        const variant = product.product_variants?.find((candidate) => candidate.id === item.variantId && candidate.active);
+        const selectedAnswerIds = new Set((item.answers || []).map((answer) => answer.optionId));
+        const addonPrice = (product.product_options || [])
+          .filter((option) => option.active && option.is_addon && selectedAnswerIds.has(option.id))
+          .reduce((total, option) => total + Number(option.price_adjustment || 0), 0);
+        const currentUnitPrice = Number(product.price) + Number(variant?.price_adjustment || 0) + addonPrice;
+        return [{
+          kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
+          materialId: MATERIALS.find((material) => material.name === item.material)?.id || item.material.toLowerCase(),
+          material: item.material, color: item.colors.map((color) => color.name).join(" · "), colors: item.colors.map((color) => ({ ...color, hex: color.hex || "#808080" })),
+          quantity: item.quantity, unitPrice: currentUnitPrice, price: currentUnitPrice * item.quantity,
+          categoryId: product.category_id, variantId: item.variantId || null, variantName: item.variantName || null,
+          optionAnswers: item.answers || [], optionFiles: [],
+        }];
+      });
+      const unavailableCount = items.length - repeated.length;
+      if (String(data.file_links || "").trim() || unavailableCount > 0 || !repeated.length) {
+        repeated.push({
+          kind: "custom",
+          id: uid(),
+          photos: [],
+          description: [
+            `Herhaal de bestanden en/of maatwerkonderdelen uit bestelling ${data.order_number}.`,
+            `Oorspronkelijke specificatie: materiaal ${data.material || "onbekend"}, kleur ${data.color || "onbekend"}, aantal ${data.quantity || 1}.`,
+            unavailableCount > 0 ? `${unavailableCount} eerder catalogusartikel is niet meer actief en moet handmatig worden gecontroleerd.` : "",
+            "Gebruik de bestanden uit de oorspronkelijke bestelling; de klant hoeft deze niet opnieuw te uploaden.",
+          ].filter(Boolean).join("\n"),
+        });
+      }
+      setCart(repeated);
+      setActiveTab(repeated.some((line) => line.kind === "prebuilt") ? "prebuilt" : "custom");
+      setFormData((current) => ({
+        ...current,
+        notes: [current.notes, data.notes ? `Oorspronkelijke notitie: ${data.notes}` : "", `Herhaalbestelling van ${data.order_number}`].filter(Boolean).join("\n"),
+        print_preferences: data.print_preferences || current.print_preferences,
+      }));
+      toast({ title: `${repeated.length} artikel${repeated.length === 1 ? "" : "en"} opnieuw toegevoegd`, description: "Prijs kan veranderen, u zal hierover geïnformeerd worden." });
+    });
+  }, [products, searchParams, toast, user]);
+
   const getColorsForMaterial = (materialId: string) =>
     availableFilamentColorsForMaterial(catalogColors, materialId);
+
+  const productGroups = useMemo(() => {
+    const query = catalogSearch.trim().toLocaleLowerCase("nl-NL");
+    const filteredProducts = products.filter((product) => !query || [
+      product.name,
+      product.description,
+      product.product_categories?.name || "",
+      product.product_categories?.description || "",
+    ].some((value) => value.toLocaleLowerCase("nl-NL").includes(query)));
+    const groups = new Map<string, { id: string; name: string; description: string; sortOrder: number; products: ProductItem[] }>();
+    for (const product of filteredProducts) {
+      const category = product.product_categories;
+      const key = category?.id || "uncategorized";
+      const group = groups.get(key) || {
+        id: key,
+        name: category?.name || "Overige producten",
+        description: category?.description || "",
+        sortOrder: category?.sort_order ?? Number.MAX_SAFE_INTEGER,
+        products: [],
+      };
+      group.products.push(product);
+      groups.set(key, group);
+    }
+    return [...groups.values()]
+      .map((group) => ({ ...group, products: [...group.products].sort((a, b) => a.name.localeCompare(b.name, "nl-NL")) }))
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "nl-NL"));
+  }, [catalogSearch, products]);
 
   const MULTICOLOR_ID = "multicolor";
   const MULTICOLOR_LABEL = "Multicolor (meerdere kleuren)";
@@ -270,7 +380,10 @@ export default function NewOrder() {
     setCart((c) => [...c, {
       kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
       materialId: options.materialId, material: options.material, color, colors: options.colors,
-      quantity: options.quantity, unitPrice: product.price, price: product.price * options.quantity,
+      quantity: options.quantity, unitPrice: options.unitPrice, price: options.unitPrice * options.quantity,
+      categoryId: product.category_id,
+      variantId: options.variantId,
+      variantName: options.variantName,
       optionAnswers: options.optionAnswers, optionFiles: options.optionFiles,
     }]);
     toast({ title: `${product.name} toegevoegd` });
@@ -314,35 +427,108 @@ export default function NewOrder() {
     return sum; // link & custom: op offerte
   }, 0);
 
-  const discountAmount = (() => {
-    if (!discountApplied) return 0;
-    if (discountApplied.type === "percentage") return estimatedSubtotal * (discountApplied.value / 100);
-    return Math.min(estimatedSubtotal, discountApplied.value);
-  })();
+  const discountSubtotal = eligibleDiscountSubtotal(cart.map((line) => ({
+    amount: line.kind === "file" ? calcFilePrice(line) : line.kind === "prebuilt" ? line.price : 0,
+    productId: line.kind === "prebuilt" ? line.productId : null,
+    categoryId: line.kind === "prebuilt" ? line.categoryId : null,
+  })), discountApplied?.productId || null, discountApplied?.categoryId || null);
+  const discountAmount = calculateDiscount(discountSubtotal, discountApplied ? {
+    discount_type: discountApplied.type,
+    discount_value: discountApplied.value,
+  } : null).discountAmount;
 
-  const estimatedTotal = Math.max(0, estimatedSubtotal - discountAmount);
+  const giftCardAmount = giftCardApplied ? Math.min(giftCardApplied.balance, Math.max(0, estimatedSubtotal - discountAmount)) : 0;
+  const estimatedTotal = Math.max(0, estimatedSubtotal - discountAmount - giftCardAmount);
   const hasOnlyQuoteItems = cart.length > 0 && cart.every((l) => l.kind === "link" || l.kind === "custom");
+  const applicablePublicDiscounts = publicDiscounts.filter((discount) => {
+    if (discount.starts_at && new Date(discount.starts_at) > new Date()) return false;
+    if (discount.expires_at && new Date(discount.expires_at) <= new Date()) return false;
+    if (discount.max_uses !== null && discount.times_used >= discount.max_uses) return false;
+    if (estimatedSubtotal < Number(discount.minimum_order_amount || 0)) return false;
+    return eligibleDiscountSubtotal(cart.map((line) => ({
+      amount: line.kind === "file" ? calcFilePrice(line) : line.kind === "prebuilt" ? line.price : 0,
+      productId: line.kind === "prebuilt" ? line.productId : null,
+      categoryId: line.kind === "prebuilt" ? line.categoryId : null,
+    })), discount.product_id || null, discount.category_id || null) > 0;
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const timer = window.setTimeout(() => {
+      const items = cart.map((line) => line.kind === "file"
+        ? { kind: line.kind, name: line.file.name, material: line.material, color: line.color, quantity: line.quantity }
+        : line.kind === "custom"
+          ? { kind: line.kind, description: line.description, photoCount: line.photos.length }
+          : { ...line, optionFiles: undefined });
+      void supabase.from("saved_carts").upsert({
+        user_id: user.id,
+        email: formData.email || user.email || "",
+        items: items as unknown as Json,
+        subtotal: estimatedSubtotal,
+        status: "active",
+        checkout_at: null,
+      }, { onConflict: "user_id" });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [cart, estimatedSubtotal, formData.email, user]);
 
   const applyDiscountCode = async () => {
     if (!discountCode.trim()) return;
     setCheckingDiscount(true);
     try {
-      const { data, error } = await supabase
-        .from("discount_codes")
-        .select("*")
-        .eq("code", discountCode.toUpperCase().trim())
-        .eq("active", true)
-        .maybeSingle();
+      const normalizedCode = discountCode.toUpperCase().trim();
+      const { data, error } = await supabase.rpc("check_discount_code", {
+        code_text: normalizedCode,
+        email_text: formData.email,
+        order_amount: estimatedSubtotal,
+      });
       if (error) throw error;
-      if (!data) { toast({ title: "Ongeldige kortingscode", variant: "destructive" }); return; }
-      if (data.expires_at && new Date(data.expires_at) < new Date()) { toast({ title: "Kortingscode is verlopen", variant: "destructive" }); return; }
-      if (data.max_uses !== null && data.times_used >= data.max_uses) { toast({ title: "Kortingscode al maximaal gebruikt", variant: "destructive" }); return; }
-      if (data.assigned_to_email && data.assigned_to_email.toLowerCase() !== (formData.email || "").toLowerCase()) {
-        toast({ title: "Deze code is persoonlijk", description: "Deze kortingscode is niet geldig voor dit e-mailadres.", variant: "destructive" });
+      const candidate = data?.[0];
+      if (!candidate) {
+        const { data: giftData, error: giftError } = await supabase.rpc("check_gift_card", { code_text: normalizedCode, email_text: formData.email });
+        if (giftError) throw giftError;
+        const gift = giftData?.[0];
+        if (!gift) { toast({ title: "Ongeldige kortingscode of cadeaubon", variant: "destructive" }); return; }
+        if (discountApplied && !discountApplied.stackable) {
+          toast({ title: "Deze korting is niet combineerbaar", description: "Verwijder eerst de kortingscode om de cadeaubon te gebruiken.", variant: "destructive" });
+          return;
+        }
+        setGiftCardApplied({ code: gift.code, balance: Number(gift.current_balance) });
+        setDiscountCode(gift.code);
+        toast({ title: `Cadeaubon ${gift.code} toegepast` });
         return;
       }
-      setDiscountApplied({ type: data.discount_type, value: Number(data.discount_value), code: data.code });
-      toast({ title: `Kortingscode "${data.code}" toegepast! 🎉` });
+      if (giftCardApplied && !candidate.stackable) {
+        toast({ title: "Deze kortingscode is niet combineerbaar", description: "Verwijder eerst de cadeaubon.", variant: "destructive" });
+        return;
+      }
+      const product = candidate.product_id ? products.find((item) => item.id === candidate.product_id) : null;
+      const categoryName = candidate.category_id ? products.find((item) => item.category_id === candidate.category_id)?.product_categories?.name || null : null;
+      const eligible = eligibleDiscountSubtotal(cart.map((line) => ({
+        amount: line.kind === "file" ? calcFilePrice(line) : line.kind === "prebuilt" ? line.price : 0,
+        productId: line.kind === "prebuilt" ? line.productId : null,
+        categoryId: line.kind === "prebuilt" ? line.categoryId : null,
+      })), candidate.product_id, candidate.category_id);
+      if ((candidate.product_id || candidate.category_id) && eligible <= 0) {
+        toast({
+          title: "Kortingscode geldt niet voor dit winkelmandje",
+          description: product ? `Voeg ${product.name} toe om deze code te gebruiken.` : categoryName ? `Voeg een artikel uit ${categoryName} toe.` : "Het bijbehorende artikel is momenteel niet beschikbaar.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setDiscountApplied({
+        type: candidate.discount_type,
+        value: Number(candidate.discount_value),
+        code: candidate.code,
+        productId: candidate.product_id,
+        productName: product?.name || null,
+        categoryId: candidate.category_id,
+        categoryName,
+        stackable: candidate.stackable,
+        minimumOrderAmount: Number(candidate.minimum_order_amount || 0),
+      });
+      toast({ title: `Kortingscode "${candidate.code}" toegepast! 🎉` });
     } catch {
       toast({ title: "Fout bij controleren code", variant: "destructive" });
     } finally { setCheckingDiscount(false); }
@@ -354,6 +540,14 @@ export default function NewOrder() {
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    if (discountApplied && discountSubtotal <= 0) {
+      toast({ title: "Artikel voor kortingscode ontbreekt", description: "Voeg een geschikt artikel opnieuw toe of verwijder de kortingscode.", variant: "destructive" });
+      return;
+    }
+    if (discountApplied && estimatedSubtotal < discountApplied.minimumOrderAmount) {
+      toast({ title: "Minimale bestelwaarde niet bereikt", description: `Deze code geldt vanaf €${discountApplied.minimumOrderAmount.toFixed(2)}.`, variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
     const stagedStoragePaths: string[] = [];
     let orderCreated = false;
@@ -417,6 +611,8 @@ export default function NewOrder() {
           unitPrice: line.unitPrice,
           totalPrice: line.price,
           answers,
+          variantId: line.variantId,
+          variantName: line.variantName,
         });
       }
 
@@ -430,11 +626,12 @@ export default function NewOrder() {
       }
       if (prebuiltLines.length) {
         sections.push("KANT-EN-KLARE ARTIKELEN:\n" + prebuiltLines.map((p) =>
-          `- ${p.name} x${p.quantity} – ${p.material} ${p.color} – €${p.price.toFixed(2)}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${String(answer.value)}`).join(" · ")}` : ""}`
+          `- ${p.name}${p.variantName ? ` (${p.variantName})` : ""} x${p.quantity} – ${p.material} ${p.color} – €${p.price.toFixed(2)}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${String(answer.value)}`).join(" · ")}` : ""}`
         ).join("\n"));
       }
       if (customSections.length) sections.push(customSections.join("\n\n"));
       if (discountApplied) sections.push(`KORTING: ${discountApplied.code} (${discountApplied.type === "percentage" ? `${discountApplied.value}%` : `€${discountApplied.value.toFixed(2)}`})`);
+      if (giftCardApplied) sections.push(`CADEAUBON: ${giftCardApplied.code} (€${giftCardAmount.toFixed(2)} gebruikt)`);
 
       // Aggregated material / color / quantity for legacy columns
       const materialNames = cart.map((l) => {
@@ -470,6 +667,8 @@ export default function NewOrder() {
         print_preferences: formData.print_preferences,
         instant_quote_price: estimatedTotal,
         applied_discount_code: discountApplied?.code || null,
+        gift_card_code: giftCardApplied?.code || null,
+        gift_card_amount: giftCardAmount,
         file_links: sections.join("\n\n"),
         catalog_items: catalogItems,
         order_method: orderMethod,
@@ -528,7 +727,7 @@ export default function NewOrder() {
       }
 
       if (discountApplied) {
-        const { error: usageError } = await supabase.rpc("increment_discount_usage", { code_text: discountApplied.code });
+        const { error: usageError } = await supabase.rpc("record_discount_redemption", { code_text: discountApplied.code, order_id_value: order.id, discount_amount_value: discountAmount });
         if (usageError) console.error("Kortingsgebruik bijwerken mislukt:", usageError.message);
         try {
           const { error: referralError } = await supabase.functions.invoke("process-referral-reward", {
@@ -537,6 +736,11 @@ export default function NewOrder() {
           if (referralError) console.error("Referralverwerking mislukt:", referralError.message);
         } catch { /* Referral processing is best-effort after order creation. */ }
       }
+      if (giftCardApplied && giftCardAmount > 0) {
+        const { error: giftError } = await supabase.rpc("redeem_gift_card", { code_text: giftCardApplied.code, order_id_value: order.id, requested_amount: giftCardAmount });
+        if (giftError) throw new Error(`Cadeaubon verwerken mislukt: ${giftError.message}`);
+      }
+      if (user) await supabase.from("saved_carts").update({ status: "converted", checkout_at: new Date().toISOString() }).eq("user_id", user.id);
       const { data: confirmationData, error: confirmationError } = await supabase.functions.invoke("send-order-email", {
         body: createOrderConfirmationRequest(order),
       });
@@ -751,12 +955,38 @@ export default function NewOrder() {
 
                           {/* PREBUILT TAB */}
                           <TabsContent value="prebuilt" className="mt-6">
+                            <div className="relative mb-6">
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                type="search"
+                                value={catalogSearch}
+                                onChange={(event) => setCatalogSearch(event.target.value)}
+                                placeholder="Zoek op product of categorie…"
+                                className="pl-10"
+                                aria-label="Zoek in kant-en-klare producten"
+                              />
+                            </div>
                             {products.length === 0 ? (
                               <p className="text-muted-foreground text-sm">Er zijn momenteel geen kant-en-klare artikelen beschikbaar.</p>
+                            ) : productGroups.length === 0 ? (
+                              <div className="rounded-xl border border-dashed p-8 text-center">
+                                <p className="font-medium text-primary">Geen producten gevonden</p>
+                                <p className="mt-1 text-sm text-muted-foreground">Probeer een andere zoekterm.</p>
+                              </div>
                             ) : (
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {products.map((p) => (
-                                  <ProductTile key={p.id} product={p} onClick={() => setSelectedProduct(p)} />
+                              <div className="space-y-10">
+                                {productGroups.map((group) => (
+                                  <section key={group.id} className="rounded-2xl border bg-muted/20 p-4 sm:p-5">
+                                    <div className="mb-4 border-b border-border pb-3">
+                                      <h3 className="text-xl font-bold text-primary">{group.name}</h3>
+                                      {group.description && <p className="mt-1 text-sm text-muted-foreground">{group.description}</p>}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                                      {group.products.map((product) => (
+                                        <ProductTile key={product.id} product={product} onClick={() => setSelectedProduct(product)} />
+                                      ))}
+                                    </div>
+                                  </section>
                                 ))}
                               </div>
                             )}
@@ -878,23 +1108,33 @@ export default function NewOrder() {
                         {/* Discount code */}
                         <div className="border-t border-border pt-4">
                           <Label className="flex items-center gap-2 mb-2"><Tag className="w-4 h-4" /> Kortingscode</Label>
-                          {discountApplied ? (
-                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                          {discountApplied && (
+                            <div className="flex items-center justify-between p-3 mb-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
                               <p className="text-sm text-green-800 dark:text-green-200">
                                 ✅ <strong>{discountApplied.code}</strong> — {discountApplied.type === "percentage" ? `${discountApplied.value}%` : `€${discountApplied.value.toFixed(2)}`} korting
+                                {discountApplied.productName ? ` op ${discountApplied.productName}` : discountApplied.categoryName ? ` op ${discountApplied.categoryName}` : ""}
                               </p>
                               <Button size="sm" variant="ghost" onClick={() => { setDiscountApplied(null); setDiscountCode(""); }}>
                                 <Trash2 className="w-4 h-4 text-destructive" />
                               </Button>
                             </div>
-                          ) : (
+                          )}
+                          {giftCardApplied && (
+                            <div className="flex items-center justify-between p-3 mb-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg"><p className="text-sm text-blue-800 dark:text-blue-200">🎁 <strong>{giftCardApplied.code}</strong> — €{giftCardAmount.toFixed(2)} tegoed gebruikt</p><Button size="sm" variant="ghost" onClick={() => { setGiftCardApplied(null); setDiscountCode(""); }}><Trash2 className="w-4 h-4 text-destructive" /></Button></div>
+                          )}
+                          {(!discountApplied || discountApplied.stackable) && (
                             <div className="flex gap-2">
-                              <Input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} placeholder="Voer kortingscode in" />
+                              <Input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} placeholder="Kortingscode of cadeaubon" />
                               <Button variant="outline" onClick={applyDiscountCode} disabled={checkingDiscount || !discountCode.trim()}>
                                 {checkingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Toepassen"}
                               </Button>
                             </div>
                           )}
+                          {!discountApplied && applicablePublicDiscounts.length > 0 && <div className="mt-3 rounded-lg bg-muted/50 p-3"><p className="text-xs font-medium mb-2">Geldige acties voor uw winkelmandje</p><div className="flex flex-wrap gap-2">{applicablePublicDiscounts.slice(0, 4).map((discount) => {
+                            const eligible = eligibleDiscountSubtotal(cart.map((line) => ({ productId: line.productId, categoryId: line.categoryId, lineTotal: line.unitPrice * line.quantity })), discount.product_id || null, discount.category_id || null);
+                            const benefit = calculateDiscount(eligible, { discount_type: discount.discount_type, discount_value: Number(discount.discount_value) }).discountAmount;
+                            return <button type="button" key={discount.code} onClick={() => setDiscountCode(discount.code)} className="text-xs rounded-full border bg-background px-3 py-1.5 hover:border-accent"><strong>{discount.code}</strong> · voordeel €{benefit.toFixed(2)} · {discountScopeLabel(discount, { productName: products.find((product) => product.id === discount.product_id)?.name, categoryName: products.find((product) => product.category_id === discount.category_id)?.product_categories?.name })}</button>;
+                          })}</div></div>}
                         </div>
 
                         <div className="flex items-start gap-2 pt-2">
@@ -968,6 +1208,7 @@ export default function NewOrder() {
                               <span>−€{discountAmount.toFixed(2)}</span>
                             </div>
                           )}
+                          {giftCardApplied && <div className="flex justify-between text-sm text-blue-700"><span>Cadeaubon ({giftCardApplied.code})</span><span>−€{giftCardAmount.toFixed(2)}</span></div>}
                           <div className="flex justify-between items-center pt-1">
                             <span className="font-semibold text-primary">{hasOnlyQuoteItems ? "Op offerte" : "Indicatie"}</span>
                             <span className="text-xl font-bold text-accent">€{estimatedTotal.toFixed(2)}</span>

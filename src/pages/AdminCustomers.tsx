@@ -29,7 +29,7 @@ export default function AdminCustomers() {
     const loadCustomers = async () => {
       const [profilesResult, ordersResult] = await Promise.all([
         supabase.from("profiles").select("user_id,full_name,email,billing_address,shipping_address,postal_code,city,country").order("full_name"),
-        supabase.from("orders").select("user_id,customer_email,final_price,shipping_cost,status"),
+        supabase.from("orders").select("user_id,customer_email,customer_name,billing_address,shipping_address,postal_code,city,country,final_price,shipping_cost,status").order("submitted_at"),
       ]);
 
       if (profilesResult.error || ordersResult.error) {
@@ -71,7 +71,7 @@ export default function AdminCustomers() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
             <div className="flex items-center gap-3">
               <Button asChild size="icon" variant="ghost"><Link to="/admin" aria-label="Terug naar admin"><ArrowLeft className="w-4 h-4" /></Link></Button>
-              <div><h1 className="text-2xl font-bold text-primary">Klanten</h1><p className="text-muted-foreground">{customers.length} personen met een account</p></div>
+              <div><h1 className="text-2xl font-bold text-primary">Klanten</h1><p className="text-muted-foreground">{customers.length} klanten uit accounts en adminbestellingen</p></div>
             </div>
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

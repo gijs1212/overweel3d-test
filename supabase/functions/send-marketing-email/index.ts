@@ -63,6 +63,22 @@ Deno.serve(async (req: Request) => {
       subject?: string;
       message?: string;
     };
+    const { data: newsletterSetting, error: settingError } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "newsletter_enabled")
+      .maybeSingle();
+    if (settingError) throw settingError;
+    if (newsletterSetting?.value === false) {
+      return jsonResponse({
+        success: true,
+        skipped: true,
+        reason: "newsletter_disabled",
+        recipientCount: 0,
+        sentCount: 0,
+        failedCount: 0,
+      });
+    }
     const templateKind = body.templateKind;
     if (!templateKind || !["color", "material", "article", "discount", "custom"].includes(templateKind)) {
       return jsonResponse({ error: "Kies een geldig e-mailsjabloon." }, 400);

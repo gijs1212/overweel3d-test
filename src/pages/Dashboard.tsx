@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Package, Plus, Loader2, User, AlertCircle } from "lucide-react";
+import { Package, Plus, Loader2, User, AlertCircle, Gift, Repeat2, Eye } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 interface OrderSummary {
   id: string;
@@ -21,12 +22,20 @@ interface OrderSummary {
   material: string;
 }
 
+interface LoyaltyCode { id: string; code: string; discount_value: number; times_used: number; max_uses: number | null }
+
 export default function Dashboard() {
-  const { user, profile, isAdmin, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, loading: authLoading, refreshProfile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileDismissed, setProfileDismissed] = useState(false);
+  const [convertingPoints, setConvertingPoints] = useState(false);
+  const [loyaltySettings, setLoyaltySettings] = useState({ pointsPerEuro: 1, eurosPerPoint: 0.05 });
+  const [loyaltyCodes, setLoyaltyCodes] = useState<LoyaltyCode[]>([]);
+  const [loyaltyRefresh, setLoyaltyRefresh] = useState(0);
+  const [repeatOrder, setRepeatOrder] = useState<OrderSummary | null>(null);
 
   const isProfileIncomplete = profile && (!profile.billing_address || !profile.city || !profile.postal_code || !profile.phone);
 
@@ -52,6 +61,18 @@ export default function Dashboard() {
     };
     void fetchOrders();
   }, [authLoading, toast, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      supabase.from("app_settings").select("key,value").in("key", ["loyalty_points_per_euro", "loyalty_euros_per_point"]),
+      supabase.from("discount_codes").select("id,code,discount_value,times_used,max_uses").like("code", "LOYAL-%").eq("active", true).order("created_at", { ascending: false }),
+    ]).then(([settingsResult, codesResult]) => {
+      const values = new Map((settingsResult.data || []).map((setting) => [setting.key, Number(setting.value)]));
+      setLoyaltySettings({ pointsPerEuro: values.get("loyalty_points_per_euro") ?? 1, eurosPerPoint: values.get("loyalty_euros_per_point") ?? 0.05 });
+      setLoyaltyCodes(((codesResult.data || []) as LoyaltyCode[]).filter((code) => code.max_uses === null || code.times_used < code.max_uses));
+    });
+  }, [loyaltyRefresh, user]);
 
   if (authLoading) {
     return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16 flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-accent" /></main><Footer /></div>);
@@ -138,6 +159,11 @@ export default function Dashboard() {
             </div>
           )}
 
+          <section className="mb-6 rounded-2xl border bg-gradient-to-r from-accent/10 via-card to-card p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><p className="text-sm text-muted-foreground flex items-center gap-2"><Gift className="w-4 h-4 text-accent" /> Loyaliteitsprogramma</p><p className="text-2xl font-bold text-primary">{profile?.loyalty_points || 0} punten</p><p className="text-xs text-muted-foreground">U ontvangt {loyaltySettings.pointsPerEuro} punt(en) per uitgegeven euro. 100 punten is €{(100 * loyaltySettings.eurosPerPoint).toFixed(2)} korting.</p></div><Button disabled={convertingPoints || (profile?.loyalty_points || 0) < 100} onClick={async () => { setConvertingPoints(true); const redeemable = Math.floor((profile?.loyalty_points || 0) / 100) * 100; const { data, error } = await supabase.rpc("convert_loyalty_points", { points_to_redeem: redeemable }); setConvertingPoints(false); if (error) toast({ title: "Inwisselen mislukt", description: error.message, variant: "destructive" }); else { await refreshProfile(); setLoyaltyRefresh((value) => value + 1); toast({ title: "Punten ingewisseld", description: `Uw eenmalige privécode is ${data}. De code blijft hieronder staan tot hij gebruikt is.` }); } }}>{convertingPoints ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />} Punten inwisselen</Button></div>
+            {loyaltyCodes.length > 0 && <div className="mt-4 border-t pt-4"><p className="text-xs font-medium text-muted-foreground mb-2">Beschikbare privécodes</p><div className="flex flex-wrap gap-2">{loyaltyCodes.map((code) => <span key={code.id} className="rounded-lg border bg-background px-3 py-2 text-sm"><strong className="font-mono">{code.code}</strong> · €{Number(code.discount_value).toFixed(2)} korting</span>)}</div></div>}
+          </section>
+
           {loading ? (
             <div className="flex justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-accent" />
@@ -162,7 +188,6 @@ export default function Dashboard() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
-                    <Link to={`/order/${order.customer_order_token}`}>
                       <div className="bg-card rounded-xl p-6 shadow-overweel-card hover:shadow-overweel-md transition-shadow border border-border">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div>
@@ -177,7 +202,7 @@ export default function Dashboard() {
                               {order.material && ` · ${order.material}`}
                             </p>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right space-y-2">
                             {order.final_price ? (
                               <p className="text-lg font-bold text-accent">€{Number(order.final_price).toFixed(2)}</p>
                             ) : (
@@ -185,10 +210,10 @@ export default function Dashboard() {
                                 Indicatie: €{Number(order.instant_quote_price).toFixed(2)}
                               </p>
                             )}
+                            <div className="flex gap-2 justify-end"><Button size="sm" variant="outline" asChild><Link to={`/order/${order.customer_order_token}`}><Eye className="w-4 h-4" /> Bekijken</Link></Button><Button size="sm" onClick={() => setRepeatOrder(order)}><Repeat2 className="w-4 h-4" /> Opnieuw bestellen</Button></div>
                           </div>
                         </div>
                       </div>
-                    </Link>
                   </motion.div>
                 );
               })}
@@ -197,6 +222,7 @@ export default function Dashboard() {
         </div>
       </main>
       <Footer />
+      <ConfirmActionDialog open={repeatOrder !== null} onOpenChange={(open) => !open && setRepeatOrder(null)} title="Bestelling opnieuw bestellen?" description="Prijs kan veranderen, u zal hierover geïnformeerd worden." confirmLabel="Opnieuw bestellen" onConfirm={() => { if (repeatOrder) navigate(`/bestellen?repeat=${repeatOrder.id}`); setRepeatOrder(null); }} />
     </div>
   );
 }

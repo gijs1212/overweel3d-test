@@ -13,7 +13,7 @@ import { ArrowLeft, Plus, Save, Trash2, Loader2, Upload, X, Palette } from "luci
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { MATERIALS } from "@/lib/constants";
+import { useMaterials } from "@/hooks/useMaterials";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { materialLabel, normalizeMaterialId } from "@/lib/productCatalog";
 import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
@@ -46,7 +46,7 @@ interface Availability { product_id: string; color_id: string; available: boolea
 
 const emptyForm = {
   name: "",
-  material: MATERIALS[0]?.name || "PLA",
+  material: "PLA",
   hex: "#808080",
   description: "",
   sort_order: 0,
@@ -63,6 +63,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function AdminColors() {
+  const MATERIALS = useMaterials(true);
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();

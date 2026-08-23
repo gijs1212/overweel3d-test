@@ -1,1 +1,7 @@
 project_id = "askbgpdygdiwuocsmsfn"
+
+[functions.printer-status-ingest]
+verify_jwt = false
+
+[functions.send-abandoned-cart-reminders]
+verify_jwt = true

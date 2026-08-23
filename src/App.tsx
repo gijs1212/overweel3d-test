@@ -28,8 +28,13 @@ import BlogPost from "./pages/BlogPost";
 import AdminContentMarketing from "./pages/AdminContentMarketing";
 import AdminDiscountCodes from "./pages/AdminDiscountCodes";
 import AdminColors from "./pages/AdminColors";
+import AdminMaterials from "./pages/AdminMaterials";
 import AdminNewsletter from "./pages/AdminNewsletter";
 import AdminCustomers from "./pages/AdminCustomers";
+import AdminProduction from "./pages/AdminProduction";
+import AdminReports from "./pages/AdminReports";
+import AdminReviews from "./pages/AdminReviews";
+import AdminGiftCards from "./pages/AdminGiftCards";
 import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
@@ -67,8 +72,13 @@ const App = () => (
             <Route path="/admin/content" element={<AdminContentMarketing />} />
             <Route path="/admin/discounts" element={<AdminDiscountCodes />} />
             <Route path="/admin/colors" element={<AdminColors />} />
+            <Route path="/admin/materials" element={<AdminMaterials />} />
             <Route path="/admin/newsletter" element={<AdminNewsletter />} />
             <Route path="/admin/customers" element={<AdminCustomers />} />
+            <Route path="/admin/production" element={<AdminProduction />} />
+            <Route path="/admin/reports" element={<AdminReports />} />
+            <Route path="/admin/reviews" element={<AdminReviews />} />
+            <Route path="/admin/gift-cards" element={<AdminGiftCards />} />
             <Route path="/kleuren" element={<Kleuren />} />
             <Route path="/blog" element={<Blog />} />
 

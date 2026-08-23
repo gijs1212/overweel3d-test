@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { MATERIALS } from "@/lib/constants";
+import { useMaterials } from "@/hooks/useMaterials";
 import { supabase } from "@/integrations/supabase/client";
 import { availableFilamentColorsForMaterial, FilamentColor } from "@/lib/productCatalog";
 
@@ -27,6 +27,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onAdd }: ProductCardProps) {
+  const MATERIALS = useMaterials();
   const [material, setMaterial] = useState("");
   const [color, setColor] = useState("");
   const [quantity, setQuantity] = useState(1);
