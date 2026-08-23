@@ -32,30 +32,30 @@ export function Navbar() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border"
+      className="fixed top-0 left-0 right-0 z-50 border-b border-black/10 bg-white/90 backdrop-blur-xl"
     >
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to="/" className="flex items-center gap-2">
+        <div className="flex items-center justify-between h-16 md:h-[76px]">
+          <Link to="/" className="flex items-center gap-3" aria-label="Overweel3D home">
             <Logo size="md" />
-            <span className="md:hidden font-bold text-primary tracking-tight">Overweel3D</span>
+            <span className="font-display text-sm font-bold uppercase tracking-[0.16em] text-black">Overweel3D</span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-7">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
-                className={`relative text-sm font-medium transition-colors hover:text-primary ${
-                  location.pathname === link.href ? "text-primary" : "text-muted-foreground"
+                className={`relative text-[13px] font-semibold transition-colors hover:text-black ${
+                  location.pathname === link.href ? "text-black" : "text-black/50"
                 }`}
               >
                 {link.label}
                 {location.pathname === link.href && (
                   <motion.div
                     layoutId="navbar-indicator"
-                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent rounded-full"
+                    className="absolute -bottom-2 left-0 right-0 h-px bg-black"
                   />
                 )}
               </Link>
@@ -73,7 +73,7 @@ export function Navbar() {
                 </Link>
                 {isAdmin && (
                   <Link to="/admin">
-                    <Button variant="ghost" size="sm">🔒 Admin</Button>
+                    <Button variant="outline" size="sm">Admin</Button>
                   </Link>
                 )}
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -90,7 +90,7 @@ export function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <button className="md:hidden rounded-lg border border-black/10 p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Menu openen of sluiten">
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -101,7 +101,7 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden py-4 border-t border-border"
+            className="md:hidden border-t border-black/10 py-5"
           >
             <div className="flex flex-col gap-4">
               {navLinks.map((link) => (

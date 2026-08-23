@@ -27,7 +27,7 @@ const materials = [
 
 export function Materials() {
   return (
-    <section id="materialen" className="py-24 bg-navy-deep text-white">
+    <section id="materialen" className="bg-background py-24 text-foreground">
       <div className="container mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -35,13 +35,13 @@ export function Materials() {
           viewport={{ once: true }}
           className="max-w-2xl mb-16"
         >
-          <span className="inline-block px-3 py-1 rounded-full bg-navy-mid text-navy-accent text-xs font-bold uppercase tracking-widest mb-4">
+          <span className="mb-5 inline-block text-xs font-bold uppercase tracking-[0.2em] text-black/45">
             Materialen
           </span>
           <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
             De juiste keuze voor elke toepassing.
           </h2>
-          <p className="text-navy-ice/80">
+          <p className="text-muted-foreground">
             Wij werken met PLA, PETG en TPU. Twijfelt u welke het beste past?
             Wij adviseren u graag op basis van uw toepassing.
           </p>
@@ -55,23 +55,23 @@ export function Materials() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.08, duration: 0.35 }}
-              className="p-8 bg-navy-mid rounded-3xl border border-navy-accent/20 hover:border-navy-accent/50 hover:-translate-y-1 transition-all duration-300"
+              className="rounded-2xl border border-black/10 bg-white p-8 transition-all duration-300 hover:-translate-y-1 hover:border-black/30 hover:shadow-overweel-md"
             >
               <div className="flex justify-between items-start mb-6">
-                <span className="px-3 py-1 bg-navy-accent/25 text-navy-ice text-xs font-bold rounded-full">
+                <span className="rounded-full border border-black/10 bg-neutral-100 px-3 py-1 text-xs font-bold text-black/55">
                   {material.tag}
                 </span>
-                <div className="font-display font-bold text-3xl text-emerald">
+                <div className="font-display text-3xl font-bold text-black">
                   {material.name}
                 </div>
               </div>
-              <p className="text-sm text-navy-ice/75 mb-6 leading-relaxed">
+              <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
                 {material.description}
               </p>
               <ul className="space-y-3 text-sm">
                 {material.pros.map((pro) => (
-                  <li key={pro} className="flex items-center gap-2 text-navy-ice/90">
-                    <Check className="w-4 h-4 text-emerald flex-shrink-0" />
+                  <li key={pro} className="flex items-center gap-2 text-black/75">
+                    <Check className="w-4 h-4 flex-shrink-0 text-black" />
                     <span>{pro}</span>
                   </li>
                 ))}
@@ -84,7 +84,7 @@ export function Materials() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="mt-12 text-center text-navy-ice/70 max-w-2xl mx-auto"
+          className="mx-auto mt-12 max-w-2xl text-center text-muted-foreground"
         >
           Iedere opdracht is uniek. Daarom ontvangt u altijd vrijblijvend een offerte
           op basis van onder andere materiaal, printtijd, afwerking en eventuele nabewerking.

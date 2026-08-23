@@ -35,6 +35,7 @@ export default function AdminProduction() {
   const [deletePrinter, setDeletePrinter] = useState<PrinterRow | null>(null);
   const [approveJob, setApproveJob] = useState<JobRow | null>(null);
   const [manualPlateNumbers, setManualPlateNumbers] = useState<Record<string, string>>({});
+  const [checkingJobId, setCheckingJobId] = useState<string | null>(null);
   const [jobForm, setJobForm] = useState({ orderId: "", printerId: "", plate: 1, runs: 1, expectedFile: "", duration: "", grams: "", scheduledAt: "" });
   const [threeMf, setThreeMf] = useState<File | null>(null); const [inspection, setInspection] = useState<ThreeMfInspection | null>(null); const [inspecting, setInspecting] = useState(false); const [saving, setSaving] = useState(false);
 
@@ -68,10 +69,10 @@ export default function AdminProduction() {
   const currentMatch = selectedPrinter && jobForm.expectedFile ? printFileMatch(jobForm.expectedFile, selectedPrinter.current_file || "") : false;
   const suggestions = useMemo(() => jobs.filter((job) => isVisiblePlateRequest(job, orders, printers)).sort((a, b) => String(a.suggested_at || a.created_at).localeCompare(String(b.suggested_at || b.created_at))), [jobs, orders, printers]);
   const approvalPlate = (job: JobRow) => {
-    const reportedPlate = findPlateRequestPrinter(job, printers)?.current_plate;
-    if (reportedPlate != null) return reportedPlate;
     const manualPlate = Number(manualPlateNumbers[job.id]);
-    return Number.isInteger(manualPlate) && manualPlate > 0 ? manualPlate : null;
+    if (Number.isInteger(manualPlate) && manualPlate > 0) return manualPlate;
+    const reportedPlate = findPlateRequestPrinter(job, printers)?.current_plate;
+    return reportedPlate != null ? reportedPlate : null;
   };
 
   const createBridgeToken = async () => {
@@ -160,8 +161,9 @@ export default function AdminProduction() {
     const order = orders.find((item) => item.id === job.order_id);
     if (!order) { toast({ title: "Bestelling is niet meer actief", description: "Voltooide of geannuleerde bestellingen worden niet meer aan printerplaten gekoppeld.", variant: "destructive" }); setApproveJob(null); return; }
     if (selectedPlate == null || !Number.isInteger(selectedPlate) || selectedPlate < 1 || selectedPlate > Math.max(1, order?.total_plates || 0)) { toast({ title: "Vul het juiste plaatnummer in", description: `Kies een plaat tussen 1 en ${Math.max(1, order?.total_plates || 1)}.`, variant: "destructive" }); return; }
-    const targetJob = jobs.find((item) => item.order_id === job.order_id && item.plate_number === selectedPlate && !["completed", "cancelled"].includes(item.status));
+    const targetJob = jobs.find((item) => item.order_id === job.order_id && item.plate_number === selectedPlate);
     if (!targetJob) { toast({ title: "Plaatkoppeling ontbreekt", description: `Voor plaat ${selectedPlate} is nog geen koppeling uit de geüploade 3MF aangemaakt.`, variant: "destructive" }); return; }
+    if (targetJob.status === "completed" || targetJob.runs_completed >= targetJob.runs_required) { toast({ title: "Plaat al geprint", description: `Plaat ${selectedPlate} is al volledig geprint. Er is niets gewijzigd.` }); setApproveJob(null); return; }
     if (printer?.current_plate != null && printer.current_plate !== targetJob.plate_number) { toast({ title: "Andere plaat actief", description: `De printer meldt plaat ${printer.current_plate}, maar deze taak is voor plaat ${targetJob.plate_number}.`, variant: "destructive" }); return; }
     if (job.status !== "suggested" || job.printer_id !== printer?.id) {
       const { error: restoreError } = await supabase.from("print_jobs").update({ status: "suggested", printer_id: printer?.id || null }).eq("id", job.id).in("status", ["suggested", "approved", "printing", "paused"]);
@@ -170,8 +172,49 @@ export default function AdminProduction() {
     const { data, error } = await supabase.rpc("approve_and_count_print_job_run", { p_suggestion_job_id: job.id, p_plate_number: selectedPlate });
     const result = data as { counted?: boolean; completed?: boolean; remainingRuns?: number; runNumber?: number; runsRequired?: number; reason?: string } | null;
     setApproveJob(null);
-    if (error || !result?.counted) toast({ title: "Goedkeuren mislukt", description: error?.message || `De printrun kon niet worden geteld (${result?.reason || "onbekende reden"}).`, variant: "destructive" });
+    if (error || !result?.counted) {
+      const alreadyComplete = result?.reason === "already_fully_printed";
+      toast({ title: alreadyComplete ? "Plaat al geprint" : "Goedkeuren mislukt", description: error?.message || (alreadyComplete ? `Plaat ${selectedPlate} is al volledig geprint. Er is niets gewijzigd.` : `De printrun kon niet worden geteld (${result?.reason || "onbekende reden"}).`), variant: alreadyComplete ? "default" : "destructive" });
+    }
     else { setManualPlateNumbers((current) => { const next = { ...current }; delete next[job.id]; return next; }); toast({ title: result.completed ? "Plaat volledig geprint" : "Printrun geteld", description: result.completed ? `Plaat ${selectedPlate} is volledig geprint.` : `Run ${result.runNumber} van ${result.runsRequired} is geteld; nog ${result.remainingRuns} te printen.` }); void load(); }
+  };
+
+  const recheckSuggestion = async (request: JobRow) => {
+    const plate = approvalPlate(request);
+    const order = orders.find((item) => item.id === request.order_id);
+    const maximum = Math.max(1, order?.total_plates || 1);
+    if (!order || plate == null || plate > maximum) {
+      toast({ title: "Kies eerst een plaat", description: `Kies een plaat tussen 1 en ${maximum}.`, variant: "destructive" });
+      return;
+    }
+    setCheckingJobId(request.id);
+    const [jobResult, printerResult] = await Promise.all([
+      supabase.from("print_jobs").select("*").eq("order_id", request.order_id),
+      supabase.from("printers").select("*"),
+    ]);
+    setCheckingJobId(null);
+    const error = jobResult.error || printerResult.error;
+    if (error) {
+      toast({ title: "Opnieuw controleren mislukt", description: error.message, variant: "destructive" });
+      return;
+    }
+    const freshJobs = jobResult.data || [];
+    const freshPrinters = printerResult.data || [];
+    setJobs((current) => [...current.filter((job) => job.order_id !== request.order_id), ...freshJobs]);
+    setPrinters(freshPrinters);
+    const freshRequest = freshJobs.find((job) => job.id === request.id) || request;
+    const printer = findPlateRequestPrinter(freshRequest, freshPrinters);
+    const target = freshJobs.find((job) => job.plate_number === plate);
+    if (!target) {
+      toast({ title: "Plaatkoppeling ontbreekt", description: `Plaat ${plate} staat niet in de 3MF-koppelingen van deze bestelling.`, variant: "destructive" });
+    } else if (target.status === "completed" || target.runs_completed >= target.runs_required) {
+      toast({ title: "Plaat al geprint", description: `Plaat ${plate} is al volledig geprint. Er is niets gewijzigd.` });
+    } else if (!printer || !printFileMatch(freshRequest.expected_file_name, printer.current_file || freshRequest.observed_file_name || "")) {
+      toast({ title: "Controle wijkt af", description: "Het actieve printerbestand komt niet overeen met deze bestelling. Er is niets gewijzigd.", variant: "destructive" });
+    } else {
+      const remaining = Math.max(target.runs_required - target.runs_completed, 0);
+      toast({ title: "Controle klopt", description: `${order.order_number} · plaat ${plate} heeft nog ${remaining} printrun${remaining === 1 ? "" : "s"} nodig. Er is niets gewijzigd.` });
+    }
   };
 
   if (authLoading || loading) return <div className="min-h-screen"><Navbar /><main className="pt-24 flex justify-center"><Loader2 className="animate-spin" /></main></div>;
@@ -199,28 +242,40 @@ export default function AdminProduction() {
             const match = printFileMatch(job.expected_file_name, printer?.current_file || "");
             const plateKnown = printer?.current_plate != null;
             const selectedPlate = approvalPlate(job);
-            const plateMatch = plateKnown && printer.current_plate === job.plate_number;
-            const manualPlateValid = !plateKnown && selectedPlate != null && selectedPlate <= Math.max(1, order?.total_plates || 0);
-            const canApprove = match && (plateMatch || manualPlateValid);
+            const targetJob = jobs.find((item) => item.order_id === job.order_id && item.plate_number === selectedPlate);
+            const targetComplete = Boolean(targetJob && (targetJob.status === "completed" || targetJob.runs_completed >= targetJob.runs_required));
+            const selectedPlateValid = selectedPlate != null && selectedPlate <= Math.max(1, order?.total_plates || 0);
+            const canApprove = match && selectedPlateValid;
+            const remainingPlates = jobs.filter((item) => item.order_id === job.order_id && item.runs_completed < item.runs_required).map((item) => item.plate_number).sort((a, b) => a - b);
             return (
               <article key={job.id} className="rounded-2xl border bg-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 ring-2 ring-accent">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-bold">{order?.order_number || "Bestelling"} · {plateKnown ? `plaat ${printer.current_plate}` : "plaat onbekend"}</h3>
                     <span className="text-xs rounded-full bg-muted px-2 py-1">Wacht op admin-goedkeuring</span>
-                    {printer?.current_file && <span className={`text-xs rounded-full px-2 py-1 ${match && (plateMatch || manualPlateValid) ? "bg-emerald-100 text-emerald-800" : "bg-destructive/10 text-destructive"}`}>{!match ? "ander bestand actief" : plateKnown ? (plateMatch ? "bestand en plaat komen overeen" : `printer meldt plaat ${printer.current_plate}`) : manualPlateValid ? `handmatig plaat ${selectedPlate}` : "actieve plaat onbekend"}</span>}
+                    {printer?.current_file && <span className={`rounded-full px-2 py-1 text-xs ${canApprove ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>{!match ? "ander bestand actief" : targetComplete ? `plaat ${selectedPlate} is voltooid` : targetJob ? `plaat ${selectedPlate} moet nog ${Math.max(targetJob.runs_required - targetJob.runs_completed, 0)}× geprint worden` : selectedPlate ? `plaat ${selectedPlate} mist een 3MF-koppeling` : plateKnown ? `printer meldt plaat ${printer.current_plate}; controle nodig` : "actieve plaat onbekend"}</span>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{job.expected_file_name} · {printer?.name || "wacht op printermatch"}</p>
-                  <p className="text-sm mt-2 text-accent">Dit bestand wordt nu geprint. Controleer de bestelling en plaat; pas na goedkeuring mag de voltooide print als geprint worden geteld.</p>
-                  {!plateKnown && (
-                    <div className="mt-3 max-w-xs">
-                      <Label htmlFor={`manual-plate-${job.id}`}>Plaatnummer handmatig invullen</Label>
-                      <Input id={`manual-plate-${job.id}`} type="number" min={1} max={Math.max(1, order?.total_plates || 1)} value={manualPlateNumbers[job.id] || ""} onChange={(event) => setManualPlateNumbers((current) => ({ ...current, [job.id]: event.target.value }))} placeholder={`1 t/m ${Math.max(1, order?.total_plates || 1)}`} />
-                    </div>
-                  )}
+                  <p className="mt-2 text-sm text-muted-foreground">Controleer de bestelling en plaat; pas na goedkeuring wordt één printuitvoering geteld.</p>
+                  <p className="mt-2 text-xs font-semibold">Nog te printen platen: {remainingPlates.join(", ") || "geen"}</p>
+                  <div className="mt-3 max-w-xs">
+                    <Label htmlFor={`manual-plate-${job.id}`}>{plateKnown ? "Plaat controleren of aanpassen" : "Plaat kiezen"}</Label>
+                    <Select value={selectedPlate == null ? "" : String(selectedPlate)} onValueChange={(value) => setManualPlateNumbers((current) => ({ ...current, [job.id]: value }))}>
+                      <SelectTrigger id={`manual-plate-${job.id}`}><SelectValue placeholder="Kies een plaat" /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: Math.max(1, order?.total_plates || 1) }, (_, index) => index + 1).map((plateNumber) => {
+                          const optionJob = jobs.find((item) => item.order_id === job.order_id && item.plate_number === plateNumber);
+                          const optionComplete = Boolean(optionJob && (optionJob.status === "completed" || optionJob.runs_completed >= optionJob.runs_required));
+                          const remaining = optionJob ? Math.max(optionJob.runs_required - optionJob.runs_completed, 0) : null;
+                          return <SelectItem key={plateNumber} value={String(plateNumber)}>Plaat {plateNumber}{optionComplete ? " · voltooid" : remaining != null ? ` · moet nog ${remaining}× geprint worden` : " · geen 3MF-koppeling"}</SelectItem>;
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => setApproveJob(job)} disabled={!canApprove}><CheckCircle2 className="w-4 h-4" /> Goedkeuren voor ‘geprint’</Button>
+                  <Button variant="outline" onClick={() => void recheckSuggestion(job)} disabled={!selectedPlateValid || checkingJobId === job.id}>{checkingJobId === job.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Opnieuw controleren</Button>
+                  <Button onClick={() => targetComplete ? toast({ title: "Plaat al geprint", description: `Plaat ${selectedPlate} is al volledig geprint. Er is niets gewijzigd.` }) : setApproveJob(job)} disabled={!canApprove}><CheckCircle2 className="w-4 h-4" /> Goedkeuren voor ‘geprint’</Button>
                 </div>
               </article>
             );

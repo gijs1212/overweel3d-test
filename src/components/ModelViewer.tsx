@@ -47,10 +47,18 @@ export function ModelViewer({ file, storagePath, filename, height = 240, classNa
     const camera = new THREE.PerspectiveCamera(45, width / h, 0.1, 5000);
     camera.position.set(80, 80, 120);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(width, h);
-    container.appendChild(renderer.domElement);
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(width, h);
+      renderer.domElement.style.touchAction = "none";
+      container.appendChild(renderer.domElement);
+    } catch {
+      setError("Interactieve 3D-weergave wordt niet ondersteund op dit apparaat");
+      setLoading(false);
+      return;
+    }
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -67,6 +75,12 @@ export function ModelViewer({ file, storagePath, filename, height = 240, classNa
     let frameId = 0;
     let disposed = false;
     let mesh: THREE.Object3D | null = null;
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      setError("De 3D-weergave is gestopt om geheugen vrij te maken");
+      setLoading(false);
+    };
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost);
 
     const animate = () => {
       if (disposed) return;
@@ -150,12 +164,16 @@ export function ModelViewer({ file, storagePath, filename, height = 240, classNa
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     };
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
+    resizeObserver?.observe(container);
     window.addEventListener("resize", onResize);
 
     return () => {
       disposed = true;
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
+      renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       controls.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {

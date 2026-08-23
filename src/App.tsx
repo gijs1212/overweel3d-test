@@ -35,6 +35,8 @@ import AdminProduction from "./pages/AdminProduction";
 import AdminReports from "./pages/AdminReports";
 import AdminReviews from "./pages/AdminReviews";
 import AdminGiftCards from "./pages/AdminGiftCards";
+import AdminFilamentInventoryPage from "./pages/AdminFilamentInventoryPage";
+import AdminPriceCalculatorPage from "./pages/AdminPriceCalculatorPage";
 import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
@@ -47,7 +49,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -79,6 +81,8 @@ const App = () => (
             <Route path="/admin/reports" element={<AdminReports />} />
             <Route path="/admin/reviews" element={<AdminReviews />} />
             <Route path="/admin/gift-cards" element={<AdminGiftCards />} />
+            <Route path="/admin/filament-inventory" element={<AdminFilamentInventoryPage />} />
+            <Route path="/admin/price-calculator" element={<AdminPriceCalculatorPage />} />
             <Route path="/kleuren" element={<Kleuren />} />
             <Route path="/blog" element={<Blog />} />
 

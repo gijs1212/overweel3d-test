@@ -444,7 +444,7 @@ export function PlateTracker({
                     Plaat {plateIndex + 1}
                     {printed && <Check className="w-4 h-4" />}
                   </span>
-                  <span className="block text-xs mt-1">{printed ? "Volledig geprint" : "Nog niet klaar"}</span>
+                  <span className="block text-xs mt-1">{printed ? "Voltooid" : `Moet nog ${localQuantities[plateIndex] ?? 1}× geprint worden`}</span>
                 </button>
                 <Label htmlFor={`plate-quantity-${plateIndex}`} className="block text-xs mt-3 mb-1">
                   Hoe vaak printen

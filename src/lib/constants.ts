@@ -1,13 +1,13 @@
 export const ORDER_STATUSES = {
   draft: { label: "Concept", color: "bg-muted text-muted-foreground" },
-  submitted: { label: "Ingediend", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-  under_review: { label: "In behandeling", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
-  waiting_for_approval: { label: "Wacht op goedkeuring", color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" },
-  approved_by_customer: { label: "Goedgekeurd", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  submitted: { label: "Ingediend", color: "bg-neutral-200 text-neutral-800" },
+  under_review: { label: "In behandeling", color: "bg-neutral-900 text-white" },
+  waiting_for_approval: { label: "Wacht op goedkeuring", color: "border border-neutral-400 bg-white text-neutral-800" },
+  approved_by_customer: { label: "Goedgekeurd", color: "bg-neutral-800 text-white" },
   rejected_by_customer: { label: "Afgewezen", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
-  waiting_for_payment: { label: "Wacht op betaling", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
-  in_production: { label: "In productie", color: "bg-accent/20 text-accent" },
-  completed: { label: "Voltooid", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  waiting_for_payment: { label: "Wacht op betaling", color: "bg-neutral-200 text-neutral-800" },
+  in_production: { label: "In productie", color: "bg-black text-white" },
+  completed: { label: "Voltooid", color: "border border-neutral-300 bg-neutral-100 text-neutral-700" },
   cancelled: { label: "Geannuleerd", color: "bg-muted text-muted-foreground" },
 } as const;
 

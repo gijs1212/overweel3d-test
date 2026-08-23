@@ -8,7 +8,7 @@ import { WhyBento } from "@/components/WhyBento";
 
 const Index = () => {
   return (
-    <div className="min-h-dvh bg-navy-deep">
+    <div className="min-h-dvh bg-background">
       <Navbar />
       <main>
         <Hero />

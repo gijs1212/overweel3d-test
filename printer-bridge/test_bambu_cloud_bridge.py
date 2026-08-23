@@ -49,5 +49,25 @@ class AddonLoginTests(unittest.TestCase):
         token_file.write_text.assert_called_once()
 
 
+class FilamentStatusTests(unittest.TestCase):
+    def test_ams_payload_uses_the_roll_weight_reported_by_bambu(self):
+        payload = bridge.status_payload({
+            "gcode_state": "IDLE",
+            "ams": {"ams": [{"tray": [{
+                "tray_type": "PLA",
+                "tray_color": "0A2989",
+                "tray_weight": "750",
+                "remain": "80",
+                "tray_uuid": "new-roll",
+            }]}]},
+        })
+
+        self.assertEqual(payload["ams_slots"][0]["spool_capacity_grams"], 750)
+        self.assertEqual(payload["ams_slots"][0]["remaining_percent"], 80)
+
+    def test_missing_roll_weight_falls_back_to_one_kilo(self):
+        self.assertEqual(bridge.spool_capacity_grams({}), 1000)
+
+
 if __name__ == "__main__":
     unittest.main()

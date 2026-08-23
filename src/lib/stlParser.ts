@@ -10,7 +10,7 @@ interface Triangle {
   v3: [number, number, number];
 }
 
-interface ParseResult {
+export interface ParseResult {
   volumeCm3: number;
   triangleCount: number;
   boundingBox: {
@@ -195,10 +195,38 @@ export async function parse3DFile(file: File): Promise<ParseResult | null> {
     } else if (ext === ".obj") {
       const text = new TextDecoder().decode(buffer);
       triangles = parseOBJ(text);
-    } else if (ext === ".3mf" || ext === ".step" || ext === ".stp") {
-      // 3MF is a ZIP containing XML with mesh data - complex to parse client-side
-      // STEP is a CAD format - also complex
-      // Return null to fall back to file-size estimate
+    } else if (ext === ".3mf") {
+      const [{ ThreeMFLoader }, THREE] = await Promise.all([
+        import("three/examples/jsm/loaders/3MFLoader.js"),
+        import("three"),
+      ]);
+      const group = new ThreeMFLoader().parse(buffer);
+      group.updateMatrixWorld(true);
+      group.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const geometry = object.geometry as InstanceType<typeof THREE.BufferGeometry>;
+        const positions = geometry.getAttribute("position");
+        if (!positions) return;
+        const index = geometry.index;
+        const vertex = (vertexIndex: number): [number, number, number] => {
+          const point = new THREE.Vector3().fromBufferAttribute(positions, vertexIndex).applyMatrix4(object.matrixWorld);
+          return [point.x, point.y, point.z];
+        };
+        const count = index ? index.count : positions.count;
+        for (let offset = 0; offset + 2 < count; offset += 3) {
+          const a = index ? index.getX(offset) : offset;
+          const b = index ? index.getX(offset + 1) : offset + 1;
+          const c = index ? index.getX(offset + 2) : offset + 2;
+          triangles.push({ v1: vertex(a), v2: vertex(b), v3: vertex(c) });
+        }
+      });
+      group.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.geometry.dispose();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => material.dispose());
+      });
+    } else if (ext === ".step" || ext === ".stp") {
       return null;
     }
 

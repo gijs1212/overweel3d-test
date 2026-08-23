@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { Upload, ArrowRight, Sparkles, Check } from "lucide-react";
+import { Upload, ArrowRight, Check } from "lucide-react";
 
 const badges = [
   "Persoonlijke service",
@@ -12,36 +12,35 @@ const badges = [
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-navy-deep text-white pt-32 pb-24">
-      {/* Ambient glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_0%,hsl(var(--navy-mid))_0%,transparent_70%)] opacity-70 pointer-events-none" />
-
-      <div className="container mx-auto px-6 relative z-10">
-        <div className="max-w-3xl">
+    <section className="relative overflow-hidden bg-black pb-20 pt-32 text-white md:pb-28 md:pt-40">
+      <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:72px_72px]" />
+      <div className="container relative z-10 mx-auto px-6">
+        <div className="grid items-end gap-14 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="max-w-4xl">
           <motion.span
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-navy-mid text-navy-accent text-xs font-bold uppercase tracking-widest mb-6"
+            className="mb-8 inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.24em] text-white/55"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Overweel3D Premium Service
+            <span className="h-px w-10 bg-white/40" />
+            Precisie in iedere laag
           </motion.span>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.05 }}
-            className="font-display text-5xl lg:text-7xl font-bold leading-[1.05] tracking-tight mb-8"
+            className="mb-8 font-display text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-[88px]"
           >
-            Van idee naar <span className="text-navy-accent">hoogwaardige</span> 3D-print.
+            Uw ontwerp.<br /><span className="text-white/45">Perfect uitgevoerd.</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.15 }}
-            className="text-navy-ice/90 text-lg lg:text-xl font-medium leading-relaxed mb-10 max-w-2xl"
+            className="mb-10 max-w-2xl text-base font-medium leading-8 text-white/60 lg:text-lg"
           >
             Laat uw ontwerp professioneel produceren met moderne 3D-printtechnologie.
             Van prototypes en reserveonderdelen tot uniek maatwerk voor particulieren en bedrijven.
@@ -54,13 +53,13 @@ export function Hero() {
             className="flex flex-wrap gap-4"
           >
             <Link to="/bestellen">
-              <Button size="xl" className="bg-navy-accent hover:bg-navy-accent/90 text-white font-semibold rounded-xl shadow-lg shadow-navy-accent/30">
+              <Button size="xl" variant="hero">
                 <Upload className="w-5 h-5" />
                 Upload ontwerp
               </Button>
             </Link>
             <Link to="/opdrachten">
-              <Button size="xl" variant="outline" className="border-2 border-navy-mid text-white hover:bg-navy-mid hover:text-white rounded-xl">
+              <Button size="xl" variant="outline" className="border-white/25 bg-transparent text-white hover:border-white hover:bg-white hover:text-black">
                 Bekijk projecten
                 <ArrowRight className="w-4 h-4" />
               </Button>
@@ -71,15 +70,31 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-10 mt-10 border-t border-navy-mid text-navy-ice/70 text-sm font-medium"
+            className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-white/15 pt-8 text-sm font-medium text-white/55"
           >
             {badges.map((b) => (
               <div key={b} className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald" />
+                <Check className="w-4 h-4 text-white" />
                 <span>{b}</span>
               </div>
             ))}
           </motion.div>
+          </div>
+
+          <motion.aside
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="hidden border-l border-white/15 pl-8 lg:block"
+          >
+            <p className="mb-8 text-xs font-semibold uppercase tracking-[0.2em] text-white/35">Atelier standaard</p>
+            {[['01', 'Bestand gecontroleerd'], ['02', 'Materiaal afgestemd'], ['03', 'Persoonlijk opgevolgd']].map(([number, label]) => (
+              <div key={number} className="flex items-center gap-5 border-t border-white/15 py-5">
+                <span className="font-mono text-xs text-white/35">{number}</span>
+                <span className="text-sm font-semibold">{label}</span>
+              </div>
+            ))}
+          </motion.aside>
         </div>
       </div>
     </section>

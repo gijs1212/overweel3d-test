@@ -4,57 +4,53 @@
 
 @layer base {
   :root {
-    /* Overweel3D — Premium Navy Bento (Light) */
-    --background: 220 40% 98%;              /* #F5F7FB */
-    --foreground: 222 60% 15%;              /* deep navy text */
+    /* Overweel3D — monochrome atelier */
+    --background: 40 14% 97%;
+    --foreground: 0 0% 6%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 60% 15%;
+    --card-foreground: 0 0% 6%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 60% 15%;
+    --popover-foreground: 0 0% 6%;
 
-    /* Navy accent as primary */
-    --primary: 211 46% 43%;                 /* #3b6fa0 */
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 0% 6%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 40% 94%;
-    --secondary-foreground: 222 60% 15%;
+    --secondary: 40 8% 92%;
+    --secondary-foreground: 0 0% 8%;
 
-    --muted: 220 30% 94%;
-    --muted-foreground: 220 15% 42%;
+    --muted: 40 8% 93%;
+    --muted-foreground: 0 0% 38%;
 
-    --accent: 158 78% 39%;                  /* emerald #10B981 */
+    --accent: 0 0% 12%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 25% 88%;
-    --input: 220 25% 88%;
-    --ring: 211 46% 43%;
+    --border: 0 0% 84%;
+    --input: 0 0% 84%;
+    --ring: 0 0% 12%;
 
-    --radius: 1rem;
+    --radius: 0.75rem;
 
-    /* Navy palette tokens */
-    --navy-deep: 222 63% 15%;               /* #0f1b3d */
-    --navy-mid: 216 51% 24%;                /* #1e3a5f */
-    --navy-accent: 211 46% 43%;             /* #3b6fa0 */
-    --navy-ice: 220 30% 92%;                /* #e8edf3 */
-    --emerald: 158 78% 39%;                 /* #10B981 */
+    --navy-deep: 0 0% 4%;
+    --navy-mid: 0 0% 11%;
+    --navy-accent: 0 0% 72%;
+    --navy-ice: 0 0% 94%;
+    --emerald: 0 0% 82%;
 
-    /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(222 63% 15%) 0%, hsl(216 51% 24%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(211 46% 43%) 0%, hsl(158 78% 39%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 30% 97%) 100%);
-    --gradient-glow: radial-gradient(circle at 50% 0%, hsl(211 46% 43% / 0.18) 0%, transparent 60%);
+    --gradient-hero: linear-gradient(145deg, hsl(0 0% 3%) 0%, hsl(0 0% 12%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(0 0% 5%) 0%, hsl(0 0% 22%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(40 10% 97%) 100%);
+    --gradient-glow: radial-gradient(circle at 50% 0%, hsl(0 0% 100% / 0.1) 0%, transparent 60%);
 
-    /* Soft shadows only */
-    --shadow-sm: 0 1px 3px 0 hsl(222 63% 15% / 0.05), 0 1px 2px 0 hsl(222 63% 15% / 0.04);
-    --shadow-md: 0 4px 12px -2px hsl(222 63% 15% / 0.08);
-    --shadow-lg: 0 12px 28px -6px hsl(222 63% 15% / 0.12);
-    --shadow-glow: 0 0 32px hsl(211 46% 43% / 0.18);
-    --shadow-card: 0 2px 8px -2px hsl(222 63% 15% / 0.06);
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.06);
+    --shadow-md: 0 10px 30px -18px hsl(0 0% 0% / 0.35);
+    --shadow-lg: 0 28px 70px -32px hsl(0 0% 0% / 0.45);
+    --shadow-glow: 0 20px 60px -28px hsl(0 0% 0% / 0.6);
+    --shadow-card: 0 14px 40px -30px hsl(0 0% 0% / 0.35);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -63,7 +59,7 @@
     --sidebar-accent: 220 30% 95%;
     --sidebar-accent-foreground: 222 63% 15%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 211 46% 43%;
+    --sidebar-ring: 0 0% 12%;
   }
 
 }
@@ -76,10 +72,15 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    letter-spacing: -0.01em;
   }
-
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight;
+  }
+
+  ::selection {
+    background: hsl(var(--foreground));
+    color: hsl(var(--background));
   }
 }
 

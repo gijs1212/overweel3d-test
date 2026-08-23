@@ -3,7 +3,7 @@ import { Clock, ShieldCheck, Cpu, Layers } from "lucide-react";
 
 export function WhyBento() {
   return (
-    <section className="py-24 bg-navy-deep text-white">
+    <section className="bg-background py-24 text-foreground">
       <div className="container mx-auto px-6 max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -11,7 +11,7 @@ export function WhyBento() {
           viewport={{ once: true }}
           className="mb-12 max-w-2xl"
         >
-          <span className="inline-block px-3 py-1 rounded-full bg-navy-mid text-navy-accent text-xs font-bold uppercase tracking-widest mb-4">
+          <span className="mb-5 inline-block text-xs font-bold uppercase tracking-[0.2em] text-black/45">
             Waarom Overweel3D
           </span>
           <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
@@ -23,55 +23,55 @@ export function WhyBento() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6">
-          <div className="md:col-span-2 lg:col-span-3 bg-navy-mid p-8 rounded-3xl border border-navy-accent/20 flex flex-col justify-between">
+          <div className="md:col-span-2 lg:col-span-3 flex flex-col justify-between rounded-2xl border border-black/10 bg-white p-8 shadow-overweel-card">
             <div>
               <h3 className="font-display text-2xl font-bold mb-3">Persoonlijke begeleiding</h3>
-              <p className="text-navy-ice/80 leading-relaxed mb-8">
+              <p className="mb-8 leading-relaxed text-black/55">
                 U krijgt direct contact met de printer zelf. Wij denken met u mee — van bestand tot afwerking.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-navy-deep rounded-lg text-navy-accent"><Clock className="w-5 h-5" /></div>
+                <div className="rounded-lg bg-black p-2 text-white"><Clock className="w-5 h-5" /></div>
                 <span className="text-sm font-semibold">Snelle reactie</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-navy-deep rounded-lg text-emerald"><ShieldCheck className="w-5 h-5" /></div>
+                <div className="rounded-lg bg-black p-2 text-white"><ShieldCheck className="w-5 h-5" /></div>
                 <span className="text-sm font-semibold">Kwaliteitscontrole</span>
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-2 lg:col-span-3 bg-navy-mid p-8 rounded-3xl border border-navy-accent/20 relative overflow-hidden group">
+          <div className="group relative overflow-hidden rounded-2xl bg-black p-8 text-white md:col-span-2 lg:col-span-3">
             <div className="relative z-10">
-              <div className="p-3 bg-navy-accent w-fit rounded-2xl mb-6 shadow-lg shadow-navy-accent/30">
+              <div className="mb-6 w-fit rounded-xl border border-white/15 p-3">
                 <Cpu className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-display text-2xl font-bold mb-2">Prototypes & productie</h3>
-              <p className="text-navy-ice/70">Van functionele testmodellen tot kleine series. Wij schalen mee met uw behoefte.</p>
+              <p className="text-white/55">Van functionele testmodellen tot kleine series. Wij schalen mee met uw behoefte.</p>
             </div>
             <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-navy-accent/10 rounded-full blur-3xl group-hover:bg-navy-accent/20 transition-colors" />
           </div>
 
-          <div className="md:col-span-2 lg:col-span-2 bg-navy-deep p-8 rounded-3xl border border-navy-mid flex flex-col justify-center">
-            <h4 className="text-navy-accent font-bold text-xs uppercase tracking-widest mb-4">Beschikbare materialen</h4>
+          <div className="flex flex-col justify-center rounded-2xl border border-black/10 bg-neutral-100 p-8 md:col-span-2 lg:col-span-2">
+            <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-black/45">Beschikbare materialen</h4>
             <div className="space-y-4">
               {[["PLA", "Ecologisch"], ["PETG", "Sterk"], ["TPU", "Flexibel"]].map(([m, t]) => (
                 <div key={m} className="flex items-center justify-between">
                   <span className="font-semibold">{m}</span>
-                  <span className="text-[10px] px-2 py-1 rounded bg-navy-mid text-navy-ice">{t}</span>
+                  <span className="rounded bg-white px-2 py-1 text-[10px] text-black/50">{t}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="md:col-span-2 lg:col-span-4 bg-navy-mid p-8 rounded-3xl border border-navy-accent/20 flex items-center gap-8">
-            <div className="hidden sm:flex w-1/3 aspect-video bg-navy-deep rounded-2xl border border-navy-accent/20 items-center justify-center">
-              <Layers className="w-10 h-10 text-navy-accent" />
+          <div className="flex items-center gap-8 rounded-2xl border border-black/10 bg-white p-8 md:col-span-2 lg:col-span-4">
+            <div className="hidden aspect-video w-1/3 items-center justify-center rounded-xl bg-black sm:flex">
+              <Layers className="w-10 h-10 text-white" />
             </div>
             <div className="flex-1">
               <h3 className="font-display text-2xl font-bold mb-3">Uniek maatwerk</h3>
-              <p className="text-navy-ice/70">
+              <p className="text-black/55">
                 Heeft u een specifiek idee of een onderdeel dat niet meer verkrijgbaar is? Wij printen het precies op maat.
               </p>
             </div>

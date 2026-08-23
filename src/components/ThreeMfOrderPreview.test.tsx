@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { inspectThreeMf, disposeThreeMfInspection } = vi.hoisted(() => ({
   inspectThreeMf: vi.fn(),
@@ -38,7 +38,12 @@ describe("ThreeMfOrderPreview", () => {
         { number: 2, name: "Plaat 2", fileName: "plate_2.gcode" },
       ],
       archiveFiles: [],
+      modelDetailsAvailable: true,
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("toont kleuren en laat de klant tussen 3MF-platen bladeren", async () => {
@@ -59,6 +64,28 @@ describe("ThreeMfOrderPreview", () => {
     act(() => nextButton?.click());
 
     expect(container.textContent).toContain("Plaat 2 van 2");
+    expect(container.textContent).toContain("Interactief 3D-model");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("laadt op telefoon eerst de lichte plaatweergave en 3D alleen op verzoek", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<ThreeMfOrderPreview file={new File(["3mf"], "mobiel.3mf")} />);
+      await Promise.resolve();
+    });
+
+    expect(inspectThreeMf).toHaveBeenCalledWith(expect.any(File), { lightweight: true });
+    expect(container.textContent).toContain("Interactieve 3D-weergave laden");
+    expect(container.textContent).not.toContain("Interactief 3D-model");
+
+    const load3dButton = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Interactieve 3D-weergave laden"));
+    act(() => load3dButton?.click());
     expect(container.textContent).toContain("Interactief 3D-model");
 
     act(() => root.unmount());

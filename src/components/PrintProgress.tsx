@@ -65,7 +65,7 @@ export function PrintProgress({ totalProducts, totalPlates, platePrintStatuses, 
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              Plaat {index + 1}: {quantities[index]}× · {printed ? "geprint" : "in afwachting"}
+              Plaat {index + 1}: {printed ? "voltooid" : `moet nog ${quantities[index]}× geprint worden`}
             </span>
           ))}
         </div>

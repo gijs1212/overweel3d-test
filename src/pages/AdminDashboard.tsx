@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, Power, ChevronRight, Euro, Layers3 } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,47 +182,63 @@ export default function AdminDashboard() {
     ).values(),
   ).sort((a, b) => a.name.localeCompare(b.name, "nl"));
 
+  const totalOrderValue = orders.reduce((sum, order) => sum + Number(order.final_price ?? order.instant_quote_price ?? 0), 0);
+  const openOrderCount = orders.filter((order) => !["completed", "cancelled"].includes(order.status)).length;
+
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="pt-20 pb-16 bg-muted/20">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+      <main className="min-h-screen bg-neutral-100 pb-20 pt-20">
+        <div className="container mx-auto px-4 py-8 lg:py-10">
+          <header className="relative mb-6 overflow-hidden rounded-2xl bg-black px-6 py-8 text-white md:px-10 md:py-10">
+            <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:56px_56px]" />
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-medium text-accent">Overweel3D beheer</p>
-              <h1 className="text-3xl font-bold text-primary">Admin dashboard</h1>
-              <p className="text-muted-foreground">Bestellingen, productie, klanten en marketing op één plek.</p>
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-white/45">Overweel3D beheeromgeving</p>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white md:text-5xl">Goed overzicht.<br /><span className="text-white/45">Direct handelen.</span></h1>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/55">Beheer bestellingen, productie, klanten en marketing vanuit één rustige werkruimte.</p>
             </div>
-            <Link to="/admin/new-order"><Button size="lg"><Plus className="w-4 h-4" /> Bestelling aanmaken</Button></Link>
-          </div>
+            <div className="flex flex-wrap gap-3">
+              <Button variant="outline" className="border-white/25 bg-transparent text-white hover:bg-white hover:text-black" onClick={handleSendTestMail} disabled={sendingTestMail}>{sendingTestMail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Testmail</Button>
+              <Link to="/admin/new-order"><Button variant="hero"><Plus className="w-4 h-4" /> Nieuwe bestelling</Button></Link>
+            </div>
+            </div>
+          </header>
 
-          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <div className="bg-card border rounded-2xl p-5"><Package className="text-accent mb-3"/><p className="text-sm text-muted-foreground">Bestellingen</p><p className="text-2xl font-bold">{orders.length}</p></div>
-            <div className="bg-card border rounded-2xl p-5"><Euro className="text-accent mb-3"/><p className="text-sm text-muted-foreground">Totale orderwaarde</p><p className="text-2xl font-bold">€{orders.reduce((sum, order) => sum + Number(order.final_price ?? order.instant_quote_price ?? 0), 0).toFixed(2)}</p></div>
-            <div className="bg-card border rounded-2xl p-5"><Printer className="text-accent mb-3"/><p className="text-sm text-muted-foreground">Printers actief</p><p className="text-2xl font-bold">{printerSummary.active} / {printerSummary.total}</p></div>
-            <div className="bg-card border rounded-2xl p-5"><MailPlus className="text-accent mb-3"/><div className="flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Nieuwsbrief</p><p className="text-lg font-bold">{newsletterEnabled ? "Actief" : "Gepauzeerd"}</p></div><Switch checked={newsletterEnabled} onCheckedChange={toggleNewsletter} disabled={savingNewsletter} aria-label="Nieuwsbrief in- of uitschakelen" /></div></div>
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              [Package, "Open orders", openOrderCount.toString()],
+              [Euro, "Totale orderwaarde", `€${totalOrderValue.toFixed(2)}`],
+              [Printer, "Printers actief", `${printerSummary.active} / ${printerSummary.total}`],
+            ].map(([Icon, label, value]) => <div key={label as string} className="rounded-2xl border border-black/10 bg-white p-5"><div className="mb-5 flex h-9 w-9 items-center justify-center rounded-lg bg-black text-white"><Icon className="h-4 w-4" /></div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40">{label as string}</p><p className="mt-1 text-2xl font-semibold tracking-tight">{value as string}</p></div>)}
+            <div className="rounded-2xl border border-black/10 bg-white p-5"><div className="mb-5 flex items-start justify-between"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-black text-white"><MailPlus className="h-4 w-4" /></div><Switch checked={newsletterEnabled} onCheckedChange={toggleNewsletter} disabled={savingNewsletter} aria-label="Nieuwsbrief in- of uitschakelen" /></div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40">Nieuwsbrief</p><p className="mt-1 text-lg font-semibold">{newsletterEnabled ? "Actief" : "Gepauzeerd"}</p></div>
           </div>
 
           <PlateApprovalRequests />
 
-          <section className="bg-card border rounded-2xl p-5 mb-6">
-            <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-              <div className="flex-1"><h2 className="font-semibold flex items-center gap-2"><Gift className="w-4 h-4 text-accent" /> Loyaliteitsprogramma</h2><p className="text-sm text-muted-foreground">Deze waarden gelden voor nieuwe voltooide bestellingen en nieuw ingewisselde kortingscodes.</p></div>
-              <div className="grid sm:grid-cols-2 gap-3 lg:w-[430px]"><div><label className="text-sm font-medium">Punten per euro</label><Input type="number" min={0} step="0.1" value={loyaltySettings.pointsPerEuro} onChange={(event) => setLoyaltySettings((current) => ({ ...current, pointsPerEuro: Number(event.target.value) }))} /></div><div><label className="text-sm font-medium">Euro korting per punt</label><Input type="number" min={0.0001} step="0.001" value={loyaltySettings.eurosPerPoint} onChange={(event) => setLoyaltySettings((current) => ({ ...current, eurosPerPoint: Number(event.target.value) }))} /></div></div>
-              <Button onClick={saveLoyaltySettings} disabled={savingLoyalty}>{savingLoyalty ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />} Opslaan</Button>
-            </div>
-          </section>
-
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+          <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <section className="rounded-2xl border border-black/10 bg-white p-6">
+            <div className="mb-5"><p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Beheer</p><h2 className="mt-1 text-xl font-semibold">Alle onderdelen</h2></div>
+            <div className="grid gap-3 md:grid-cols-2">
             {[
               ["Bestellingen & klanten", [["Klanten", "/admin/customers", Users], ["Nieuwe bestelling", "/admin/new-order", Plus]]],
               ["Catalogus", [["Producten & varianten", "/admin/products", ShoppingBag], ["Materialen", "/admin/materials", Layers3], ["Kleuren", "/admin/colors", Palette], ["Reviews", "/admin/reviews", Star]]],
-              ["Marketing", [["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Blog & content", "/admin/blog", FileText]]],
-              ["Productie & inzicht", [["Printers & plaatkoppeling", "/admin/production", Printer], ["Kostenrapportage", "/admin/reports", BarChart3], ["Websitecontent", "/admin/content", Megaphone]]],
-            ].map(([title, items]) => <section key={title as string} className="bg-card border rounded-2xl p-5"><h2 className="font-semibold mb-3">{title as string}</h2><div className="space-y-1">{(items as [string,string,typeof Package][]).map(([label,to,Icon]) => <Link key={to} to={to} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"><Icon className="w-4 h-4 text-accent"/><span className="flex-1 text-sm">{label}</span><ChevronRight className="w-4 h-4 text-muted-foreground"/></Link>)}</div></section>)}
+              ["Marketing", [["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Loyaliteitsprogramma", "/admin#loyaliteitsprogramma", Gift], ["Blog & content", "/admin/blog", FileText]]],
+              ["Productie & inzicht", [["Printers & plaatkoppeling", "/admin/production", Printer], ["Filamentvoorraad", "/admin/filament-inventory", Boxes], ["Automatische prijsberekening", "/admin/price-calculator", Calculator], ["Kostenrapportage", "/admin/reports", BarChart3], ["Websitecontent", "/admin/content", Megaphone]]],
+            ].map(([title, items]) => <section key={title as string} className="rounded-xl border border-black/10 bg-neutral-50 p-4"><h3 className="mb-2 text-sm font-bold">{title as string}</h3><div className="space-y-1">{(items as [string,string,typeof Package][]).map(([label,to,Icon]) => <Link key={to} to={to} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-black/65 transition-colors hover:bg-black hover:text-white"><Icon className="w-4 h-4"/><span className="flex-1">{label}</span><ChevronRight className="w-4 h-4 opacity-40"/></Link>)}</div></section>)}
+            </div>
+          </section>
+
+          <section id="loyaliteitsprogramma" className="scroll-mt-28 rounded-2xl border border-black/10 bg-white p-6">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+              <div className="flex-1"><div className="mb-4 flex h-9 w-9 items-center justify-center rounded-lg bg-black text-white"><Gift className="w-4 h-4" /></div><h2 className="font-semibold">Loyaliteitsprogramma</h2><p className="mt-1 text-sm text-muted-foreground">Instellingen voor nieuwe voltooide bestellingen.</p></div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:w-[430px] xl:w-full xl:grid-cols-1"><div><label className="text-sm font-medium">Punten per euro</label><Input type="number" min={0} step="0.1" value={loyaltySettings.pointsPerEuro} onChange={(event) => setLoyaltySettings((current) => ({ ...current, pointsPerEuro: Number(event.target.value) }))} /></div><div><label className="text-sm font-medium">Euro korting per punt</label><Input type="number" min={0.0001} step="0.001" value={loyaltySettings.eurosPerPoint} onChange={(event) => setLoyaltySettings((current) => ({ ...current, eurosPerPoint: Number(event.target.value) }))} /></div><Button onClick={saveLoyaltySettings} disabled={savingLoyalty}>{savingLoyalty ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />} Instellingen opslaan</Button></div>
+            </div>
+          </section>
           </div>
 
-          <div className="flex items-center justify-between mb-4"><div><h2 className="text-xl font-bold">Bestellingen</h2><p className="text-sm text-muted-foreground">Zoek en filter alle binnengekomen orders.</p></div><Button variant="outline" onClick={handleSendTestMail} disabled={sendingTestMail}>{sendingTestMail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Testmail</Button></div>
+          <section className="rounded-2xl border border-black/10 bg-white p-5 md:p-6">
+          <div className="mb-5 flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Orderbeheer</p><h2 className="mt-1 text-xl font-bold">Bestellingen</h2><p className="text-sm text-muted-foreground">Zoek en filter alle binnengekomen orders.</p></div><span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold">{filtered.length} zichtbaar</span></div>
 
           {/* Filters */}
           <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -272,7 +287,7 @@ export default function AdminDashboard() {
               <p className="text-muted-foreground">Geen bestellingen gevonden.</p>
             </div>
           ) : (
-            <div className="bg-card rounded-2xl shadow-overweel-card overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-black/10 bg-card">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -292,7 +307,7 @@ export default function AdminDashboard() {
                       const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.submitted;
                       const isAdminOrder = order.customer_email === "admin@overweel3d.nl";
                       return (
-                        <tr key={order.id} className="border-b border-border hover:bg-muted/30 transition-colors">
+                        <tr key={order.id} className="border-b border-border transition-colors hover:bg-neutral-50">
                           <td className="p-4 font-medium">
                             {order.order_number}
                             {isAdminOrder && <span className="ml-1 text-xs text-accent">(admin)</span>}
@@ -309,7 +324,7 @@ export default function AdminDashboard() {
                           <td className="p-4">
                             {order.link_first_viewed_at ? (
                               <div>
-                                <span className="text-green-700 dark:text-green-300 font-medium">Bezocht</span>
+                                <span className="font-medium text-black">Bezocht</span>
                                 <div className="text-xs text-muted-foreground whitespace-nowrap">
                                   Eerste: {new Date(order.link_first_viewed_at).toLocaleString("nl-NL", {
                                     day: "2-digit",
@@ -337,7 +352,7 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td className="p-4">€{Number(order.instant_quote_price || 0).toFixed(2)}</td>
-                          <td className="p-4 font-semibold text-accent">
+                          <td className="p-4 font-semibold text-foreground">
                             {order.final_price ? `€${Number(order.final_price).toFixed(2)}` : "—"}
                           </td>
                           <td className="p-4 text-muted-foreground">
@@ -356,6 +371,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+          </section>
         </div>
       </main>
       <Footer />

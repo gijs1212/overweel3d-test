@@ -8,6 +8,31 @@ const matches = (expected: string, observed: string) => {
   return Boolean(left && right && (left === right || left.includes(right) || right.includes(left)));
 };
 
+type FilamentColor = { id: string; name: string; material: string; hex: string };
+
+const normalizeMaterial = (value: unknown) => String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
+const parseRgb = (value: unknown) => {
+  const match = String(value || "").trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return null;
+  const number = Number.parseInt(match[1], 16);
+  return [(number >> 16) & 255, (number >> 8) & 255, number & 255] as const;
+};
+const findFilamentColor = (colors: FilamentColor[], material: unknown, colorHex: unknown) => {
+  const wantedMaterial = normalizeMaterial(material);
+  const wantedRgb = parseRgb(colorHex);
+  if (!wantedMaterial || !wantedRgb) return null;
+  const candidates = colors.filter((color) => normalizeMaterial(color.material) === wantedMaterial);
+  let best: { color: FilamentColor; distance: number } | null = null;
+  for (const color of candidates) {
+    const rgb = parseRgb(color.hex);
+    if (!rgb) continue;
+    const distance = Math.sqrt(rgb.reduce((sum, channel, index) => sum + (channel - wantedRgb[index]) ** 2, 0));
+    if (!best || distance < best.distance) best = { color, distance };
+  }
+  // Bambu's reported hex value can differ slightly from the catalogue swatch.
+  return best && best.distance <= 100 ? best.color : null;
+};
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const printerId = req.headers.get("x-printer-id") || "";
@@ -32,16 +57,45 @@ Deno.serve(async (req) => {
   if (printerError) return json({ error: printerError.message }, 500);
 
   if (Array.isArray(body.ams_slots)) {
+    const { data: palette, error: paletteError } = await supabase.from("filament_colors").select("id,name,material,hex");
+    if (paletteError) return json({ error: paletteError.message }, 500);
     for (const slot of body.ams_slots) {
       const capacity = Math.max(1, Number(slot.spool_capacity_grams || 1000));
       const percent = slot.remaining_percent == null ? null : Math.max(0, Math.min(100, Number(slot.remaining_percent)));
-      await supabase.from("printer_ams_slots").upsert({
+      const reportedGrams = slot.remaining_grams == null ? null : Math.max(0, Number(slot.remaining_grams));
+      const remainingGrams = reportedGrams ?? (percent == null ? null : capacity * percent / 100);
+      const { error: slotError } = await supabase.from("printer_ams_slots").upsert({
         printer_id: printerId, ams_unit: Number(slot.ams_unit || 0), slot_number: Number(slot.slot_number || 1),
         material: slot.material || null, color_name: slot.color_name || null, color_hex: slot.color_hex || null,
         tray_uuid: slot.tray_uuid || null, remaining_percent: percent,
-        remaining_grams: slot.remaining_grams ?? (percent == null ? null : capacity * percent / 100),
+        remaining_grams: remainingGrams,
         spool_capacity_grams: capacity, raw_status: slot.raw_status || slot,
       }, { onConflict: "printer_id,ams_unit,slot_number" });
+      if (slotError) return json({ error: slotError.message }, 500);
+
+      const color = findFilamentColor((palette || []) as FilamentColor[], slot.material, slot.color_hex);
+      const slotMaterial = normalizeMaterial(slot.material);
+      const slotHex = String(slot.color_hex || "").trim().toUpperCase();
+      if (slotMaterial && parseRgb(slotHex)) {
+        const { error: inventoryError } = await supabase.from("filament_inventory").upsert({
+          inventory_key: color ? `palette:${color.id}` : `ams:${slotMaterial}:${slotHex}`,
+          filament_color_id: color?.id || null,
+          material: color?.material || slotMaterial,
+          color_name: color?.name || slot.color_name || `${slotMaterial} ${slotHex}`,
+          color_hex: color?.hex || slotHex,
+          // Replacing a roll of the same color deliberately resets the total to
+          // the observed weight of that roll; weights are never added together.
+          total_weight_grams: remainingGrams,
+          spool_capacity_grams: capacity,
+          remaining_percent: percent,
+          source_printer_id: printerId,
+          source_ams_unit: Number(slot.ams_unit || 0),
+          source_slot_number: Number(slot.slot_number || 1),
+          tray_uuid: slot.tray_uuid || null,
+          last_seen_at: new Date().toISOString(),
+        }, { onConflict: "inventory_key" });
+        if (inventoryError) return json({ error: inventoryError.message }, 500);
+      }
     }
   }
 

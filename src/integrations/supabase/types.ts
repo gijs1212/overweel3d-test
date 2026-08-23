@@ -434,6 +434,81 @@ export type Database = {
         }
         Relationships: []
       }
+      filament_inventory: {
+        Row: {
+          color_hex: string | null
+          color_name: string | null
+          created_at: string
+          filament_color_id: string | null
+          id: string
+          inventory_key: string
+          last_seen_at: string
+          manual_weight_grams: number | null
+          material: string | null
+          remaining_percent: number | null
+          source_ams_unit: number | null
+          source_printer_id: string | null
+          source_slot_number: number | null
+          spool_capacity_grams: number
+          total_weight_grams: number | null
+          tray_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          color_hex?: string | null
+          color_name?: string | null
+          created_at?: string
+          filament_color_id?: string | null
+          id?: string
+          inventory_key: string
+          last_seen_at?: string
+          manual_weight_grams?: number | null
+          material?: string | null
+          remaining_percent?: number | null
+          source_ams_unit?: number | null
+          source_printer_id?: string | null
+          source_slot_number?: number | null
+          spool_capacity_grams?: number
+          total_weight_grams?: number | null
+          tray_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color_hex?: string | null
+          color_name?: string | null
+          created_at?: string
+          filament_color_id?: string | null
+          id?: string
+          inventory_key?: string
+          last_seen_at?: string
+          manual_weight_grams?: number | null
+          material?: string | null
+          remaining_percent?: number | null
+          source_ams_unit?: number | null
+          source_printer_id?: string | null
+          source_slot_number?: number | null
+          spool_capacity_grams?: number
+          total_weight_grams?: number | null
+          tray_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filament_inventory_filament_color_id_fkey"
+            columns: ["filament_color_id"]
+            isOneToOne: false
+            referencedRelation: "filament_colors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "filament_inventory_source_printer_id_fkey"
+            columns: ["source_printer_id"]
+            isOneToOne: false
+            referencedRelation: "printers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gift_card_redemptions: {
         Row: {
           amount: number
@@ -1838,6 +1913,17 @@ export type Database = {
       increment_discount_usage: {
         Args: { code_text: string }
         Returns: undefined
+      }
+      promote_inventory_to_filament_color: {
+        Args: {
+          p_active?: boolean
+          p_description?: string
+          p_hex: string
+          p_inventory_id: string
+          p_material: string
+          p_name: string
+        }
+        Returns: string
       }
       record_discount_redemption: {
         Args: {

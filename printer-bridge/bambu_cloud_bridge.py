@@ -191,6 +191,18 @@ def merge(target: dict, patch: dict) -> dict:
     return target
 
 
+def spool_capacity_grams(tray: dict) -> float:
+    """Read Bambu's nominal roll weight, with a safe 1 kg fallback."""
+    for key in ("tray_weight", "spool_capacity_grams", "weight"):
+        try:
+            value = float(tray.get(key))
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value * 1000 if value < 10 else value
+    return 1000
+
+
 def status_payload(report: dict) -> dict:
     state = str(report.get("gcode_state", "IDLE")).upper()
     status = {"RUNNING": "printing", "PAUSE": "paused", "FAILED": "error", "FINISH": "idle", "IDLE": "idle"}.get(state, "idle")
@@ -210,7 +222,7 @@ def status_payload(report: dict) -> dict:
                 "color_hex": "#" + raw_color[:6],
                 "tray_uuid": tray.get("tray_uuid"),
                 "remaining_percent": float(remain) if remain not in (None, "") else None,
-                "spool_capacity_grams": 1000,
+                "spool_capacity_grams": spool_capacity_grams(tray),
                 "raw_status": tray,
             })
     return {
