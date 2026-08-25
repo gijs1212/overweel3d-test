@@ -93,6 +93,7 @@ export default function AdminOrderEdit() {
   const [totalPlates, setTotalPlates] = useState(0);
   const [platePrintStatuses, setPlatePrintStatuses] = useState<boolean[]>([]);
   const [platePrintQuantities, setPlatePrintQuantities] = useState<number[]>([]);
+  const [plateRunsCompleted, setPlateRunsCompleted] = useState<number[]>([]);
   const [deliveryEmail, setDeliveryEmail] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState("none");
   const [trackingCode, setTrackingCode] = useState("");
@@ -142,6 +143,7 @@ export default function AdminOrderEdit() {
         const storedPlateQuantities = Array.isArray(o.plate_runs_required_per_plate)
           ? o.plate_runs_required_per_plate
           : [];
+        const storedPlateRunsCompleted = Array.isArray(o.plate_runs_completed) ? o.plate_runs_completed : [];
         setTotalProducts(Math.max(0, o.total_products ?? o.parts_total ?? o.quantity ?? 0));
         setTotalPlates(loadedTotalPlates);
         setPlatePrintStatuses(Array.from(
@@ -153,6 +155,16 @@ export default function AdminOrderEdit() {
           (_, index) => {
             const quantity = Number(storedPlateQuantities[index]);
             return Number.isInteger(quantity) && quantity >= 1 ? quantity : 1;
+          },
+        ));
+        setPlateRunsCompleted(Array.from(
+          { length: loadedTotalPlates },
+          (_, index) => {
+            const completed = Number(storedPlateRunsCompleted[index]);
+            const required = Number(storedPlateQuantities[index]);
+            return Number.isInteger(completed) && completed >= 0
+              ? Math.min(completed, Number.isInteger(required) && required >= 1 ? required : 1)
+              : storedPlateStatuses[index] === true ? (Number(required) || 1) : 0;
           },
         ));
         setDeliveryEmail(o.delivery_email || "");
@@ -683,6 +695,19 @@ export default function AdminOrderEdit() {
                     totalPlates={totalPlates}
                     platePrintStatuses={platePrintStatuses}
                     platePrintQuantities={platePrintQuantities}
+                    plateRunsCompleted={plateRunsCompleted}
+                    onRunRecorded={(data) => {
+                      setPlatePrintStatuses(data.platePrintStatuses);
+                      setPlatePrintQuantities(data.platePrintQuantities);
+                      setPlateRunsCompleted(data.plateRunsCompleted);
+                      setOrder((current) => current ? {
+                        ...current,
+                        plate_print_statuses: data.platePrintStatuses,
+                        plate_runs_required_per_plate: data.platePrintQuantities,
+                        plate_runs_completed: data.plateRunsCompleted,
+                        plates_completed: data.platesCompleted,
+                      } : current);
+                    }}
                     onUpdate={savePlateProgress}
                   />
                 </div>

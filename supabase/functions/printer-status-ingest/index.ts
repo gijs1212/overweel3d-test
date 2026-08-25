@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
 
   const currentPlate = Number(body.current_plate) > 0 ? Number(body.current_plate) : null;
   const { data: candidates } = await supabase.from("print_jobs").select("*,orders!inner(status)")
+    .eq("active", true)
     .or(`printer_id.eq.${printerId},printer_id.is.null`)
     .in("status", ["queued","suggested","approved","printing","paused","awaiting_next_run","mismatch"])
     .order("created_at");
@@ -143,10 +144,18 @@ Deno.serve(async (req) => {
   );
   const job = currentPlate == null
     ? activeApprovedJob || matchingCandidates.find((candidate) => candidate.status === "suggested") || matchingCandidates[0]
-    : matchingCandidates.find((candidate) => Number(candidate.plate_number) === currentPlate);
+    : matchingCandidates.find((candidate) => Number(candidate.source_plate_number) === currentPlate);
   if (!job || !currentFile) return json({ success: true, matched: false });
 
-  const comparison = { match: true, expected: job.expected_file_name, observed: currentFile, expectedPlate: job.plate_number, observedPlate: currentPlate, comparedAt: new Date().toISOString() };
+  const comparison = {
+    match: true,
+    expected: job.expected_file_name,
+    observed: currentFile,
+    logicalPlate: job.plate_number,
+    expectedSourcePlate: job.source_plate_number,
+    observedSourcePlate: currentPlate,
+    comparedAt: new Date().toISOString(),
+  };
   if (job.status === "queued" || job.status === "mismatch") {
     if (!["printing", "paused"].includes(status)) return json({ success: true, matched: false, reason: "printer_not_printing" });
     await supabase.from("print_jobs").update({
@@ -156,12 +165,12 @@ Deno.serve(async (req) => {
       observed_file_name: currentFile,
       comparison,
     }).eq("id", job.id);
-    return json({ success: true, matched: true, suggestion: true, jobId: job.id, orderId: job.order_id, plateNumber: job.plate_number });
+    return json({ success: true, matched: true, suggestion: true, jobId: job.id, orderId: job.order_id, plateNumber: job.plate_number, sourcePlateNumber: job.source_plate_number });
   }
 
   if (job.status === "suggested") {
     await supabase.from("print_jobs").update({ observed_file_name: currentFile, comparison }).eq("id", job.id);
-    return json({ success: true, matched: true, suggestion: true, jobId: job.id, orderId: job.order_id, plateNumber: job.plate_number });
+    return json({ success: true, matched: true, suggestion: true, jobId: job.id, orderId: job.order_id, plateNumber: job.plate_number, sourcePlateNumber: job.source_plate_number });
   }
 
   const approvedByAdmin = Boolean(job.approved_by && job.approved_at);
@@ -172,7 +181,7 @@ Deno.serve(async (req) => {
       observed_file_name: currentFile,
       comparison: { ...comparison, approvalRequired: true },
     }).eq("id", job.id);
-    return json({ success: true, matched: true, suggestion: true, approvalRequired: true, jobId: job.id, orderId: job.order_id, plateNumber: job.plate_number });
+    return json({ success: true, matched: true, suggestion: true, approvalRequired: true, jobId: job.id, orderId: job.order_id, plateNumber: job.plate_number, sourcePlateNumber: job.source_plate_number });
   }
 
   if (status === "printing") {

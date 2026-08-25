@@ -746,7 +746,9 @@ export type Database = {
       }
       order_files: {
         Row: {
+          customer_visible: boolean
           created_at: string | null
+          file_purpose: string
           file_size: number | null
           id: string
           mime_type: string | null
@@ -755,7 +757,9 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          customer_visible?: boolean
           created_at?: string | null
+          file_purpose?: string
           file_size?: number | null
           id?: string
           mime_type?: string | null
@@ -764,7 +768,9 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          customer_visible?: boolean
           created_at?: string | null
+          file_purpose?: string
           file_size?: number | null
           id?: string
           mime_type?: string | null
@@ -781,6 +787,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      order_3mf_plate_mappings: {
+        Row: {
+          active: boolean
+          colors: Json
+          created_at: string
+          id: string
+          logical_plate_number: number | null
+          order_file_id: string
+          order_id: string
+          preview_storage_path: string | null
+          runs_completed: number
+          runs_required: number
+          source_file_name: string
+          source_plate_number: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          colors?: Json
+          created_at?: string
+          id?: string
+          logical_plate_number?: number | null
+          order_file_id: string
+          order_id: string
+          preview_storage_path?: string | null
+          runs_completed?: number
+          runs_required?: number
+          source_file_name?: string
+          source_plate_number: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          colors?: Json
+          created_at?: string
+          id?: string
+          logical_plate_number?: number | null
+          order_file_id?: string
+          order_id?: string
+          preview_storage_path?: string | null
+          runs_completed?: number
+          runs_required?: number
+          source_file_name?: string
+          source_plate_number?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       order_messages: {
         Row: {
@@ -1034,6 +1088,7 @@ export type Database = {
       }
       print_jobs: {
         Row: {
+          active: boolean
           approved_at: string | null
           approved_by: string | null
           colors: Json
@@ -1048,12 +1103,14 @@ export type Database = {
           observed_file_name: string | null
           order_id: string
           plate_name: string
+          plate_mapping_id: string | null
           plate_number: number
           printer_id: string | null
           runs_completed: number
           runs_required: number
           scheduled_at: string | null
           source_order_file_id: string | null
+          source_plate_number: number | null
           started_at: string | null
           status: string
           suggested_at: string | null
@@ -1062,6 +1119,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active?: boolean
           approved_at?: string | null
           approved_by?: string | null
           colors?: Json
@@ -1076,12 +1134,14 @@ export type Database = {
           observed_file_name?: string | null
           order_id: string
           plate_name?: string
+          plate_mapping_id?: string | null
           plate_number: number
           printer_id?: string | null
           runs_completed?: number
           runs_required?: number
           scheduled_at?: string | null
           source_order_file_id?: string | null
+          source_plate_number?: number | null
           started_at?: string | null
           status?: string
           suggested_at?: string | null
@@ -1090,6 +1150,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active?: boolean
           approved_at?: string | null
           approved_by?: string | null
           colors?: Json
@@ -1104,12 +1165,14 @@ export type Database = {
           observed_file_name?: string | null
           order_id?: string
           plate_name?: string
+          plate_mapping_id?: string | null
           plate_number?: number
           printer_id?: string | null
           runs_completed?: number
           runs_required?: number
           scheduled_at?: string | null
           source_order_file_id?: string | null
+          source_plate_number?: number | null
           started_at?: string | null
           status?: string
           suggested_at?: string | null
@@ -1842,6 +1905,14 @@ export type Database = {
     Functions: {
       approve_and_count_print_job_run: {
         Args: { p_plate_number: number; p_suggestion_job_id: string }
+        Returns: Json
+      }
+      decrement_manual_order_plate_run: {
+        Args: { p_order_id: string; p_plate_number: number }
+        Returns: Json
+      }
+      save_order_3mf_plate_selection: {
+        Args: { p_order_id: string; p_mappings: Json }
         Returns: Json
       }
       complete_print_job_run: {

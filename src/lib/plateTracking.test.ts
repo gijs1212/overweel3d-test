@@ -3,6 +3,7 @@ import {
   createPlateTrackingUpdate,
   detectBambuPlateCount,
   normalizePlatePrintQuantities,
+  normalizePlateCompletedRuns,
   normalizePlateStatuses,
 } from "./plateTracking";
 
@@ -47,6 +48,10 @@ describe("plate tracking normalization", () => {
   it("keeps a print quantity per plate and defaults invalid values to one", () => {
     expect(normalizePlatePrintQuantities([3, "2", 0, -1, 1.5], 6)).toEqual([3, 2, 1, 1, 1, 1]);
     expect(normalizePlatePrintQuantities([4, 2], 1)).toEqual([4]);
+  });
+
+  it("normalizes completed runs and never exceeds the required count", () => {
+    expect(normalizePlateCompletedRuns([1, 8, -2, "2"], 5, [3, 4, 2, 3, 1])).toEqual([1, 4, 0, 2, 0]);
   });
 
   it("keeps product totals separate from plate completion", () => {

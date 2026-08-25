@@ -57,6 +57,20 @@ export function normalizePlatePrintQuantities(
   });
 }
 
+export function normalizePlateCompletedRuns(
+  completedRuns: readonly unknown[],
+  totalPlates: number,
+  requiredRuns: readonly unknown[] = [],
+): number[] {
+  const safePlateTotal = Number.isFinite(totalPlates) ? Math.max(0, Math.trunc(totalPlates)) : 0;
+  return Array.from({ length: safePlateTotal }, (_, index) => {
+    const completed = Number(completedRuns[index]);
+    const required = Number(requiredRuns[index]);
+    const safeRequired = Number.isInteger(required) && required >= 1 ? required : 1;
+    return Number.isInteger(completed) && completed >= 0 ? Math.min(completed, safeRequired) : 0;
+  });
+}
+
 /**
  * Build the persistence payload while deliberately keeping total products and
  * plates independent. No products-per-plate value is calculated or stored.

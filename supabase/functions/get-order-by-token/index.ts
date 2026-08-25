@@ -132,6 +132,7 @@ serve(async (req: Request) => {
         .select("storage_path, original_filename")
         .eq("id", fileId)
         .eq("order_id", order.id)
+        .eq("customer_visible", true)
         .single();
       if (fileError || !file) {
         return new Response(JSON.stringify({ error: "Bestand niet gevonden" }), {
@@ -158,14 +159,32 @@ serve(async (req: Request) => {
     }
 
     // Fetch related data
-    const [filesRes, eventsRes, messagesRes, appointmentsRes] = await Promise.all([
-      supabase.from("order_files").select("id, storage_path, original_filename, file_size").eq("order_id", order.id),
+    const [filesRes, eventsRes, messagesRes, appointmentsRes, platesRes] = await Promise.all([
+      supabase.from("order_files").select("id, storage_path, original_filename, file_size").eq("order_id", order.id).eq("customer_visible", true),
       supabase.from("order_events").select("id, event_type, event_description, visible_to_customer, created_at").eq("order_id", order.id).eq("visible_to_customer", true).order("created_at", { ascending: false }),
       supabase.from("order_messages").select("id, sender_type, message, created_at, read").eq("order_id", order.id).order("created_at", { ascending: true }),
       supabase.from("delivery_appointments").select("*").eq("order_id", order.id).order("created_at", { ascending: false }),
+      supabase.from("order_3mf_plate_mappings")
+        .select("logical_plate_number,preview_storage_path,colors")
+        .eq("order_id", order.id)
+        .eq("active", true)
+        .order("logical_plate_number"),
     ]);
-    const relatedError = filesRes.error || eventsRes.error || messagesRes.error || appointmentsRes.error;
+    const relatedError = filesRes.error || eventsRes.error || messagesRes.error || appointmentsRes.error || platesRes.error;
     if (relatedError) throw relatedError;
+
+    const selectedPlates = await Promise.all((platesRes.data || []).map(async (plate) => {
+      let previewUrl: string | null = null;
+      if (plate.preview_storage_path) {
+        const { data } = await supabase.storage.from("orders").createSignedUrl(plate.preview_storage_path, 600);
+        previewUrl = data?.signedUrl || null;
+      }
+      return {
+        logicalPlateNumber: plate.logical_plate_number,
+        previewUrl,
+        colors: Array.isArray(plate.colors) ? plate.colors : [],
+      };
+    }));
 
     return new Response(JSON.stringify({
       order: {
@@ -174,6 +193,7 @@ serve(async (req: Request) => {
         linked_to_current_user: Boolean(authData.user && order.user_id === authData.user.id),
       },
       files: filesRes.data || [],
+      selectedPlates,
       events: eventsRes.data || [],
       messages: messagesRes.data || [],
       appointments: appointmentsRes.data || [],

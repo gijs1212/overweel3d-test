@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { CustomerSelectedPlatePreview, type CustomerPlatePreview } from "@/components/CustomerSelectedPlatePreview";
 
 interface Order {
   id: string;
@@ -72,6 +73,7 @@ export default function OrderDetail() {
   const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [files, setFiles] = useState<OrderFile[]>([]);
+  const [selectedPlates, setSelectedPlates] = useState<CustomerPlatePreview[]>([]);
   const [events, setEvents] = useState<OrderEvent[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -102,6 +104,7 @@ export default function OrderDetail() {
     }
     setOrder(data.order);
     setFiles(data.files || []);
+    setSelectedPlates(data.selectedPlates || []);
     setEvents(data.events || []);
     setMessages(data.messages || []);
     setAppointments(data.appointments || []);
@@ -475,6 +478,7 @@ export default function OrderDetail() {
               </div>
 
               {/* Files/Links/Custom */}
+              <CustomerSelectedPlatePreview plates={selectedPlates} />
               {order.order_method === "custom" ? (
                 <CustomPhotosSection fileLinks={order.file_links} />
               ) : order.order_method === "link" ? (

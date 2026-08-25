@@ -294,6 +294,7 @@ export default function AdminDashboard() {
                     <tr className="border-b border-border bg-muted/50">
                       <th className="text-left p-4 font-medium text-muted-foreground">Bestelling</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Klant</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">Bekijken</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Klantlink</th>
                       <th className="text-left p-4 font-medium text-muted-foreground">Indicatie</th>
@@ -315,6 +316,11 @@ export default function AdminDashboard() {
                           <td className="p-4">
                             <div>{order.customer_name}</div>
                             {!isAdminOrder && <div className="text-xs text-muted-foreground">{order.customer_email}</div>}
+                          </td>
+                          <td className="p-4">
+                            <Link to={`/admin/order/${order.id}`}>
+                              <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /> Bekijken</Button>
+                            </Link>
                           </td>
                           <td className="p-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
@@ -362,9 +368,6 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-end gap-1">
                               <Link to={`/admin/order-files?order=${order.id}`}>
                                 <Button variant="ghost" size="sm"><Upload className="w-4 h-4" /> Uploaden</Button>
-                              </Link>
-                              <Link to={`/admin/order/${order.id}`}>
-                                <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /> Bekijken</Button>
                               </Link>
                             </div>
                           </td>

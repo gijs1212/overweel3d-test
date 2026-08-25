@@ -42,7 +42,7 @@ export default function AdminProduction() {
   const load = useCallback(async () => {
     const [printerResult, jobResult, slotResult, orderResult] = await Promise.all([
       supabase.from("printers").select("*").order("name"),
-      supabase.from("print_jobs").select("*").order("created_at", { ascending: false }),
+      supabase.from("print_jobs").select("*").eq("active", true).order("created_at", { ascending: false }),
       supabase.from("printer_ams_slots").select("*").order("ams_unit").order("slot_number"),
       supabase.from("orders").select("id,order_number,customer_name,total_plates,plate_runs_required_per_plate").not("status", "in", "(completed,cancelled)").order("submitted_at", { ascending: false }),
     ]);
@@ -72,8 +72,12 @@ export default function AdminProduction() {
     const manualPlate = Number(manualPlateNumbers[job.id]);
     if (Number.isInteger(manualPlate) && manualPlate > 0) return manualPlate;
     const reportedPlate = findPlateRequestPrinter(job, printers)?.current_plate;
-    return reportedPlate != null ? reportedPlate : null;
+    if (reportedPlate == null) return null;
+    return jobs.find((candidate) => candidate.order_id === job.order_id && candidate.source_plate_number === reportedPlate)?.plate_number ?? null;
   };
+  const adminPlateLabel = (job: JobRow | undefined) => job
+    ? `Plaat ${job.plate_number}${job.source_plate_number != null ? ` (${job.source_plate_number} in bestand)` : ""}`
+    : "Plaat onbekend";
 
   const createBridgeToken = async () => {
     const token = [...crypto.getRandomValues(new Uint8Array(24))].map(value => value.toString(16).padStart(2, "0")).join("");
@@ -164,7 +168,7 @@ export default function AdminProduction() {
     const targetJob = jobs.find((item) => item.order_id === job.order_id && item.plate_number === selectedPlate);
     if (!targetJob) { toast({ title: "Plaatkoppeling ontbreekt", description: `Voor plaat ${selectedPlate} is nog geen koppeling uit de geüploade 3MF aangemaakt.`, variant: "destructive" }); return; }
     if (targetJob.status === "completed" || targetJob.runs_completed >= targetJob.runs_required) { toast({ title: "Plaat al geprint", description: `Plaat ${selectedPlate} is al volledig geprint. Er is niets gewijzigd.` }); setApproveJob(null); return; }
-    if (printer?.current_plate != null && printer.current_plate !== targetJob.plate_number) { toast({ title: "Andere plaat actief", description: `De printer meldt plaat ${printer.current_plate}, maar deze taak is voor plaat ${targetJob.plate_number}.`, variant: "destructive" }); return; }
+    if (printer?.current_plate != null && printer.current_plate !== targetJob.source_plate_number) { toast({ title: "Andere plaat actief", description: `De printer meldt plaat ${printer.current_plate} in het bestand, maar ${adminPlateLabel(targetJob)} is gekoppeld.`, variant: "destructive" }); return; }
     if (job.status !== "suggested" || job.printer_id !== printer?.id) {
       const { error: restoreError } = await supabase.from("print_jobs").update({ status: "suggested", printer_id: printer?.id || null }).eq("id", job.id).in("status", ["suggested", "approved", "printing", "paused"]);
       if (restoreError) { toast({ title: "Oud plaatverzoek herstellen mislukt", description: restoreError.message, variant: "destructive" }); return; }
@@ -191,7 +195,7 @@ export default function AdminProduction() {
     const refreshResult = await supabase.rpc("refresh_order_plate_data", { p_order_id: request.order_id });
     const [printerResult, jobResult, slotResult, orderResult] = await Promise.all([
       supabase.from("printers").select("*").order("name"),
-      supabase.from("print_jobs").select("*").order("created_at", { ascending: false }),
+      supabase.from("print_jobs").select("*").eq("active", true).order("created_at", { ascending: false }),
       supabase.from("printer_ams_slots").select("*").order("ams_unit").order("slot_number"),
       supabase.from("orders").select("id,order_number,customer_name,total_plates,plate_runs_required_per_plate").not("status", "in", "(completed,cancelled)").order("submitted_at", { ascending: false }),
     ]);
@@ -275,7 +279,7 @@ export default function AdminProduction() {
                           const optionJob = jobs.find((item) => item.order_id === job.order_id && item.plate_number === plateNumber);
                           const optionComplete = Boolean(optionJob && (optionJob.status === "completed" || optionJob.runs_completed >= optionJob.runs_required));
                           const remaining = optionJob ? Math.max(optionJob.runs_required - optionJob.runs_completed, 0) : null;
-                          return <SelectItem key={plateNumber} value={String(plateNumber)}>Plaat {plateNumber}{optionComplete ? " · voltooid" : remaining != null ? ` · moet nog ${remaining}× geprint worden` : " · geen 3MF-koppeling"}</SelectItem>;
+                          return <SelectItem key={plateNumber} value={String(plateNumber)}>{adminPlateLabel(optionJob)}{optionComplete ? " · voltooid" : remaining != null ? ` · moet nog ${remaining}× geprint worden` : " · geen 3MF-koppeling"}</SelectItem>;
                         })}
                       </SelectContent>
                     </Select>
