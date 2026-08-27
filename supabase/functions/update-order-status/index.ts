@@ -73,6 +73,13 @@ serve(async (req: Request) => {
         visible_to_customer: true,
       });
 
+      await resend.emails.send({
+        from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",
+        to: [order.customer_email],
+        subject: `Bestelling ${order.order_number} afgewezen`,
+        html: `<h2>Bestelling afgewezen</h2><p>Beste ${order.customer_name},</p><p>Uw bestelling <strong>${order.order_number}</strong> heeft nu de status <strong>Afgewezen</strong>.</p><p>U kunt de bestelling en eventuele berichten bekijken via <a href="${orderLink}">uw persoonlijke bestellink</a>.</p>`,
+      });
+
       // Email to admin
       await resend.emails.send({
         from: "Overweel3D <info@overweel3d.gijsoverweel.nl>",

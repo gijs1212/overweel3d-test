@@ -11,7 +11,7 @@ serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { token, action, message, appointmentData, fileId, download = false, registerVisit = true } = await req.json();
+    const { token, action, message, appointmentData, addressData, fileId, download = false, registerVisit = true } = await req.json();
     if (typeof token !== "string" || token.length < 32 || token.length > 128) {
       return new Response(JSON.stringify({ error: "Invalid order token" }), {
         status: 400,
@@ -120,6 +120,47 @@ serve(async (req: Request) => {
       });
     }
 
+    if (action === "update_shipping_address") {
+      const shippingAddress = typeof addressData?.shipping_address === "string" ? addressData.shipping_address.trim() : "";
+      const postalCode = typeof addressData?.postal_code === "string" ? addressData.postal_code.trim() : "";
+      const city = typeof addressData?.city === "string" ? addressData.city.trim() : "";
+      const country = typeof addressData?.country === "string" ? addressData.country.trim() : "Nederland";
+      if (!shippingAddress || !postalCode || !city || shippingAddress.length > 500 || postalCode.length > 32 || city.length > 120 || country.length > 120) {
+        return new Response(JSON.stringify({ error: "Vul een geldig en volledig verzendadres in" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const addressAlreadyComplete = Boolean(
+        String(order.shipping_address || order.billing_address || "").trim()
+        && String(order.postal_code || "").trim()
+        && String(order.city || "").trim()
+      );
+      if (addressAlreadyComplete) {
+        return new Response(JSON.stringify({ error: "Het verzendadres is al volledig ingevuld" }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { error: addressError } = await supabase.from("orders").update({
+        shipping_address: shippingAddress,
+        billing_address: "",
+        postal_code: postalCode.toUpperCase(),
+        city,
+        country: country || "Nederland",
+      }).eq("id", order.id);
+      if (addressError) throw addressError;
+      await supabase.from("order_events").insert({
+        order_id: order.id,
+        event_type: "shipping_address_added",
+        event_description: "De klant heeft het ontbrekende verzendadres ingevuld.",
+        visible_to_customer: true,
+      });
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "get_file_url") {
       if (typeof fileId !== "string" || !/^[0-9a-f-]{36}$/i.test(fileId)) {
         return new Response(JSON.stringify({ error: "Ongeldig bestand" }), {
@@ -219,7 +260,7 @@ function toCustomerOrder(order: Record<string, unknown>) {
     "customer_order_token", "submitted_at", "approved_at", "rejected_at",
     "billing_address", "shipping_address", "postal_code", "city", "country",
     "order_method", "file_links", "total_products", "total_plates",
-    "plate_print_statuses", "plate_runs_required_per_plate",
+    "plate_print_statuses", "plate_runs_required_per_plate", "plate_runs_completed",
     "shipping_carrier", "tracking_code", "shipping_cost",
     "customer_upload_requested", "customer_upload_request_note",
   ] as const;

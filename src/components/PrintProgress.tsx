@@ -1,11 +1,14 @@
+import { getPlateRunProgress } from "@/lib/plateRunProgress";
+
 interface PrintProgressProps {
   totalProducts: number;
   totalPlates: number;
   platePrintStatuses: boolean[];
   platePrintQuantities: number[];
+  plateRunsCompleted: number[];
 }
 
-export function PrintProgress({ totalProducts, totalPlates, platePrintStatuses, platePrintQuantities }: PrintProgressProps) {
+export function PrintProgress({ totalProducts, totalPlates, platePrintStatuses, platePrintQuantities, plateRunsCompleted }: PrintProgressProps) {
   if (totalProducts === 0 && totalPlates === 0) return null;
 
   const statuses = Array.from(
@@ -13,18 +16,14 @@ export function PrintProgress({ totalProducts, totalPlates, platePrintStatuses, 
     (_, index) => platePrintStatuses[index] === true,
   );
   const platesCompleted = statuses.filter(Boolean).length;
-  const quantities = Array.from(
+  const runProgress = Array.from(
     { length: Math.max(0, totalPlates) },
-    (_, index) => {
-      const quantity = Number(platePrintQuantities[index]);
-      return Number.isInteger(quantity) && quantity >= 1 ? quantity : 1;
-    },
+    (_, index) => getPlateRunProgress(Number(platePrintQuantities[index]), Number(plateRunsCompleted[index]), statuses[index]),
   );
+  const quantities = runProgress.map((plate) => plate.required);
   const totalPrintRuns = quantities.reduce((sum, quantity) => sum + quantity, 0);
-  const completedPrintRuns = quantities.reduce(
-    (sum, quantity, index) => sum + (statuses[index] ? quantity : 0),
-    0,
-  );
+  const completedRuns = runProgress.map((plate) => plate.completed);
+  const completedPrintRuns = completedRuns.reduce((sum, completed) => sum + completed, 0);
   const progressPercent = totalPrintRuns > 0 ? (completedPrintRuns / totalPrintRuns) * 100 : 0;
 
   return (
@@ -65,7 +64,7 @@ export function PrintProgress({ totalProducts, totalPlates, platePrintStatuses, 
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              Plaat {index + 1}: {printed ? "voltooid" : `moet nog ${quantities[index]}× geprint worden`}
+              Plaat {index + 1}: {printed ? "voltooid" : `moet nog ${runProgress[index].remaining}× geprint worden`}
             </span>
           ))}
         </div>

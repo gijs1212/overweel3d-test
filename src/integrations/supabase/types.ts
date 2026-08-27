@@ -1331,6 +1331,8 @@ export type Database = {
           model: string
           name: string
           nozzle_temperature: number | null
+          offline_alert_sent_at: string | null
+          offline_since: string | null
           progress: number
           raw_status: Json
           remaining_minutes: number | null
@@ -1354,6 +1356,8 @@ export type Database = {
           model?: string
           name: string
           nozzle_temperature?: number | null
+          offline_alert_sent_at?: string | null
+          offline_since?: string | null
           progress?: number
           raw_status?: Json
           remaining_minutes?: number | null
@@ -1377,6 +1381,8 @@ export type Database = {
           model?: string
           name?: string
           nozzle_temperature?: number | null
+          offline_alert_sent_at?: string | null
+          offline_since?: string | null
           progress?: number
           raw_status?: Json
           remaining_minutes?: number | null

@@ -40,8 +40,8 @@ export function OrderAuthGate({ children }: { children: React.ReactNode }) {
       setProfileForm({
         full_name: profile.full_name || "",
         phone: profile.phone || "",
-        billing_address: profile.billing_address || "",
-        shipping_address: profile.shipping_address || "",
+        billing_address: profile.shipping_address ? profile.billing_address || "" : "",
+        shipping_address: profile.shipping_address || profile.billing_address || "",
         postal_code: profile.postal_code || "",
         city: profile.city || "",
         country: profile.country || "Nederland",
@@ -52,7 +52,7 @@ export function OrderAuthGate({ children }: { children: React.ReactNode }) {
   const profileComplete = !!(
     profile?.full_name &&
     profile?.phone &&
-    profile?.billing_address &&
+    (profile?.shipping_address || profile?.billing_address) &&
     profile?.postal_code &&
     profile?.city
   );
@@ -73,10 +73,10 @@ export function OrderAuthGate({ children }: { children: React.ReactNode }) {
         await signIn(email, password);
         toast({ title: "Welkom terug!" });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: mode === "register" ? "Registratie mislukt" : "Inloggen mislukt",
-        description: err.message || "Probeer het opnieuw.",
+        description: err instanceof Error ? err.message : "Probeer het opnieuw.",
         variant: "destructive",
       });
     } finally {
@@ -88,10 +88,16 @@ export function OrderAuthGate({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     setBusy(true);
     try {
-      await updateProfile(profileForm);
+      await updateProfile({
+        ...profileForm,
+        billing_address: profileForm.billing_address.trim().toLowerCase() === profileForm.shipping_address.trim().toLowerCase()
+          ? ""
+          : profileForm.billing_address.trim(),
+        shipping_address: profileForm.shipping_address.trim(),
+      });
       toast({ title: "Profiel opgeslagen" });
-    } catch (err: any) {
-      toast({ title: "Opslaan mislukt", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Opslaan mislukt", description: err instanceof Error ? err.message : "Probeer het opnieuw.", variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -203,19 +209,19 @@ export function OrderAuthGate({ children }: { children: React.ReactNode }) {
                   />
                 </div>
                 <div>
-                  <Label>Factuuradres *</Label>
+                  <Label>Verzendadres *</Label>
                   <Input
-                    value={profileForm.billing_address}
-                    onChange={(e) => setProfileForm({ ...profileForm, billing_address: e.target.value })}
+                    value={profileForm.shipping_address}
+                    onChange={(e) => setProfileForm({ ...profileForm, shipping_address: e.target.value })}
                     required
                   />
                 </div>
                 <div>
-                  <Label>Verzendadres</Label>
+                  <Label>Factuuradres</Label>
                   <Input
-                    value={profileForm.shipping_address}
-                    onChange={(e) => setProfileForm({ ...profileForm, shipping_address: e.target.value })}
-                    placeholder="Laat leeg indien gelijk aan factuuradres"
+                    value={profileForm.billing_address}
+                    onChange={(e) => setProfileForm({ ...profileForm, billing_address: e.target.value })}
+                    placeholder="Laat leeg indien gelijk aan verzendadres"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">

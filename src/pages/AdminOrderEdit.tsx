@@ -224,9 +224,21 @@ export default function AdminOrderEdit() {
         visible_to_customer: true,
       });
 
+      const statusChanged = effectiveStatus !== order.status;
+      let statusMailFailed = false;
+      if (statusChanged) {
+        const { data: mailData, error: mailError } = await supabase.functions.invoke("send-order-email", {
+          body: { type: "status_changed", orderId: order.id },
+        });
+        statusMailFailed = Boolean(mailError || !mailData?.success);
+      }
+
       toast({
-        title: "Bestelling opgeslagen",
-        description: "De wijzigingen zijn opgeslagen. Er is geen e-mail verzonden.",
+        title: statusMailFailed ? "Bestelling opgeslagen, statusmail mislukt" : "Bestelling opgeslagen",
+        description: statusChanged
+          ? statusMailFailed ? "De status is opgeslagen, maar de klantmail kon niet worden verzonden." : "De status is opgeslagen en de klant heeft een e-mail ontvangen."
+          : "De wijzigingen zijn opgeslagen; de status is niet veranderd.",
+        variant: statusMailFailed ? "destructive" : undefined,
       });
       setOriginalFinalPrice(newFinalPrice);
       setStatus(effectiveStatus);
@@ -245,7 +257,7 @@ export default function AdminOrderEdit() {
   }) => {
     if (!order) return;
     try {
-      const { error } = await supabase.from("orders").update({
+      const { data: savedOrder, error } = await supabase.from("orders").update({
         total_products: data.totalProducts,
         total_plates: data.totalPlates,
         plate_print_statuses: data.platePrintStatuses,
@@ -253,27 +265,40 @@ export default function AdminOrderEdit() {
         // Retain the legacy completed count for older exports only. New logic
         // never derives plates or products from the legacy per-plate fields.
         plates_completed: data.platesCompleted,
-      }).eq("id", order.id).select("id").single();
+      }).eq("id", order.id).select("total_products,total_plates,plate_print_statuses,plate_runs_required_per_plate,plate_runs_completed,plates_completed").single();
       if (error) throw error;
+
+      const savedStatuses = Array.isArray(savedOrder.plate_print_statuses)
+        ? savedOrder.plate_print_statuses.map((value) => value === true)
+        : data.platePrintStatuses;
+      const savedQuantities = Array.isArray(savedOrder.plate_runs_required_per_plate)
+        ? savedOrder.plate_runs_required_per_plate.map((value) => Math.max(1, Number(value) || 1))
+        : data.platePrintQuantities;
+      const savedCompletedRuns = Array.isArray(savedOrder.plate_runs_completed)
+        ? savedOrder.plate_runs_completed.map((value, index) => Math.min(savedQuantities[index] || 1, Math.max(0, Number(value) || 0)))
+        : plateRunsCompleted;
+      const savedPlatesCompleted = Number(savedOrder.plates_completed) || 0;
 
       await supabase.from("order_events").insert({
         order_id: order.id,
         event_type: "production_progress",
-        event_description: `Printstatus opgeslagen: ${data.platesCompleted}/${data.totalPlates} platen geprint, ${data.platePrintQuantities.reduce((sum, quantity) => sum + quantity, 0)} printruns nodig (${data.totalProducts} producten totaal).`,
+        event_description: `Printstatus opgeslagen: ${savedPlatesCompleted}/${data.totalPlates} platen geprint, ${savedQuantities.reduce((sum, quantity) => sum + quantity, 0)} printruns nodig (${data.totalProducts} producten totaal).`,
         visible_to_customer: true,
       });
 
       setTotalProducts(data.totalProducts);
       setTotalPlates(data.totalPlates);
-      setPlatePrintStatuses(data.platePrintStatuses);
-      setPlatePrintQuantities(data.platePrintQuantities);
+      setPlatePrintStatuses(savedStatuses);
+      setPlatePrintQuantities(savedQuantities);
+      setPlateRunsCompleted(savedCompletedRuns);
       setOrder({
         ...order,
         total_products: data.totalProducts,
         total_plates: data.totalPlates,
-        plate_print_statuses: data.platePrintStatuses,
-        plate_runs_required_per_plate: data.platePrintQuantities,
-        plates_completed: data.platesCompleted,
+        plate_print_statuses: savedStatuses,
+        plate_runs_required_per_plate: savedQuantities,
+        plate_runs_completed: savedCompletedRuns,
+        plates_completed: savedPlatesCompleted,
       });
 
       toast({ title: "Printstatus opgeslagen", description: "De plaatstatussen zijn opgeslagen. Er is geen e-mail verzonden." });
@@ -342,7 +367,8 @@ export default function AdminOrderEdit() {
       const { data, error } = await supabase.functions.invoke("complete-order", { body: { order_id: order.id } });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Bestelling voltooien mislukt");
-      toast({ title: "Bestelling voltooid! ✅" });
+      if (!data.statusMailSent) toast({ title: "Bestelling voltooid, statusmail mislukt", description: "De bestelling is voltooid, maar de klantmail kon niet worden verzonden.", variant: "destructive" });
+      else toast({ title: "Bestelling voltooid en klant geïnformeerd! ✅" });
       setOrder({ ...order, status: "completed" as OrderStatus });
       setStatus("completed" as OrderStatus);
     } catch (error: unknown) { toast({ title: "Fout", description: getErrorMessage(error), variant: "destructive" }); }
@@ -427,7 +453,7 @@ export default function AdminOrderEdit() {
                   <div className="flex justify-between"><span className="text-muted-foreground">E-mail</span><span>{order.customer_email}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Telefoon</span><span>{order.phone || "—"}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Bedrijf</span><span>{order.company_name || "—"}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Adres</span><span>{order.billing_address}, {order.postal_code} {order.city}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Adres</span><span>{order.shipping_address || order.billing_address}, {order.postal_code} {order.city}</span></div>
                   {order.vat_number && <div className="flex justify-between"><span className="text-muted-foreground">BTW</span><span>{order.vat_number}</span></div>}
                 </div>
               </div>

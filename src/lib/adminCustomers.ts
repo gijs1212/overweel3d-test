@@ -55,7 +55,7 @@ export function buildAdminCustomers(
       && order.final_price !== null
       && (order.user_id === profile.user_id || (!order.user_id && order.customer_email.trim().toLowerCase() === email)),
     );
-    const street = profile.billing_address?.trim() || profile.shipping_address?.trim() || "";
+    const street = profile.shipping_address?.trim() || profile.billing_address?.trim() || "";
     const locality = [profile.postal_code?.trim(), profile.city?.trim()].filter(Boolean).join(" ");
     const address = [street, locality, profile.country?.trim()].filter(Boolean).join(", ") || "—";
     const { firstName, lastName } = splitCustomerName(profile.full_name || "");
@@ -83,7 +83,7 @@ export function buildAdminCustomers(
   const adminOrderCustomers = [...grouped.entries()].map(([email, customerOrders]) => {
     const latest = customerOrders[customerOrders.length - 1];
     const { firstName, lastName } = splitCustomerName(latest.customer_name || "");
-    const street = latest.billing_address?.trim() || latest.shipping_address?.trim() || "";
+    const street = latest.shipping_address?.trim() || latest.billing_address?.trim() || "";
     const locality = [latest.postal_code?.trim(), latest.city?.trim()].filter(Boolean).join(" ");
     const validOrders = customerOrders.filter((order) => !excludedStatuses.has(order.status) && order.final_price !== null);
     return {

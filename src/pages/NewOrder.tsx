@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag, Tag, ShoppingCart, Eye, Search } from "lucide-react";
+import { Upload, Check, Loader2, AlertCircle, Trash2, FileText, Plus, Info, Link2, Pencil, Camera, ShoppingBag, Tag, ShoppingCart, Eye, Search, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,7 +90,7 @@ function uid() { return Math.random().toString(36).slice(2, 10); }
 export default function NewOrder() {
   const MATERIALS = useMaterials();
   const { toast } = useToast();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const repeatLoaded = useRef(false);
@@ -130,6 +130,9 @@ export default function NewOrder() {
   const [giftCardApplied, setGiftCardApplied] = useState<{ code: string; balance: number } | null>(null);
   const [publicDiscounts, setPublicDiscounts] = useState<ApplicableDiscount[]>([]);
   const [checkingDiscount, setCheckingDiscount] = useState(false);
+  const [redeemingPoints, setRedeemingPoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState("");
+  const [eurosPerPoint, setEurosPerPoint] = useState(0.05);
 
   // Form
   const [formData, setFormData] = useState({
@@ -137,8 +140,8 @@ export default function NewOrder() {
     email: profile?.email || user?.email || "",
     phone: profile?.phone || "",
     company_name: profile?.company_name || "",
-    billing_address: profile?.billing_address || "",
-    shipping_address: profile?.shipping_address || "",
+    billing_address: profile?.shipping_address ? profile?.billing_address || "" : "",
+    shipping_address: profile?.shipping_address || profile?.billing_address || "",
     postal_code: profile?.postal_code || "",
     city: profile?.city || "",
     country: profile?.country || "Nederland",
@@ -155,8 +158,8 @@ export default function NewOrder() {
         email: profile.email || prev.email,
         phone: profile.phone || prev.phone,
         company_name: profile.company_name || prev.company_name,
-        billing_address: profile.billing_address || prev.billing_address,
-        shipping_address: profile.shipping_address || prev.shipping_address,
+        billing_address: profile.shipping_address ? profile.billing_address || "" : prev.billing_address,
+        shipping_address: profile.shipping_address || profile.billing_address || prev.shipping_address,
         postal_code: profile.postal_code || prev.postal_code,
         city: profile.city || prev.city,
         country: profile.country || prev.country,
@@ -193,6 +196,11 @@ export default function NewOrder() {
       .eq("active", true)
       .order("created_at", { ascending: false })
       .then(({ data }) => setPublicDiscounts((data || []) as ApplicableDiscount[]));
+  }, []);
+
+  useEffect(() => {
+    supabase.from("app_settings").select("value").eq("key", "loyalty_euros_per_point").maybeSingle()
+      .then(({ data }) => setEurosPerPoint(Math.max(0.0001, Number(data?.value) || 0.05)));
   }, []);
 
   useEffect(() => {
@@ -414,6 +422,15 @@ export default function NewOrder() {
 
   const removeCartLine = (id: string) => setCart((c) => c.filter((l) => l.id !== id));
 
+  const updateCartLineQuantity = (id: string, nextQuantity: number) => {
+    const quantity = Math.max(1, Math.floor(nextQuantity || 1));
+    setCart((current) => current.map((line) => {
+      if (line.id !== id || line.kind === "custom") return line;
+      if (line.kind === "prebuilt") return { ...line, quantity, price: line.unitPrice * quantity };
+      return { ...line, quantity };
+    }));
+  };
+
   // ===== Totals =====
   const calcFilePrice = (f: FileLine) => {
     const mat = MATERIALS.find((m) => m.id === f.material);
@@ -534,9 +551,47 @@ export default function NewOrder() {
     } finally { setCheckingDiscount(false); }
   };
 
+  const redeemLoyaltyPoints = async () => {
+    if (!user || !profile) {
+      toast({ title: "Log in om punten in te wisselen", variant: "destructive" });
+      return;
+    }
+    if (discountApplied || giftCardApplied) {
+      toast({ title: "Verwijder eerst de huidige korting", description: "Loyaliteitskorting is een eenmalige privécode en kan niet worden gecombineerd.", variant: "destructive" });
+      return;
+    }
+    if (estimatedSubtotal <= 0) {
+      toast({ title: "Nog geen berekenbaar bestelbedrag", description: "Voeg eerst een artikel met een prijs toe; bij offerte-items kunt u de privécode later gebruiken.", variant: "destructive" });
+      return;
+    }
+    const points = Math.floor(Number(pointsToRedeem));
+    if (!Number.isInteger(points) || points < 1 || points > (profile.loyalty_points || 0)) {
+      toast({ title: "Controleer het aantal punten", description: "Vul minimaal één punt in en niet meer dan uw huidige saldo.", variant: "destructive" });
+      return;
+    }
+    setRedeemingPoints(true);
+    try {
+      const { data: code, error } = await supabase.rpc("convert_loyalty_points", { points_to_redeem: points });
+      if (error) throw error;
+      const value = Number((points * eurosPerPoint).toFixed(2));
+      setDiscountApplied({
+        type: "fixed", value, code, productId: null, productName: null,
+        categoryId: null, categoryName: null, stackable: false, minimumOrderAmount: 0,
+      });
+      setDiscountCode(code);
+      setPointsToRedeem("");
+      await refreshProfile();
+      toast({ title: "Puntenkorting toegepast", description: `${points} punten geven €${value.toFixed(2)} korting. Privécode ${code} is direct toegepast.` });
+    } catch (error) {
+      toast({ title: "Punten inwisselen mislukt", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
+    } finally {
+      setRedeemingPoints(false);
+    }
+  };
+
   // ===== Submit =====
   const canProceed = cart.length > 0;
-  const canSubmit = canProceed && formData.name && formData.email && formData.billing_address && formData.city && formData.postal_code && formData.agreeTerms;
+  const canSubmit = canProceed && formData.name && formData.email && formData.shipping_address && formData.city && formData.postal_code && formData.agreeTerms;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -655,8 +710,10 @@ export default function NewOrder() {
         customer_name: formData.name,
         phone: formData.phone,
         company_name: formData.company_name,
-        billing_address: formData.billing_address,
-        shipping_address: formData.shipping_address || formData.billing_address,
+        billing_address: formData.billing_address.trim().toLowerCase() === formData.shipping_address.trim().toLowerCase()
+          ? ""
+          : formData.billing_address.trim(),
+        shipping_address: formData.shipping_address.trim(),
         postal_code: formData.postal_code,
         city: formData.city,
         country: formData.country,
@@ -795,7 +852,7 @@ export default function NewOrder() {
               <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en nooit de definitieve prijs. De definitieve prijs wordt na controle vastgesteld. Minimale bestelwaarde is €5,- totaal.
+                  <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en nooit de definitieve prijs. De definitieve prijs wordt na controle vastgesteld.
                 </p>
               </div>
             </div>
@@ -1075,12 +1132,12 @@ export default function NewOrder() {
                             <Input value={formData.company_name} onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} />
                           </div>
                           <div className="md:col-span-2">
-                            <Label>Factuuradres *</Label>
-                            <Input value={formData.billing_address} onChange={(e) => setFormData({ ...formData, billing_address: e.target.value })} required />
+                            <Label>Verzendadres *</Label>
+                            <Input value={formData.shipping_address} onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })} required />
                           </div>
                           <div className="md:col-span-2">
-                            <Label>Verzendadres</Label>
-                            <Input value={formData.shipping_address} onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })} placeholder="Laat leeg als gelijk aan factuuradres" />
+                            <Label>Factuuradres</Label>
+                            <Input value={formData.billing_address} onChange={(e) => setFormData({ ...formData, billing_address: e.target.value })} placeholder="Laat leeg als gelijk aan verzendadres" />
                           </div>
                           <div>
                             <Label>Postcode *</Label>
@@ -1135,6 +1192,16 @@ export default function NewOrder() {
                             const benefit = calculateDiscount(eligible, { discount_type: discount.discount_type, discount_value: Number(discount.discount_value) }).discountAmount;
                             return <button type="button" key={discount.code} onClick={() => setDiscountCode(discount.code)} className="text-xs rounded-full border bg-background px-3 py-1.5 hover:border-accent"><strong>{discount.code}</strong> · voordeel €{benefit.toFixed(2)} · {discountScopeLabel(discount, { productName: products.find((product) => product.id === discount.product_id)?.name, categoryName: products.find((product) => product.category_id === discount.category_id)?.product_categories?.name })}</button>;
                           })}</div></div>}
+                          {user && profile && (profile.loyalty_points || 0) > 0 && (
+                            <div className="mt-3 rounded-xl border border-accent/20 bg-accent/5 p-3">
+                              <Label htmlFor="checkout-loyalty-points" className="flex items-center gap-2 text-xs"><Gift className="h-4 w-4" /> Loyaliteitspunten direct inwisselen</Label>
+                              <p className="mt-1 text-xs text-muted-foreground">Beschikbaar: {profile.loyalty_points} punten · één punt is €{eurosPerPoint.toFixed(3)}. Uw keuze geeft €{(Math.max(0, Number(pointsToRedeem) || 0) * eurosPerPoint).toFixed(2)} korting.</p>
+                              <div className="mt-2 flex gap-2">
+                                <Input id="checkout-loyalty-points" type="number" min={1} max={profile.loyalty_points} step={1} value={pointsToRedeem} onChange={(event) => setPointsToRedeem(event.target.value)} placeholder={`Max. ${profile.loyalty_points}`} />
+                                <Button type="button" variant="outline" disabled={redeemingPoints || !pointsToRedeem} onClick={() => void redeemLoyaltyPoints()}>{redeemingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />} Inwisselen en toepassen</Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-start gap-2 pt-2">
@@ -1188,6 +1255,12 @@ export default function NewOrder() {
                                     ))}
                                   </div>
                                 )}
+                                {line.kind !== "custom" && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Label htmlFor={`cart-quantity-${line.id}`} className="text-xs text-muted-foreground">Aantal</Label>
+                                    <Input id={`cart-quantity-${line.id}`} type="number" min={1} step={1} value={line.quantity} onChange={(event) => updateCartLineQuantity(line.id, Number(event.target.value))} className="h-8 w-20" />
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 <span className="text-sm font-semibold text-accent">{cartLinePrice(line)}</span>
@@ -1218,7 +1291,7 @@ export default function NewOrder() {
                     )}
                     <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                       <p className="text-xs text-amber-800 dark:text-amber-200">
-                        ⚠️ Indicatie is een schatting. Definitieve prijs wordt na controle vastgesteld. Min. €5,-.
+                        ⚠️ Indicatie is een schatting. Definitieve prijs wordt na controle vastgesteld.
                       </p>
                     </div>
                   </div>

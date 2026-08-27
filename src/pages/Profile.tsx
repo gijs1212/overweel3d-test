@@ -37,8 +37,8 @@ export default function Profile() {
         email: profile.email || "",
         phone: profile.phone || "",
         company_name: profile.company_name || "",
-        billing_address: profile.billing_address || "",
-        shipping_address: profile.shipping_address || "",
+        billing_address: profile.shipping_address ? profile.billing_address || "" : "",
+        shipping_address: profile.shipping_address || profile.billing_address || "",
         postal_code: profile.postal_code || "",
         city: profile.city || "",
         country: profile.country || "Nederland",
@@ -51,7 +51,13 @@ export default function Profile() {
     e.preventDefault();
     setLoading(true);
     try {
-      await updateProfile(formData);
+      await updateProfile({
+        ...formData,
+        billing_address: formData.billing_address.trim().toLowerCase() === formData.shipping_address.trim().toLowerCase()
+          ? ""
+          : formData.billing_address.trim(),
+        shipping_address: formData.shipping_address.trim(),
+      });
       if (newsletterSubscribed !== profile?.newsletter_subscribed) {
         await setNewsletterPreference(newsletterSubscribed);
       }
@@ -125,12 +131,12 @@ export default function Profile() {
                 <h3 className="font-semibold text-primary mb-4">Adresgegevens</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <Label>Factuuradres</Label>
-                    <Input value={formData.billing_address} onChange={(e) => update("billing_address", e.target.value)} />
+                    <Label>Verzendadres</Label>
+                    <Input value={formData.shipping_address} onChange={(e) => update("shipping_address", e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
-                    <Label>Verzendadres</Label>
-                    <Input value={formData.shipping_address} onChange={(e) => update("shipping_address", e.target.value)} placeholder="Laat leeg als gelijk aan factuuradres" />
+                    <Label>Factuuradres</Label>
+                    <Input value={formData.billing_address} onChange={(e) => update("billing_address", e.target.value)} placeholder="Laat leeg als gelijk aan verzendadres" />
                   </div>
                   <div>
                     <Label>Postcode</Label>

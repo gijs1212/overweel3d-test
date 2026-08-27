@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowDown, ArrowUp, Check, Eye, FileArchive, GripVertical, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -224,6 +224,8 @@ export function PlateTracker({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [countingPlate, setCountingPlate] = useState<number | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressTriggered = useRef(false);
 
   useEffect(() => {
     setLocalTotalProducts(String(totalProducts));
@@ -279,6 +281,10 @@ export function PlateTracker({
   }, [orderId]);
 
   useEffect(() => () => disposeThreeMfInspection(pendingInspection), [pendingInspection]);
+
+  useEffect(() => () => {
+    if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+  }, []);
 
   const parsedPlateTotal = Math.max(0, Number.parseInt(localTotalPlates, 10) || 0);
 
@@ -588,6 +594,25 @@ export function PlateTracker({
     }
   };
 
+  const startPlateLongPress = (plateIndex: number, pointerType: string) => {
+    if (pointerType !== "touch" || countingPlate !== null) return;
+    if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+    longPressTriggered.current = false;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTriggered.current = true;
+      longPressTimer.current = null;
+      if (navigator.vibrate) navigator.vibrate(30);
+      void decrementPlateRun(plateIndex);
+    }, 650);
+  };
+
+  const cancelPlateLongPress = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   const updateQuantity = (plateIndex: number, value: string) => {
     const quantity = Number(value);
     setLocalQuantities((current) => current.map((item, index) => (
@@ -756,10 +781,22 @@ export function PlateTracker({
                 <button
                   type="button"
                   aria-pressed={printed}
-                  onClick={(event) => void (event.ctrlKey ? decrementPlateRun(plateIndex) : recordPlateRun(plateIndex))}
+                  onPointerDown={(event) => startPlateLongPress(plateIndex, event.pointerType)}
+                  onPointerUp={cancelPlateLongPress}
+                  onPointerCancel={cancelPlateLongPress}
+                  onPointerLeave={cancelPlateLongPress}
+                  onContextMenu={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    if (longPressTriggered.current) {
+                      longPressTriggered.current = false;
+                      event.preventDefault();
+                      return;
+                    }
+                    void (event.ctrlKey ? decrementPlateRun(plateIndex) : recordPlateRun(plateIndex));
+                  }}
                   disabled={countingPlate !== null}
-                  className="w-full text-left"
-                  title="Klik om één printrun toe te voegen. Ctrl + klik om één printrun af te trekken."
+                  className="w-full select-none touch-manipulation text-left"
+                  title="Klik om één printrun toe te voegen. Ctrl + klik of lang indrukken om één printrun af te trekken."
                 >
                   <span className="flex items-center justify-between">
                     Plaat {plateIndex + 1}
@@ -769,7 +806,7 @@ export function PlateTracker({
                     Geprint {localCompletedRuns[plateIndex] ?? 0}/{localQuantities[plateIndex] ?? 1}
                     {printed ? " · Voltooid" : ` · nog ${Math.max(0, (localQuantities[plateIndex] ?? 1) - (localCompletedRuns[plateIndex] ?? 0))}×`}
                   </span>
-                  <span className="mt-1 block text-[10px] text-muted-foreground">Ctrl + klik: 1 aftrekken</span>
+                  <span className="mt-1 block text-[10px] text-muted-foreground">Ctrl + klik of lang indrukken: 1 aftrekken</span>
                 </button>
                 <Label htmlFor={`plate-quantity-${plateIndex}`} className="block text-xs mt-3 mb-1">
                   Hoe vaak printen

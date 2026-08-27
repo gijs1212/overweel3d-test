@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -50,6 +50,7 @@ interface Order {
   total_plates: number;
   plate_print_statuses: boolean[];
   plate_runs_required_per_plate: number[];
+  plate_runs_completed: number[];
   shipping_carrier?: string;
   tracking_code?: string;
   shipping_cost?: number;
@@ -92,17 +93,29 @@ export default function OrderDetail() {
   const [fileLoadingId, setFileLoadingId] = useState<string | null>(null);
   const [claimingOrder, setClaimingOrder] = useState(false);
   const [repeatConfirmationOpen, setRepeatConfirmationOpen] = useState(false);
-  const fetchOrder = useCallback(async (registerVisit = true) => {
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [addressForm, setAddressForm] = useState({ shipping_address: "", postal_code: "", city: "", country: "Nederland" });
+  const addressInitializedOrderId = useRef<string | null>(null);
+  const fetchOrder = useCallback(async (registerVisit = true, silent = false) => {
     if (!token) return;
     const { data, error } = await supabase.functions.invoke("get-order-by-token", {
       body: { token, registerVisit },
     });
     if (error || !data?.order) {
-      toast({ title: "Bestelling niet gevonden", variant: "destructive" });
+      if (!silent) toast({ title: "Bestelling niet gevonden", variant: "destructive" });
       setLoading(false);
       return;
     }
     setOrder(data.order);
+    if (addressInitializedOrderId.current !== data.order.id) {
+      setAddressForm({
+        shipping_address: data.order.shipping_address || data.order.billing_address || "",
+        postal_code: data.order.postal_code || "",
+        city: data.order.city || "",
+        country: data.order.country || "Nederland",
+      });
+      addressInitializedOrderId.current = data.order.id;
+    }
     setFiles(data.files || []);
     setSelectedPlates(data.selectedPlates || []);
     setEvents(data.events || []);
@@ -112,6 +125,19 @@ export default function OrderDetail() {
   }, [toast, token]);
 
   useEffect(() => { void fetchOrder(); }, [fetchOrder]);
+
+  useEffect(() => {
+    const refresh = () => void fetchOrder(false, true);
+    const timer = window.setInterval(refresh, 15_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [fetchOrder]);
 
   const handleAccept = async () => {
     if (!order) return;
@@ -153,6 +179,27 @@ export default function OrderDetail() {
     if (error) throw error;
     if (!data?.signedUrl) throw new Error(data?.error || "Bestand niet beschikbaar");
     return data.signedUrl as string;
+  };
+
+  const saveMissingAddress = async () => {
+    if (!token || !addressForm.shipping_address.trim() || !addressForm.postal_code.trim() || !addressForm.city.trim()) {
+      toast({ title: "Vul het volledige verzendadres in", variant: "destructive" });
+      return;
+    }
+    setSavingAddress(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("get-order-by-token", {
+        body: { token, action: "update_shipping_address", addressData: addressForm },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Adres opslaan mislukt");
+      await fetchOrder(false);
+      toast({ title: "Verzendadres opgeslagen" });
+    } catch (error) {
+      toast({ title: "Adres opslaan mislukt", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
+    } finally {
+      setSavingAddress(false);
+    }
   };
 
   const downloadFile = async (file: OrderFile) => {
@@ -304,7 +351,7 @@ export default function OrderDetail() {
           )}
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {!order.linked_to_account && (
+            {!order.linked_to_current_user && (
               <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/5 p-5">
                 <div className="flex items-start gap-3">
                   <Link2 className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
@@ -313,27 +360,25 @@ export default function OrderDetail() {
                     {!user ? (
                       <>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Log in of maak een account aan met <strong>{order.customer_email}</strong>. Daarna kunt u de bestelling vanuit uw dashboard bekijken.
+                          Log in of maak een account aan. Met deze persoonlijke bestellink kunt u de bestelling daarna aan dat account koppelen.
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <Button asChild size="sm"><Link to="/login"><LogIn className="h-4 w-4" />Inloggen</Link></Button>
                           <Button asChild size="sm" variant="outline"><Link to="/register">Account aanmaken</Link></Button>
                         </div>
                       </>
-                    ) : user.email?.trim().toLowerCase() === order.customer_email.trim().toLowerCase() ? (
+                    ) : (
                       <>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          U bent ingelogd met hetzelfde e-mailadres als op de bestelling. Koppelen kan eenmalig.
+                          {order.linked_to_account
+                            ? "Deze bestelling is nu aan een ander account gekoppeld. Met de persoonlijke bestellink kunt u haar naar uw huidige account overzetten."
+                            : "Koppel deze bestelling aan uw huidige account. Het e-mailadres van uw account mag afwijken van het e-mailadres op de bestelling."}
                         </p>
                         <Button className="mt-4" disabled={claimingOrder} onClick={() => void handleClaimOrder()} size="sm">
                           {claimingOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
                           Aan mijn account koppelen
                         </Button>
                       </>
-                    ) : (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Log in met <strong>{order.customer_email}</strong> om deze bestelling te koppelen. U bent nu ingelogd met een ander e-mailadres.
-                      </p>
                     )}
                   </div>
                 </div>
@@ -376,6 +421,7 @@ export default function OrderDetail() {
                     totalPlates={order.total_plates || 0}
                     platePrintStatuses={Array.isArray(order.plate_print_statuses) ? order.plate_print_statuses : []}
                     platePrintQuantities={Array.isArray(order.plate_runs_required_per_plate) ? order.plate_runs_required_per_plate : []}
+                    plateRunsCompleted={Array.isArray(order.plate_runs_completed) ? order.plate_runs_completed : []}
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">Productie-informatie wordt bijgewerkt zodra de productie start.</p>
@@ -426,7 +472,7 @@ export default function OrderDetail() {
                 </div>
                 <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                   <p className="text-xs text-amber-800 dark:text-amber-200">
-                    ⚠️ De indicatieprijs is slechts een schatting. Minimale bestelwaarde is €5,- totaal.
+                    ⚠️ De indicatieprijs is slechts een schatting.
                   </p>
                 </div>
               </div>
@@ -591,12 +637,22 @@ export default function OrderDetail() {
               {/* Address */}
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                 <h3 className="font-bold text-primary mb-4">Verzendadres</h3>
-                <p className="text-sm text-muted-foreground">
-                  {order.customer_name}<br />
-                  {order.shipping_address || order.billing_address}<br />
-                  {order.postal_code} {order.city}<br />
-                  {order.country}
-                </p>
+                {(order.shipping_address || order.billing_address) && order.postal_code && order.city ? (
+                  <p className="text-sm text-muted-foreground">
+                    {order.customer_name}<br />
+                    {order.shipping_address || order.billing_address}<br />
+                    {order.postal_code} {order.city}<br />
+                    {order.country}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">De admin heeft nog geen volledig adres ingevuld. Vul hier uw verzendadres aan.</p>
+                    <div><Label htmlFor="customer-shipping-address">Straat en huisnummer *</Label><Input id="customer-shipping-address" value={addressForm.shipping_address} onChange={(event) => setAddressForm((current) => ({ ...current, shipping_address: event.target.value }))} /></div>
+                    <div className="grid grid-cols-2 gap-3"><div><Label htmlFor="customer-postal-code">Postcode *</Label><Input id="customer-postal-code" value={addressForm.postal_code} onChange={(event) => setAddressForm((current) => ({ ...current, postal_code: event.target.value }))} /></div><div><Label htmlFor="customer-city">Plaats *</Label><Input id="customer-city" value={addressForm.city} onChange={(event) => setAddressForm((current) => ({ ...current, city: event.target.value }))} /></div></div>
+                    <div><Label htmlFor="customer-country">Land</Label><Input id="customer-country" value={addressForm.country} onChange={(event) => setAddressForm((current) => ({ ...current, country: event.target.value }))} /></div>
+                    <Button type="button" onClick={() => void saveMissingAddress()} disabled={savingAddress}>{savingAddress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />} Verzendadres opslaan</Button>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -87,7 +87,25 @@ serve(async (req: Request) => {
       performed_by: user.id,
     });
 
-    return new Response(JSON.stringify({ success: true }), {
+    let statusMailSent = false;
+    try {
+      const mailResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-order-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader || "",
+          apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+        },
+        body: JSON.stringify({ type: "status_changed", orderId: order_id }),
+      });
+      const mailResult = await mailResponse.json();
+      statusMailSent = mailResponse.ok && mailResult?.success === true;
+      if (!statusMailSent) console.error("Statusmail na voltooien mislukt", mailResult);
+    } catch (mailError) {
+      console.error("Statusmail na voltooien mislukt", mailError);
+    }
+
+    return new Response(JSON.stringify({ success: true, statusMailSent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {

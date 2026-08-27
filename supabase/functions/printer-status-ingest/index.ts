@@ -40,19 +40,25 @@ Deno.serve(async (req) => {
   if (!printerId || !token) return json({ error: "Bridge credentials ontbreken" }, 401);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { data: printer } = await supabase.from("printers").select("id,bridge_token_hash,status").eq("id", printerId).maybeSingle();
+  const { data: printer } = await supabase.from("printers").select("id,bridge_token_hash,status,offline_since,offline_alert_sent_at").eq("id", printerId).maybeSingle();
   const tokenHash = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
   if (!printer?.bridge_token_hash || printer.bridge_token_hash !== tokenHash) return json({ error: "Ongeldige bridge-token" }, 403);
 
   const body = await req.json();
   const currentFile = String(body.current_file || "");
   const status = ["offline","idle","printing","paused","error","maintenance"].includes(body.status) ? body.status : "offline";
+  const heartbeatAt = new Date().toISOString();
+  const nextOfflineSince = status === "offline"
+    ? (printer.status === "offline" ? printer.offline_since || heartbeatAt : heartbeatAt)
+    : null;
   const { error: printerError } = await supabase.from("printers").update({
     status: printer.status === "maintenance" ? "maintenance" : status, current_file: currentFile || null, current_plate: body.current_plate || null,
     progress: Math.max(0, Math.min(100, Number(body.progress || 0))), remaining_minutes: body.remaining_minutes ?? null,
     current_layer: body.current_layer ?? null, total_layers: body.total_layers ?? null,
     nozzle_temperature: body.nozzle_temperature ?? null, bed_temperature: body.bed_temperature ?? null,
-    chamber_temperature: body.chamber_temperature ?? null, last_seen_at: new Date().toISOString(), raw_status: body.raw_status || {},
+    chamber_temperature: body.chamber_temperature ?? null, last_seen_at: heartbeatAt, raw_status: body.raw_status || {},
+    offline_since: nextOfflineSince,
+    offline_alert_sent_at: status === "offline" ? printer.offline_alert_sent_at : null,
   }).eq("id", printerId);
   if (printerError) return json({ error: printerError.message }, 500);
 

@@ -34,6 +34,7 @@ interface EmailOrder {
   phone: string | null;
   total_products: number | null;
   total_plates: number | null;
+  status: string;
 }
 
 function jsonResponse(payload: Record<string, unknown>, status = 200) {
@@ -171,11 +172,12 @@ serve(async (req: Request) => {
         }).eq("id", order.id).is("confirmation_email_sent_at", null);
         throw confirmationError;
       }
-    } else if (type === "order_updated") {
+    } else if (type === "order_updated" || type === "status_changed") {
+      const statusChanged = type === "status_changed";
       const { error: mailError } = await resend.emails.send({
         from: mailFrom,
         to: [order.customer_email],
-        subject: `📋 Update voor bestelling ${order.order_number}`,
+        subject: statusChanged ? `Status gewijzigd: bestelling ${order.order_number}` : `📋 Update voor bestelling ${order.order_number}`,
         html: buildUpdateEmail(order, orderLink),
       });
       if (mailError) throw new Error(mailError.message);
@@ -183,7 +185,7 @@ serve(async (req: Request) => {
       await supabase.from("order_events").insert({
         order_id: order.id,
         event_type: "order_updated",
-        event_description: "Bestelling is bijgewerkt. De klant is per e-mail geïnformeerd.",
+        event_description: statusChanged ? "De bestelstatus is gewijzigd. De klant is per e-mail geïnformeerd." : "Bestelling is bijgewerkt. De klant is per e-mail geïnformeerd.",
         visible_to_customer: true,
       });
     } else if (type === "customer_upload_request") {
@@ -254,7 +256,7 @@ function buildAdminCreatedConfirmationEmail(order: EmailOrder, orderLink: string
         ${price}
       </div>
       <p style="text-align:center;margin:28px 0"><a href="${escapeHtml(orderLink)}" style="display:inline-block;background:#00b4d8;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600">Bekijk uw bestelling</a></p>
-      <p>Heeft u al een Overweel3D-account of maakt u er een aan met <strong>${escapeHtml(order.customer_email)}</strong>? Open dan de bestellink terwijl u bent ingelogd en kies <strong>Aan mijn account koppelen</strong>. Daarna staat de bestelling blijvend in uw dashboard. Een bestelling kan maar aan één account worden gekoppeld.</p>
+      <p>Heeft u een Overweel3D-account? Open dan de persoonlijke bestellink terwijl u bent ingelogd en kies <strong>Aan mijn account koppelen</strong>. Het account mag een ander e-mailadres gebruiken dan de bestelling.</p>
       <p>Met vriendelijke groet,<br><strong>Team Overweel3D</strong></p>
     </div>
   </body></html>`;
@@ -301,7 +303,7 @@ function buildConfirmationEmail(order: EmailOrder, orderLink: string): string {
       </div>
 
       <p>Bewaar bovenstaande link om uw bestelling te volgen. U kunt hier ook de definitieve offerte bekijken en accepteren of afwijzen.</p>
-      <p>Als deze bestelling nog niet in uw dashboard staat, kunt u haar via deze link eenmalig koppelen aan een account met hetzelfde e-mailadres.</p>
+      <p>Als deze bestelling nog niet in uw dashboard staat, kunt u haar via deze persoonlijke link aan uw account koppelen. Het e-mailadres van het account mag afwijken.</p>
 
       <div class="section">
         <h2>❓ Vragen?</h2>
@@ -332,6 +334,12 @@ function buildAdminNotificationEmail(order: EmailOrder): string {
 }
 
 function buildUpdateEmail(order: EmailOrder, orderLink: string): string {
+  const statusLabels: Record<string, string> = {
+    submitted: "Ingediend", under_review: "In behandeling", waiting_for_approval: "Wacht op uw goedkeuring",
+    approved_by_customer: "Door u goedgekeurd", rejected_by_customer: "Afgewezen", in_production: "In productie",
+    ready: "Klaar", shipped: "Verzonden", completed: "Voltooid", cancelled: "Geannuleerd",
+  };
+  const statusLabel = statusLabels[order.status] || order.status;
   return `<!DOCTYPE html><html><head><style>
     body { font-family: 'Segoe UI', sans-serif; color: #1B365D; max-width: 600px; margin: 0 auto; line-height: 1.6; }
     .header { background: linear-gradient(135deg, #1B365D, #2d4a7c); padding: 30px; text-align: center; color: white; }
@@ -343,6 +351,7 @@ function buildUpdateEmail(order: EmailOrder, orderLink: string): string {
     <div class="content">
       <p>Beste ${escapeHtml(order.customer_name)},</p>
       <p>Er is nieuwe informatie beschikbaar voor uw bestelling <strong>${escapeHtml(order.order_number)}</strong>.</p>
+      <p>De huidige status is: <strong>${escapeHtml(statusLabel)}</strong>.</p>
       ${order.final_price ? `<p>De definitieve prijs is vastgesteld op: <strong style="font-size: 24px; color: #00b4d8;">€${Number(order.final_price).toFixed(2)}</strong></p>` : ""}
       <p>Bekijk uw bestelling voor alle details en om de offerte te accepteren of af te wijzen.</p>
       <div style="text-align: center; margin: 24px 0;">

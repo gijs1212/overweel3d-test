@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Package, Plus, Loader2, User, AlertCircle, Gift, Repeat2, Eye } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -32,12 +33,32 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [profileDismissed, setProfileDismissed] = useState(false);
   const [convertingPoints, setConvertingPoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState("1");
   const [loyaltySettings, setLoyaltySettings] = useState({ pointsPerEuro: 1, eurosPerPoint: 0.05 });
   const [loyaltyCodes, setLoyaltyCodes] = useState<LoyaltyCode[]>([]);
   const [loyaltyRefresh, setLoyaltyRefresh] = useState(0);
   const [repeatOrder, setRepeatOrder] = useState<OrderSummary | null>(null);
 
-  const isProfileIncomplete = profile && (!profile.billing_address || !profile.city || !profile.postal_code || !profile.phone);
+  const redeemPoints = async () => {
+    const points = Math.floor(Number(pointsToRedeem));
+    if (!Number.isInteger(points) || points < 1 || points > (profile?.loyalty_points || 0)) {
+      toast({ title: "Controleer het aantal punten", description: "Vul minimaal één punt in en niet meer dan uw huidige saldo.", variant: "destructive" });
+      return;
+    }
+    setConvertingPoints(true);
+    const { data, error } = await supabase.rpc("convert_loyalty_points", { points_to_redeem: points });
+    setConvertingPoints(false);
+    if (error) {
+      toast({ title: "Inwisselen mislukt", description: error.message, variant: "destructive" });
+      return;
+    }
+    await refreshProfile();
+    setLoyaltyRefresh((value) => value + 1);
+    setPointsToRedeem("1");
+    toast({ title: "Punten ingewisseld", description: `Uw eenmalige privécode is ${data}. De code blijft hieronder staan tot hij gebruikt is.` });
+  };
+
+  const isProfileIncomplete = profile && (!(profile.shipping_address || profile.billing_address) || !profile.city || !profile.postal_code || !profile.phone);
 
   useEffect(() => {
     if (authLoading) return;
@@ -160,7 +181,7 @@ export default function Dashboard() {
           )}
 
           <section className="mb-6 rounded-2xl border bg-gradient-to-r from-accent/10 via-card to-card p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><p className="text-sm text-muted-foreground flex items-center gap-2"><Gift className="w-4 h-4 text-accent" /> Loyaliteitsprogramma</p><p className="text-2xl font-bold text-primary">{profile?.loyalty_points || 0} punten</p><p className="text-xs text-muted-foreground">U ontvangt {loyaltySettings.pointsPerEuro} punt(en) per uitgegeven euro. 100 punten is €{(100 * loyaltySettings.eurosPerPoint).toFixed(2)} korting.</p></div><Button disabled={convertingPoints || (profile?.loyalty_points || 0) < 100} onClick={async () => { setConvertingPoints(true); const redeemable = Math.floor((profile?.loyalty_points || 0) / 100) * 100; const { data, error } = await supabase.rpc("convert_loyalty_points", { points_to_redeem: redeemable }); setConvertingPoints(false); if (error) toast({ title: "Inwisselen mislukt", description: error.message, variant: "destructive" }); else { await refreshProfile(); setLoyaltyRefresh((value) => value + 1); toast({ title: "Punten ingewisseld", description: `Uw eenmalige privécode is ${data}. De code blijft hieronder staan tot hij gebruikt is.` }); } }}>{convertingPoints ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />} Punten inwisselen</Button></div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-muted-foreground flex items-center gap-2"><Gift className="w-4 h-4 text-accent" /> Loyaliteitsprogramma</p><p className="text-2xl font-bold text-primary">{profile?.loyalty_points || 0} punten</p><p className="text-xs text-muted-foreground">U ontvangt {loyaltySettings.pointsPerEuro} punt(en) per uitgegeven euro. Eén punt is €{loyaltySettings.eurosPerPoint.toFixed(3)} korting.</p></div><div className="w-full sm:w-72"><label htmlFor="dashboard-points" className="text-xs font-medium text-muted-foreground">Aantal punten · €{(Math.max(0, Number(pointsToRedeem) || 0) * loyaltySettings.eurosPerPoint).toFixed(2)} korting</label><div className="mt-1 flex gap-2"><Input id="dashboard-points" type="number" min={1} max={profile?.loyalty_points || 0} step={1} value={pointsToRedeem} onChange={(event) => setPointsToRedeem(event.target.value)} /><Button disabled={convertingPoints || (profile?.loyalty_points || 0) < 1} onClick={() => void redeemPoints()}>{convertingPoints ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />} Inwisselen</Button></div></div></div>
             {loyaltyCodes.length > 0 && <div className="mt-4 border-t pt-4"><p className="text-xs font-medium text-muted-foreground mb-2">Beschikbare privécodes</p><div className="flex flex-wrap gap-2">{loyaltyCodes.map((code) => <span key={code.id} className="rounded-lg border bg-background px-3 py-2 text-sm"><strong className="font-mono">{code.code}</strong> · €{Number(code.discount_value).toFixed(2)} korting</span>)}</div></div>}
           </section>
 

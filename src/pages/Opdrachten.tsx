@@ -49,13 +49,18 @@ export default function Opdrachten() {
         .eq("is_published", true)
         .order("sort_order", { ascending: true });
       if (error || !data?.length) return;
-      const loaded = (data as unknown as Array<{ id: string; title: string; description: string; portfolio_project_media: Array<{ storage_path: string; mime_type: string; is_cover: boolean; sort_order: number }> }>).map((project) => {
+      const projects = data as unknown as Array<{ id: string; title: string; description: string; portfolio_project_media: Array<{ storage_path: string; mime_type: string; is_cover: boolean; sort_order: number }> }>;
+      const paths = projects.flatMap((project) => project.portfolio_project_media.map((item) => item.storage_path));
+      const { data: signedMedia, error: signedMediaError } = await supabase.storage.from("orders").createSignedUrls(paths, 60 * 60);
+      if (signedMediaError) return;
+      const signedUrls = new Map(paths.map((path, index) => [path, signedMedia?.[index]?.signedUrl || ""]));
+      const loaded = projects.map((project) => {
         const sorted = [...project.portfolio_project_media].sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: project.id,
           title: project.title,
           description: project.description,
-          media: sorted.map((item) => ({ url: supabase.storage.from("orders").getPublicUrl(item.storage_path).data.publicUrl, mimeType: item.mime_type })),
+          media: sorted.map((item) => ({ url: signedUrls.get(item.storage_path) || "", mimeType: item.mime_type })).filter((item) => item.url),
           coverIndex: Math.max(0, sorted.findIndex((item) => item.is_cover)),
         };
       }).filter((project) => project.media.length > 0);
