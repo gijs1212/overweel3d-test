@@ -43,6 +43,7 @@ import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
 import NewsletterPopup from "./components/NewsletterPopup";
+import UploadProgressCenter from "./components/UploadProgressCenter";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +98,7 @@ const App = () => (
       </BrowserRouter>
       <CookieBanner />
       <NewsletterPopup />
+      <UploadProgressCenter />
     </TooltipProvider>
   </QueryClientProvider>
 );

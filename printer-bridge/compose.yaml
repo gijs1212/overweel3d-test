@@ -5,6 +5,12 @@ services:
       dockerfile: Dockerfile
     volumes:
       - /mnt/data/supervisor/share/overweel3d/data:/data:rw
+      - /mnt/data/supervisor/share/overweel3d/data:/config/overweel3d:rw
+      - /mnt/data/supervisor/share/overweel3d:/share/overweel3d:ro
+    environment:
+      BAMBU_ACCOUNT: ${BAMBU_ACCOUNT:-}
+      WEBSITE_PAIRING_CODE: ${WEBSITE_PAIRING_CODE:-}
+      NEXT_PLATE_BUTTON_ENTITY: ${NEXT_PLATE_BUTTON_ENTITY:-input_button.volgende_plaat_printen}
     restart: unless-stopped
     stdin_open: true
     tty: true

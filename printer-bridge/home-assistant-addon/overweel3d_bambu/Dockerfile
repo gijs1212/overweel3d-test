@@ -14,7 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
+RUN apk add --no-cache iputils && mkdir -p /config/overweel3d
 COPY bambu_cloud_bridge.py /app/bambu_cloud_bridge.py
 
 CMD ["python", "/app/bambu_cloud_bridge.py"]
-

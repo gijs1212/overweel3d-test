@@ -1,5 +1,5 @@
 name: Overweel3D Bambu Bridge
-version: "1.0.0"
+version: "1.20.1"
 slug: overweel3d_bambu
 description: Leest de Bambu P1S-cloudstatus en stuurt deze naar Overweel3D.
 arch:
@@ -9,8 +9,43 @@ startup: application
 boot: auto
 init: false
 apparmor: true
+homeassistant_api: true
+ports:
+  8766/tcp: 8766
+ports_description:
+  8766/tcp: Beveiligde API voor de VM-agent
+map:
+  - share:ro
+  - config:rw
 options:
   email_code: ""
+  bambu_account: "gijsoverweel@gmail.com"
+  website_pairing_code: ""
+  next_plate_button_entity: "input_button.volgende_plaat_printen"
+  host_pc_ip: "192.168.2.20"
+  host_status_interval_seconds: 60
+  host_online_delay_seconds: 60
+  host_boot_delay_seconds: 150
+  pc_power_on_entity: "script.pc_aanzetten"
+  pc_power_off_entity: "script.pc_en_stekker_uit"
+  vm_start_entity: "button.pc_gijs_overweel3d"
+  vm_start_wait_seconds: 240
+  vm_ip: "192.168.2.42"
+  guest_api_port: 8766
+  guest_api_token: "Gijs1212!"
 schema:
   email_code: str
-
+  bambu_account: email
+  website_pairing_code: password
+  next_plate_button_entity: str?
+  host_pc_ip: str
+  host_status_interval_seconds: int(30,3600)
+  host_online_delay_seconds: int(0,600)
+  host_boot_delay_seconds: int(0,900)
+  pc_power_on_entity: str?
+  pc_power_off_entity: str?
+  vm_start_entity: str?
+  vm_start_wait_seconds: int(30,900)?
+  vm_ip: str
+  guest_api_port: port
+  guest_api_token: password

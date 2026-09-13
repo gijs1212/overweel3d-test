@@ -51,6 +51,16 @@ Deno.serve(async (req) => {
   const nextOfflineSince = status === "offline"
     ? (printer.status === "offline" ? printer.offline_since || heartbeatAt : heartbeatAt)
     : null;
+  if (body.heartbeat_only === true) {
+    const { error: heartbeatError } = await supabase.from("printers").update({
+      status: printer.status === "maintenance" ? "maintenance" : status,
+      last_seen_at: heartbeatAt,
+      offline_since: nextOfflineSince,
+      offline_alert_sent_at: status === "offline" ? printer.offline_alert_sent_at : null,
+    }).eq("id", printerId);
+    if (heartbeatError) return json({ error: heartbeatError.message }, 500);
+    return json({ success: true, heartbeat_only: true, status });
+  }
   const { error: printerError } = await supabase.from("printers").update({
     status: printer.status === "maintenance" ? "maintenance" : status, current_file: currentFile || null, current_plate: body.current_plate || null,
     progress: Math.max(0, Math.min(100, Number(body.progress || 0))), remaining_minutes: body.remaining_minutes ?? null,

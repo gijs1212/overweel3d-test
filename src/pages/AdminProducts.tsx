@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
-import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMaterials } from "@/hooks/useMaterials";
@@ -78,6 +78,9 @@ export default function AdminProducts() {
   const [colors, setColors] = useState<FilamentColor[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processingMedia, setProcessingMedia] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [mediaError, setMediaError] = useState("");
   const [showEditor, setShowEditor] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>({ ...emptyForm });
@@ -131,7 +134,7 @@ export default function AdminProducts() {
   const resetEditor = () => {
     pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     setEditingId(null); setForm({ ...emptyForm, materials: [], colors: [], photos: [] }); setImages([]);
-    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setVariants([]); setSelectedColorIds([]); setShowEditor(false);
+    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setVariants([]); setSelectedColorIds([]); setMediaError(""); setShowEditor(false);
   };
   const openNew = () => { resetEditor(); setShowEditor(true); };
   const openEdit = (product: CatalogProduct) => {
@@ -175,25 +178,37 @@ export default function AdminProducts() {
     ? current.filter((id) => id !== colorId) : [...current, colorId]);
 
   const handleImageInput = async (files: File[]) => {
+    if (!files.length) return;
+    setProcessingMedia(true);
+    setMediaError("");
     const converted: File[] = [];
-    for (const file of files) {
-      const isHeic = isHeicFile(file);
-      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
-      if (!isHeic && !file.type.startsWith("image/") && !isVideo) { toast({ title: `${file.name} is geen afbeelding of video`, variant: "destructive" }); continue; }
-      const maxBytes = isVideo ? 50 * 1024 * 1024 : 12 * 1024 * 1024;
-      if (file.size > maxBytes) { toast({ title: `${file.name} is te groot`, description: isVideo ? "Maximaal 50 MB per video." : "Maximaal 12 MB per afbeelding.", variant: "destructive" }); continue; }
-      if (isHeic) {
-        try {
-          converted.push(await prepareImageFileForUpload(file));
-        } catch { toast({ title: `HEIC-conversie mislukt voor ${file.name}`, variant: "destructive" }); }
-      } else converted.push(file);
+    try {
+      for (const file of files) {
+        const isHeic = isHeicFile(file);
+        const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+        if (!isHeic && !file.type.startsWith("image/") && !isVideo) { toast({ title: `${file.name} is geen afbeelding of video`, variant: "destructive" }); continue; }
+        const maxBytes = isVideo ? 50 * 1024 * 1024 : 12 * 1024 * 1024;
+        if (file.size > maxBytes) { toast({ title: `${file.name} is te groot`, description: isVideo ? "Maximaal 50 MB per video." : "Maximaal 12 MB per afbeelding.", variant: "destructive" }); continue; }
+        converted.push(file);
+      }
+      const additions = converted.map((file) => ({
+        key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file),
+        media_type: file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name) ? "video" as const : "image" as const,
+      }));
+      setPendingImages((current) => [...current, ...additions]);
+      setPrimaryKey((current) => current || additions[0]?.key || "");
+      if (additions.length) toast({
+        title: `${additions.length} mediabestand${additions.length === 1 ? "" : "en"} geselecteerd`,
+        description: "De preview staat klaar. Klik op product opslaan om de upload te starten.",
+      });
+      if (!additions.length) setMediaError("Geen van de gekozen bestanden kon worden toegevoegd. Kies een JPG, PNG, HEIC of ondersteunde video binnen de maximale bestandsgrootte.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Onbekende fout bij het openen van het bestand.";
+      setMediaError(message);
+      toast({ title: "Mediabestand openen mislukt", description: message, variant: "destructive" });
+    } finally {
+      setProcessingMedia(false);
     }
-    const additions = converted.map((file) => ({
-      key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file),
-      media_type: file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name) ? "video" as const : "image" as const,
-    }));
-    setPendingImages((current) => [...current, ...additions]);
-    if (!primaryKey && additions[0]) setPrimaryKey(additions[0].key);
   };
   const removeExistingImage = (image: ProductImage) => {
     const remaining = images.filter((item) => item.id !== image.id);
@@ -245,6 +260,8 @@ export default function AdminProducts() {
     const validationError = validateProduct();
     if (validationError) { toast({ title: "Product nog niet compleet", description: validationError, variant: "destructive" }); return; }
     setSaving(true);
+    setMediaError("");
+    setSaveStatus("Productgegevens opslaan…");
     let productId = editingId; let createdProduct = false; let imagesCommitted = false; const uploadedPaths: string[] = [];
     try {
       const payload = {
@@ -268,12 +285,16 @@ export default function AdminProducts() {
         productId = data.id; createdProduct = true;
       }
       const uploaded: Array<{ key: string; path: string; media_type: "image" | "video" }> = [];
-      for (const pending of pendingImages) {
+      for (let mediaIndex = 0; mediaIndex < pendingImages.length; mediaIndex += 1) {
+        const pending = pendingImages[mediaIndex];
+        setSaveStatus(`${pending.file.name} uploaden (${mediaIndex + 1}/${pendingImages.length})…`);
         const path = `products/${productId}/${crypto.randomUUID()}-${sanitizeFilename(pending.file.name)}`;
-        const { error } = await uploadFileWithHeicConversion("orders", path, pending.file, { cacheControl: "3600", upsert: false });
+        const uploadedFile = await uploadFileWithHeicConversion("orders", path, pending.file, { cacheControl: "3600", upsert: false });
+        const { error } = uploadedFile;
         if (error) throw new Error(`Upload van ${pending.file.name} mislukt: ${error.message}`);
-        uploadedPaths.push(path); uploaded.push({ key: pending.key, path, media_type: pending.media_type });
+        uploadedPaths.push(uploadedFile.path); uploaded.push({ key: pending.key, path: uploadedFile.path, media_type: pending.media_type });
       }
+      setSaveStatus("Productmedia koppelen…");
       const allImageRows = [
         ...images.map((image) => ({ key: image.id, path: image.storage_path, alt: image.alt_text, media_type: image.media_type || (isVideoProductMedia(image.storage_path) ? "video" as const : "image" as const) })),
         ...uploaded.map((image) => ({ key: image.key, path: image.path, alt: form.name.trim(), media_type: image.media_type })),
@@ -326,8 +347,10 @@ export default function AdminProducts() {
     } catch (error) {
       if (uploadedPaths.length && (createdProduct || !imagesCommitted)) await supabase.storage.from("orders").remove(uploadedPaths);
       if (createdProduct && productId) await supabase.from("products").delete().eq("id", productId);
-      toast({ title: "Opslaan mislukt", description: error instanceof Error ? error.message : "Onbekende databasefout.", variant: "destructive" });
-    } finally { setSaving(false); }
+      const message = error instanceof Error ? error.message : "Onbekende databasefout.";
+      setMediaError(message);
+      toast({ title: "Opslaan mislukt", description: message, variant: "destructive" });
+    } finally { setSaving(false); setSaveStatus(""); }
   };
 
   const handleDeleteProduct = async (product: CatalogProduct) => {
@@ -410,11 +433,11 @@ export default function AdminProducts() {
           <div className="flex items-end gap-2 pb-2"><Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /><Label>Zichtbaar voor klanten</Label></div>
         </div>
 
-        <div><Label>Productmedia</Label><p className="text-xs text-muted-foreground mb-3">Upload afbeeldingen of video's en klik op de ster om de hoofdmedia te kiezen.</p><div className="flex flex-wrap gap-3">
+        <div><Label>Productmedia</Label><p className="text-xs text-muted-foreground mb-3">Kies afbeeldingen of video's. Ze worden geüpload wanneer u het product opslaat; klik op de ster om de hoofdmedia te kiezen.</p><div className="flex flex-wrap gap-3">
           {images.map((image) => <div key={image.id} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.id ? "border-accent" : "border-border"}`}><SignedMedia path={image.storage_path} mediaType={image.media_type} alt={form.name} className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.id)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.id ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removeExistingImage(image)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{isVideoProductMedia(image.storage_path, image.media_type) && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div>)}
-          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.key ? "border-accent" : "border-border"}`}>{image.media_type === "video" ? <video src={image.previewUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={image.previewUrl} alt="Nieuwe productmedia" className="w-full h-full object-cover" />}<button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{image.media_type === "video" && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div>)}
-          <label className="w-28 h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-accent/60"><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">Media</span><input type="file" multiple accept="image/*,.heic,.heif,video/mp4,video/webm,video/quicktime,.m4v" className="hidden" onChange={(event) => { handleImageInput(Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
-        </div></div>
+          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 overflow-hidden rounded-xl border-2 bg-card ${primaryKey === image.key ? "border-accent" : "border-border"}`}><div className="relative h-24 overflow-hidden">{image.media_type === "video" ? <video src={image.previewUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={image.previewUrl} alt={image.file.name} className="w-full h-full object-cover" />}<button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{image.media_type === "video" && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div><p className="truncate px-2 py-1 text-[10px]" title={image.file.name}>{image.file.name}</p></div>)}
+          <label className={`relative w-28 h-28 overflow-hidden rounded-xl border-2 border-dashed flex flex-col items-center justify-center hover:border-accent/60 ${processingMedia ? "cursor-wait opacity-60" : "cursor-pointer"}`}><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">{processingMedia ? "Verwerken…" : "Media kiezen"}</span><input type="file" multiple disabled={processingMedia || saving} accept="image/*,video/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Productmedia kiezen" onClick={(event) => { event.currentTarget.value = ""; }} onChange={async (event) => { const selected = Array.from(event.currentTarget.files || []); await handleImageInput(selected); }} /></label>
+        </div>{mediaError && <div role="alert" className="mt-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"><p className="font-semibold">Media verwerken of uploaden mislukt</p><p className="mt-1 break-words">{mediaError}</p></div>}</div>
 
         <div className="grid lg:grid-cols-2 gap-6 border-t pt-6">
           <div><Label>Materiaalkeuze</Label><Select value={form.material_mode} onValueChange={(value) => setMaterialMode(value as MaterialMode)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Vast materiaal</SelectItem><SelectItem value="selected">Klant kiest uit geselecteerde materialen</SelectItem><SelectItem value="all">Klant kiest uit alle materialen</SelectItem></SelectContent></Select>{form.material_mode !== "all" && <div className="flex flex-wrap gap-2 mt-3">{MATERIALS.map((material) => <button type="button" key={material.id} onClick={() => toggleMaterial(material.id)} className={`px-3 py-1.5 text-sm rounded-full border ${form.materials.includes(material.id) ? "bg-accent text-accent-foreground border-accent" : ""}`}>{material.name}</button>)}</div>}{form.material_mode === "fixed" && <p className="text-xs text-muted-foreground mt-2">De klant ziet het gekozen materiaal, maar kan dit niet aanpassen.</p>}</div>
@@ -454,7 +477,7 @@ export default function AdminProducts() {
           {options.length === 0 && <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">Geen extra opties. Klanten kiezen alleen materiaal, kleur en aantal.</p>}
         </div></div>
         <div className="flex items-center gap-2"><Switch checked={form.customer_photo_required} onCheckedChange={(customer_photo_required) => setForm({ ...form, customer_photo_required })} /><Label>Altijd minimaal één klantfoto verplichten</Label></div>
-        <div className="flex gap-3"><Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingId ? "Product bijwerken" : "Product aanmaken"}</Button><Button variant="outline" onClick={resetEditor} disabled={saving}>Annuleren</Button></div>
+        <div><div className="flex gap-3"><Button onClick={handleSave} disabled={saving || processingMedia}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingId ? "Product bijwerken" : "Product aanmaken"}</Button><Button variant="outline" onClick={resetEditor} disabled={saving || processingMedia}>Annuleren</Button></div>{saveStatus && <p className="mt-2 text-sm text-muted-foreground" role="status">{saveStatus}</p>}</div>
       </section>}
 
       {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></div> : products.length === 0 ? <p className="text-center text-muted-foreground py-12">Nog geen producten.</p> : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{products.map((product) => { const mainImage = orderedProductImages(product)[0]; return <article key={product.id} className={`bg-card rounded-2xl border overflow-hidden ${product.active ? "" : "opacity-60"}`}><div className="aspect-[4/3] bg-muted">{mainImage ? <SignedMedia path={mainImage.storage_path} mediaType={mainImage.media_type} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">Geen media</div>}</div><div className="p-4"><div className="flex gap-2 items-start"><div className="min-w-0 flex-1"><h3 className="font-bold text-primary truncate">{product.name}</h3><p className="text-accent font-semibold">€{Number(product.price).toFixed(2)}</p></div><Button variant="ghost" size="sm" onClick={() => toggleProductActive(product)} aria-label={product.active ? "Verbergen" : "Tonen"}>{product.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</Button></div><p className="text-xs text-muted-foreground mt-2">{product.product_categories?.name || "Zonder categorie"} · {product.product_options?.length || 0} extra opties · {product.colors.length} kleuren</p><div className="flex gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => openEdit(product)}><Pencil className="w-4 h-4" /> Bewerken</Button><Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ type: "product", value: product })}><Trash2 className="w-4 h-4 text-destructive" /></Button></div></div></article>; })}</div>}

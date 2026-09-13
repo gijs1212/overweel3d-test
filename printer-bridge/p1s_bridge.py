@@ -10,7 +10,7 @@ import json, os, re, socket, ssl, struct, time, urllib.request
 HOST = os.environ["BAMBU_HOST"]
 ACCESS_CODE = os.environ["BAMBU_ACCESS_CODE"]
 SERIAL = os.environ["BAMBU_SERIAL"]
-SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
+WEBSITE_API_URL = os.environ.get("WEBSITE_API_URL", "https://api.gijsoverweel.nl/api/overweel3d").rstrip("/")
 PRINTER_ID = os.environ["OVERWEEL_PRINTER_ID"]
 BRIDGE_TOKEN = os.environ["OVERWEEL_BRIDGE_TOKEN"]
 
@@ -96,7 +96,7 @@ def status_payload(report: dict) -> dict:
         "ams_slots": slots, "raw_status": report}
 
 def forward(payload: dict) -> None:
-    request = urllib.request.Request(SUPABASE_URL + "/functions/v1/printer-status-ingest",
+    request = urllib.request.Request(WEBSITE_API_URL + "/bridge/status",
         data=json.dumps(payload).encode(), method="POST", headers={"content-type": "application/json",
         "x-printer-id": PRINTER_ID, "x-bridge-token": BRIDGE_TOKEN})
     with urllib.request.urlopen(request, timeout=10) as response:

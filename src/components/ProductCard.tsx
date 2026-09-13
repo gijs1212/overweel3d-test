@@ -33,20 +33,30 @@ export function ProductCard({ product, onAdd }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [customText, setCustomText] = useState("");
   const [filamentColors, setFilamentColors] = useState<FilamentColor[]>([]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.from("filament_colors").select("*").eq("active", true).order("material").order("sort_order")
       .then(({ data }) => setFilamentColors((data || []) as unknown as FilamentColor[]));
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const path = product.photos[0];
+    if (!path) {
+      setPhotoUrl(null);
+      return () => { active = false; };
+    }
+    void supabase.storage.from("orders").createSignedUrl(path, 3600).then(({ data }) => {
+      if (active) setPhotoUrl(data?.signedUrl || null);
+    });
+    return () => { active = false; };
+  }, [product.photos]);
+
   const availableMaterials = MATERIALS.filter(m => product.materials.length === 0 || product.materials.includes(m.id));
   const materialColors = material ? availableFilamentColorsForMaterial(filamentColors, material) : [];
   const explicitlyConfiguredColors = materialColors.filter((color) => product.colors.includes(color.id));
   const availableColors = explicitlyConfiguredColors.length > 0 ? explicitlyConfiguredColors : materialColors;
-
-  const photoUrl = product.photos[0]
-    ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/orders/${product.photos[0]}`
-    : null;
 
   const handleAdd = () => {
     if (!material || !color) return;

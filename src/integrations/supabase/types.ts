@@ -443,6 +443,9 @@ export type Database = {
           id: string
           inventory_key: string
           last_seen_at: string
+          metadata_completed_request_id: number
+          metadata_last_error: string | null
+          metadata_request_id: number
           manual_weight_grams: number | null
           material: string | null
           remaining_percent: number | null
@@ -462,6 +465,9 @@ export type Database = {
           id?: string
           inventory_key: string
           last_seen_at?: string
+          metadata_completed_request_id?: number
+          metadata_last_error?: string | null
+          metadata_request_id?: number
           manual_weight_grams?: number | null
           material?: string | null
           remaining_percent?: number | null
@@ -481,6 +487,9 @@ export type Database = {
           id?: string
           inventory_key?: string
           last_seen_at?: string
+          metadata_completed_request_id?: number
+          metadata_last_error?: string | null
+          metadata_request_id?: number
           manual_weight_grams?: number | null
           material?: string | null
           remaining_percent?: number | null
@@ -1258,6 +1267,135 @@ export type Database = {
           },
         ]
       }
+      printer_queue_items: {
+        Row: {
+          ams_mapping: number[]
+          blocked_reason: string | null
+          bridge_error: string | null
+          calibration_enabled: boolean
+          command_claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          file_name: string
+          id: string
+          plate_number: number
+          position: number
+          printer_id: string
+          required_colors: Json
+          sd_file_id: string | null
+          sd_file_path: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ams_mapping?: number[]
+          blocked_reason?: string | null
+          bridge_error?: string | null
+          calibration_enabled?: boolean
+          command_claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          id?: string
+          plate_number: number
+          position: number
+          printer_id: string
+          required_colors?: Json
+          sd_file_id?: string | null
+          sd_file_path: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ams_mapping?: number[]
+          blocked_reason?: string | null
+          bridge_error?: string | null
+          calibration_enabled?: boolean
+          command_claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          id?: string
+          plate_number?: number
+          position?: number
+          printer_id?: string
+          required_colors?: Json
+          sd_file_id?: string | null
+          sd_file_path?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      printer_sd_files: {
+        Row: {
+          available: boolean
+          created_at: string
+          display_name: string
+          detected_color_name: string | null
+          detected_filaments: Json
+          detected_material: string | null
+          id: string
+          last_seen_at: string
+          metadata_completed_request_id: number
+          metadata_last_error: string | null
+          metadata_request_id: number
+          metadata_requested_plate_number: number | null
+          modified_at: string | null
+          path: string
+          plates: Json
+          printer_id: string
+          size_bytes: number | null
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          display_name: string
+          detected_color_name?: string | null
+          detected_filaments?: Json
+          detected_material?: string | null
+          id?: string
+          last_seen_at?: string
+          metadata_completed_request_id?: number
+          metadata_last_error?: string | null
+          metadata_request_id?: number
+          metadata_requested_plate_number?: number | null
+          modified_at?: string | null
+          path: string
+          plates?: Json
+          printer_id: string
+          size_bytes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          display_name?: string
+          detected_color_name?: string | null
+          detected_filaments?: Json
+          detected_material?: string | null
+          id?: string
+          last_seen_at?: string
+          metadata_completed_request_id?: number
+          metadata_last_error?: string | null
+          metadata_request_id?: number
+          metadata_requested_plate_number?: number | null
+          modified_at?: string | null
+          path?: string
+          plates?: Json
+          printer_id?: string
+          size_bytes?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       printer_ams_slots: {
         Row: {
           ams_unit: number
@@ -1317,7 +1455,11 @@ export type Database = {
       printers: {
         Row: {
           bed_temperature: number | null
+          bridge_refresh_token_hash: string | null
           bridge_token_hash: string | null
+          bridge_token_refreshed_at: string | null
+          camera_last_seen_at: string | null
+          camera_status: string
           connection_mode: string
           chamber_temperature: number | null
           created_at: string
@@ -1325,6 +1467,18 @@ export type Database = {
           current_layer: number | null
           current_plate: number | null
           device_serial: string
+          ftps_directory_listing: Json
+          ftps_folder_scan_requested_at: string | null
+          ftps_folder_scan_request_id: number
+          ftps_folder_scan_completed_request_id: number
+          ftps_last_error: string | null
+          ftps_scan_paths: Json
+          ftps_scan_requested_at: string | null
+          ftps_scan_request_id: number
+          ftps_scan_completed_request_id: number
+          host_pc_checked_at: string | null
+          host_pc_status: string
+          host_pc_uptime_seconds: number | null
           id: string
           last_seen_at: string | null
           maintenance_note: string
@@ -1333,16 +1487,25 @@ export type Database = {
           nozzle_temperature: number | null
           offline_alert_sent_at: string | null
           offline_since: string | null
+          plate_check_status: string
+          plate_state_changed_at: string | null
+          print_start_completed_request_id: number
+          print_start_request_id: number
           progress: number
           raw_status: Json
           remaining_minutes: number | null
+          sd_card_last_seen_at: string | null
           status: string
           total_layers: number | null
           updated_at: string
         }
         Insert: {
           bed_temperature?: number | null
+          bridge_refresh_token_hash?: string | null
           bridge_token_hash?: string | null
+          bridge_token_refreshed_at?: string | null
+          camera_last_seen_at?: string | null
+          camera_status?: string
           connection_mode?: string
           chamber_temperature?: number | null
           created_at?: string
@@ -1350,6 +1513,18 @@ export type Database = {
           current_layer?: number | null
           current_plate?: number | null
           device_serial: string
+          ftps_directory_listing?: Json
+          ftps_folder_scan_requested_at?: string | null
+          ftps_folder_scan_request_id?: number
+          ftps_folder_scan_completed_request_id?: number
+          ftps_last_error?: string | null
+          ftps_scan_paths?: Json
+          ftps_scan_requested_at?: string | null
+          ftps_scan_request_id?: number
+          ftps_scan_completed_request_id?: number
+          host_pc_checked_at?: string | null
+          host_pc_status?: string
+          host_pc_uptime_seconds?: number | null
           id?: string
           last_seen_at?: string | null
           maintenance_note?: string
@@ -1358,16 +1533,25 @@ export type Database = {
           nozzle_temperature?: number | null
           offline_alert_sent_at?: string | null
           offline_since?: string | null
+          plate_check_status?: string
+          plate_state_changed_at?: string | null
+          print_start_completed_request_id?: number
+          print_start_request_id?: number
           progress?: number
           raw_status?: Json
           remaining_minutes?: number | null
+          sd_card_last_seen_at?: string | null
           status?: string
           total_layers?: number | null
           updated_at?: string
         }
         Update: {
           bed_temperature?: number | null
+          bridge_refresh_token_hash?: string | null
           bridge_token_hash?: string | null
+          bridge_token_refreshed_at?: string | null
+          camera_last_seen_at?: string | null
+          camera_status?: string
           connection_mode?: string
           chamber_temperature?: number | null
           created_at?: string
@@ -1375,6 +1559,18 @@ export type Database = {
           current_layer?: number | null
           current_plate?: number | null
           device_serial?: string
+          ftps_directory_listing?: Json
+          ftps_folder_scan_requested_at?: string | null
+          ftps_folder_scan_request_id?: number
+          ftps_folder_scan_completed_request_id?: number
+          ftps_last_error?: string | null
+          ftps_scan_paths?: Json
+          ftps_scan_requested_at?: string | null
+          ftps_scan_request_id?: number
+          ftps_scan_completed_request_id?: number
+          host_pc_checked_at?: string | null
+          host_pc_status?: string
+          host_pc_uptime_seconds?: number | null
           id?: string
           last_seen_at?: string | null
           maintenance_note?: string
@@ -1383,9 +1579,14 @@ export type Database = {
           nozzle_temperature?: number | null
           offline_alert_sent_at?: string | null
           offline_since?: string | null
+          plate_check_status?: string
+          plate_state_changed_at?: string | null
+          print_start_completed_request_id?: number
+          print_start_request_id?: number
           progress?: number
           raw_status?: Json
           remaining_minutes?: number | null
+          sd_card_last_seen_at?: string | null
           status?: string
           total_layers?: number | null
           updated_at?: string
@@ -1909,9 +2110,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      request_printer_file_metadata: {
+        Args: { p_file_id: string; p_plate_number?: number | null }
+        Returns: number
+      }
+      request_printer_queue_start: {
+        Args: { p_printer_id: string }
+        Returns: number
+      }
+      request_printer_ftps_scan: {
+        Args: { p_printer_id: string; p_kind: string; p_scan_paths?: Json | null }
+        Returns: number
+      }
       approve_and_count_print_job_run: {
         Args: { p_plate_number: number; p_suggestion_job_id: string }
         Returns: Json
+      }
+      reorder_printer_queue: {
+        Args: { p_item_ids: string[]; p_printer_id: string }
+        Returns: undefined
       }
       decrement_manual_order_plate_run: {
         Args: { p_order_id: string; p_plate_number: number }

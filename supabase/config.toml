@@ -3,5 +3,17 @@ project_id = "askbgpdygdiwuocsmsfn"
 [functions.printer-status-ingest]
 verify_jwt = false
 
+[functions.printer-camera-ingest]
+verify_jwt = false
+
+[functions.bridge-token-refresh]
+verify_jwt = false
+
+[functions/printer-queue-bridge]
+verify_jwt = false
+
+[functions.printer-pair]
+verify_jwt = false
+
 [functions.send-abandoned-cart-reminders]
 verify_jwt = true

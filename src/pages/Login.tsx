@@ -22,15 +22,16 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signIn(email, password);
+      const signedInAsAdmin = await signIn(email, password);
       toast({ title: "Welkom terug!" });
-      navigate("/dashboard");
-    } catch (error: any) {
+      navigate(signedInAsAdmin ? "/admin" : "/dashboard", { replace: true });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Onbekende fout";
       toast({
         title: "Inloggen mislukt",
-        description: error.message === "Invalid login credentials"
+        description: message === "Invalid login credentials"
           ? "E-mailadres of wachtwoord is onjuist."
-          : error.message,
+          : message,
         variant: "destructive",
       });
     } finally {

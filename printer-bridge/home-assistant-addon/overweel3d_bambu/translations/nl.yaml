@@ -1,5 +1,46 @@
 configuration:
+  bambu_account:
+    name: Bambu-e-mailadres
+    description: Het e-mailadres van uw Bambu-account.
   email_code:
     name: E-mailcode
     description: De eenmalige code die Bambu naar het ingestelde account stuurt.
-
+  website_pairing_code:
+    name: Website-koppelcode
+    description: De eenmalige code uit Admin → Printproductie op de website.
+  next_plate_button_entity:
+    name: Volgende-plaatknop
+    description: De Home Assistant input_button die de volgende wachtrijprint start.
+  host_pc_ip:
+    name: IP-adres host-pc
+    description: IP-adres dat iedere minuut en opnieuw bij een printstart via ICMP wordt gepingd.
+  host_status_interval_seconds:
+    name: Status-pinginterval
+    description: Interval voor alleen de pc-status op de adminwebsite.
+  host_online_delay_seconds:
+    name: Wachttijd als pc al aanstaat
+    description: Wachttijd vóór de VM-start wanneer de eerste verse ping slaagt.
+  host_boot_delay_seconds:
+    name: Wachttijd na pc-opstart
+    description: Wachttijd nadat een eerder onbereikbare pc voor het eerst reageert.
+  pc_power_on_entity:
+    name: Pc-aanzetscript
+    description: Script dat wordt uitgevoerd wanneer de Windows-pc niet beschikbaar is.
+  pc_power_off_entity:
+    name: Pc-uitzetscript
+    description: Script dat na bevestiging van de geselecteerde print wordt uitgevoerd.
+  vm_start_entity:
+    name: VM-startknop
+    description: Button-entiteit die de Overweel3D VMware-VM start.
+  vm_start_wait_seconds:
+    name: VM-opstartwachttijd
+    description: Maximale tijd om op het rechtstreekse gereedsignaal van de VM-agent te wachten.
+  vm_ip:
+    name: VM-IP-adres
+    description: IP-adres waarvan de VM-agent verbinding met de lokale add-on-API mag maken.
+  guest_api_port:
+    name: VM-agent-API-poort
+    description: Lokale poort waarop de VM-agent zich rechtstreeks bij de add-on meldt.
+  guest_api_token:
+    name: VM-agent-token
+    description: Gedeeld token voor de rechtstreekse verbinding tussen VM en add-on.

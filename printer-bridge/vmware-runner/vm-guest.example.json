@@ -1,0 +1,39 @@
+{
+  "addon_url": "http://homeassistant.local:8766",
+  "addon_token": "Gijs1212!",
+  "poll_seconds": 3,
+  "automatic_ui_detection": true,
+  "window_title_regex": ".*Bambu Connect.*",
+  "ui_timeout_seconds": 120,
+  "import_settle_seconds": 8,
+  "confirm_settle_seconds": 2,
+  "printer_name": "printer Gijs",
+  "printer_combobox": {
+    "auto_id": "",
+    "title_re": ".*printer.*",
+    "control_type": "ComboBox",
+    "found_index": 0
+  },
+  "ams_comboboxes": [
+    { "auto_id": "", "title_re": ".*Filament.*1.*" },
+    { "auto_id": "", "title_re": ".*Filament.*2.*" },
+    { "auto_id": "", "title_re": ".*Filament.*3.*" },
+    { "auto_id": "", "title_re": ".*Filament.*4.*" }
+  ],
+  "disable_calibration": true,
+  "bed_leveling_checkbox": { "auto_id": "", "title_re": ".*bed level.*|.*bed nivell.*", "control_type": "CheckBox" },
+  "other_calibration_checkboxes": [
+    { "auto_id": "", "title_re": ".*flow calibration.*|.*flowkalibratie.*" }
+  ],
+  "send_button": {
+    "auto_id": "",
+    "title_re": "^(Print|Send|Afdrukken|Verzenden).*$"
+  },
+  "confirm_button": {
+    "auto_id": "",
+    "title_re": "^(Confirm|Print|Bevestigen|Afdrukken).*$"
+  },
+  "keep_download_seconds": 120,
+  "test_scan_roots": ["/cache", "/"],
+  "test_ams_mapping": []
+}
