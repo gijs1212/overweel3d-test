@@ -14,7 +14,24 @@ PocketBase-programma en herstart PocketBase. Controleer vervolgens:
 GET https://api.gijsoverweel.nl/api/overweel3d/health
 ```
 
-Een geldig antwoord bevat `"ok": true` en versie `1.3.0`.
+Een geldig antwoord bevat `"ok": true` en versie `1.3.14`.
+
+Vanaf versie 1.3.4 staan gedeelde functies in `overweel3d-core.js`. Versie 1.3.5 maakt printerkoppelcodes blijvend en herbruikbaar, zodat een herstart of herinstallatie geen nieuwe code vereist. De kleine
+`overweel3d.pb.js`-registratie laadt deze module binnen iedere routehandler,
+zoals PocketBase 0.40 vereist vanwege de geïsoleerde handlercontexten.
+
+## Home Assistant-app
+
+De complete lokale app staat in `home-assistant-addon/local_pocketbase`. Deze
+gebruikt dezelfde slug als de bestaande installatie, behoudt de persistente
+`/data`-mount en start PocketBase met:
+
+```text
+--hooksDir=/share/pocketbase/pb_hooks
+```
+
+De hook zit in de app en wordt bij iedere start automatisch geïnstalleerd of
+bijgewerkt. Een bestaande afwijkende versie wordt eerst als `.backup` bewaard.
 
 ## Serverintegraties
 

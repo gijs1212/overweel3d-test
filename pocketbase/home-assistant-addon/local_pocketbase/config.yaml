@@ -1,0 +1,22 @@
+name: PocketBase
+version: "1.3.14"
+slug: local_pocketbase
+description: PocketBase voor Overweel3D met bewerkbare serverhooks uit /share/pocketbase/pb_hooks.
+url: https://pocketbase.io
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: system
+boot: auto
+init: false
+ports:
+  8090/tcp: 8090
+ports_description:
+  8090/tcp: PocketBase API en beheer
+webui: http://[HOST]:[PORT:8090]/_/
+map:
+  - type: share
+    read_only: false
+options: {}
+schema: {}

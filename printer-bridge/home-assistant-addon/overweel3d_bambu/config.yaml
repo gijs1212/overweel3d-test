@@ -1,5 +1,5 @@
 name: Overweel3D Bambu Bridge
-version: "1.20.1"
+version: "1.22.0"
 slug: overweel3d_bambu
 description: Leest de Bambu P1S-cloudstatus en stuurt deze naar Overweel3D.
 arch:

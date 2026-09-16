@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, FileUp, FolderOpen, HardDriveDownload, ListOrdered, Loader2, Play, Plus, RefreshCw, Terminal, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, FolderOpen, HardDriveDownload, ListOrdered, Loader2, Play, Plus, RefreshCw, Terminal, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { disposeThreeMfInspection, inspectThreeMf, type ThreeMfInspection } from "@/lib/threeMfInspector";
@@ -14,7 +15,7 @@ type Printer = { id: string; name: string; status?: string | null; plate_check_s
 type Slot = { id: string; printer_id: string; ams_unit: number; slot_number: number; material: string | null; color_name: string | null; color_hex: string | null };
 type Inventory = { id: string; material: string | null; color_name: string | null; color_hex: string | null };
 type DetectedFilament = { material?: string | null; color_name?: string | null; color_hex?: string | null };
-type SdPlate = { number: number; name?: string; path?: string; detected_filaments?: DetectedFilament[]; preview_data_url?: string };
+type SdPlate = { number: number; name?: string; path?: string; size_bytes?: number | null; detected_filaments?: DetectedFilament[]; preview_data_url?: string; printable?: boolean };
 type SdFile = { id: string; printer_id: string; path: string; display_name: string; plates: SdPlate[] | null; detected_material?: string | null; detected_color_name?: string | null; detected_filaments?: DetectedFilament[] | null; metadata_request_id?: number; metadata_completed_request_id?: number; metadata_last_error?: string | null; metadata_requested_plate_number?: number | null };
 type RequiredColor = { inventory_id: string; name: string; material: string; color_hex: string; ams_unit?: number; slot_number?: number };
 type QueueItem = { id: string; printer_id: string; file_name: string; plate_number: number; position: number; required_colors: RequiredColor[]; status: string; blocked_reason: string | null; calibration_enabled: boolean };
@@ -22,6 +23,14 @@ type ColorDraft = { key: string; inventoryId: string; slotId: string; materialLo
 
 const labels: Record<string, string> = { queued: "In wachtrij", blocked: "Wacht op filament", starting: "Startopdracht verzonden", printing: "Bezig", paused: "Gepauzeerd", failed: "Mislukt" };
 const db = supabase;
+
+function metadataDownloadProgress(value?: string | null) {
+  const match = /^DOWNLOAD_PROGRESS:(\d+):(\d+)$/.exec(value || "");
+  if (!match) return null;
+  const downloaded = Number(match[1]);
+  const total = Number(match[2]);
+  return { downloaded, total, percent: total > 0 ? Math.min(100, Math.round(downloaded * 100 / total)) : 0 };
+}
 
 export function PrinterQueueManager({ printers, slots }: { printers: Printer[]; slots: Slot[] }) {
   const { toast } = useToast();
@@ -81,6 +90,12 @@ export function PrinterQueueManager({ printers, slots }: { printers: Printer[]; 
       .on("postgres_changes", { event: "*", schema: "public", table: "printer_sd_files" }, () => void load()).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [load]);
+  useEffect(() => {
+    const hasActiveDownload = files.some((file) => Number(file.metadata_request_id || 0) > Number(file.metadata_completed_request_id || 0));
+    if (!hasActiveDownload) return;
+    const timer = window.setInterval(() => void load(), 1000);
+    return () => window.clearInterval(timer);
+  }, [files, load]);
   useEffect(() => { if (!printerId && printers[0]) setPrinterId(printers[0].id); }, [printerId, printers]);
   useEffect(() => {
     const value = printers.find((printer) => printer.id === printerId)?.ftps_scan_paths;
@@ -96,6 +111,8 @@ export function PrinterQueueManager({ printers, slots }: { printers: Printer[]; 
     : [];
   const availableDirectories = [...new Set(["/", ...scanPaths, ...directoryListing.filter((entry) => entry.type === "directory").map((entry) => entry.path)])].sort();
   const selectedFile = files.find((file) => file.id === fileId);
+  const downloadProgress = metadataDownloadProgress(selectedFile?.metadata_last_error);
+  const downloadPending = Boolean(selectedFile && Number(selectedFile.metadata_request_id || 0) > Number(selectedFile.metadata_completed_request_id || 0));
   const selectedPlates = selectedFile?.plates?.length ? selectedFile.plates : [{ number: 1, name: "Plaat 1" }];
   const printerSlots = slots.filter((slot) => slot.printer_id === printerId);
   const movable = queue.filter((item) => item.printer_id === printerId && ["queued", "blocked", "paused"].includes(item.status));
@@ -149,13 +166,30 @@ export function PrinterQueueManager({ printers, slots }: { printers: Printer[]; 
     else toast({ title: "Printbestand wordt tijdelijk voorbereid", description: `Aanvraag #${requestId}: de add-on downloadt, parseert en verwijdert het bestand daarna automatisch.` });
   };
 
+  const cancelSelectedFilePreparation = async () => {
+    if (!selectedFile) return;
+    const { data: requestId, error } = await supabase.rpc("cancel_printer_file_metadata", { p_file_id: selectedFile.id });
+    if (error) {
+      toast({ title: "Download annuleren mislukt", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Download geannuleerd", description: `Aanvraag #${requestId} wordt door de add-on afgebroken en het tijdelijke bestand wordt verwijderd.` });
+    void load();
+  };
+
   const selectPlate = (value: number) => {
     setPlate(value);
     if (selectedFile) applyDetectedMatches(selectedFile, value);
   };
 
   useEffect(() => {
-    if (selectedFile && Number(selectedFile.metadata_completed_request_id || 0) > 0) applyDetectedMatches(selectedFile, plate);
+    if (selectedFile && Number(selectedFile.metadata_completed_request_id || 0) > 0) {
+      const parsedPlate = selectedFile.plates?.some((item) => item.number === plate)
+        ? plate
+        : selectedFile.plates?.[0]?.number || 1;
+      setPlate(parsedPlate);
+      applyDetectedMatches(selectedFile, parsedPlate);
+    }
     // Re-run only when newly scanned metadata for the selected file arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFile?.metadata_completed_request_id]);
@@ -339,7 +373,7 @@ export function PrinterQueueManager({ printers, slots }: { printers: Printer[]; 
         </div>
         <div><Label htmlFor="ftps-file-search">Zoeken in printbestanden</Label><Input id="ftps-file-search" type="search" value={fileSearch} onChange={(event) => setFileSearch(event.target.value)} placeholder="Zoek op naam of map…" /></div>
         <div><Label>Bestand op FTPS-opslag</Label><Select value={fileId} onValueChange={selectSdFile}><SelectTrigger><SelectValue placeholder={printerFiles.length ? "Kies bestand" : "Nog geen bestanden gevonden"} /></SelectTrigger><SelectContent>{filteredPrinterFiles.map((file) => <SelectItem key={file.id} value={file.id}>{file.display_name}{file.plates?.length ? ` · ${file.plates.length} plaat${file.plates.length === 1 ? "" : "en"}` : ""}</SelectItem>)}</SelectContent></Select>{fileSearch && !filteredPrinterFiles.length && <p className="mt-1 text-xs text-muted-foreground">Geen printbestanden gevonden voor “{fileSearch}”.</p>}</div>
-        {selectedFile && <div className="rounded-xl border p-3 space-y-3"><Button type="button" variant="outline" onClick={() => void prepareSelectedFile()} disabled={preparing || Number(selectedFile.metadata_request_id || 0) > Number(selectedFile.metadata_completed_request_id || 0) || !/\.(?:gcode|3mf)$/i.test(selectedPlates.find((item) => item.number === plate)?.path || selectedFile.path)}>{preparing || Number(selectedFile.metadata_request_id || 0) > Number(selectedFile.metadata_completed_request_id || 0) ? <Loader2 className="w-4 h-4 animate-spin" /> : <HardDriveDownload className="w-4 h-4" />} Bestand tijdelijk downloaden en voorbereiden</Button>{selectedFile.metadata_last_error && <p className="text-xs text-destructive">Voorbereiden mislukt: {selectedFile.metadata_last_error}</p>}<div><Label>Plaat uit bestand</Label><Select value={String(plate)} onValueChange={(value) => selectPlate(Number(value))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{selectedPlates.map((item) => <SelectItem key={item.number} value={String(item.number)}>Plaat {item.number}{item.name && item.name !== "Plaat " + item.number ? " · " + item.name : ""}</SelectItem>)}</SelectContent></Select></div>{selectedPlates.find((item) => item.number === plate)?.preview_data_url && <div className="overflow-hidden rounded-xl border bg-black"><img src={selectedPlates.find((item) => item.number === plate)?.preview_data_url} alt={`Preview van ${selectedPlates.find((item) => item.number === plate)?.name || `plaat ${plate}`}`} className="aspect-square w-full max-h-80 object-contain" /></div>}<div className="text-sm"><p className="font-semibold">Plaat {plate} · {selectedPlates.find((item) => item.number === plate)?.name || `Plaat ${plate}`}</p><p className="text-muted-foreground">{colors.length} {colors.length === 1 ? "kleur" : "kleuren"} daadwerkelijk gebruikt · beste filamentmatches voorgeselecteerd</p></div></div>}
+        {selectedFile && <div className="rounded-xl border p-3 space-y-3"><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => void prepareSelectedFile()} disabled={preparing || downloadPending || !/\.(?:gcode|3mf)$/i.test(selectedPlates.find((item) => item.number === plate)?.path || selectedFile.path)}>{preparing || downloadPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <HardDriveDownload className="w-4 h-4" />} Bestand tijdelijk downloaden en voorbereiden</Button>{downloadPending && <Button type="button" variant="destructive" onClick={() => void cancelSelectedFilePreparation()}><XCircle className="w-4 h-4" /> Download annuleren</Button>}</div>{downloadPending && !downloadProgress && <div className="space-y-1.5" aria-label="Wachten op add-on"><div className="flex justify-between text-xs font-medium"><span>Wachten tot de add-on de aanvraag ontvangt…</span><Loader2 className="h-3.5 w-3.5 animate-spin" /></div><Progress value={0} className="h-2" /></div>}{downloadProgress && <div className="space-y-1.5" aria-label="Voortgang tijdelijke download"><div className="flex justify-between text-xs font-medium"><span>Bestand downloaden</span><span>{downloadProgress.total > 0 ? `${downloadProgress.percent}%` : `${(downloadProgress.downloaded / 1024 / 1024).toFixed(1)} MB`}</span></div><Progress value={downloadProgress.percent} className="h-2" /><p className="text-[11px] text-muted-foreground">{(downloadProgress.downloaded / 1024 / 1024).toFixed(1)} van {downloadProgress.total > 0 ? `${(downloadProgress.total / 1024 / 1024).toFixed(1)} MB` : "onbekende bestandsgrootte"}</p></div>}{selectedFile.metadata_last_error && !downloadProgress && !downloadPending && <p className="text-xs text-destructive">Voorbereiden: {selectedFile.metadata_last_error}</p>}<div><Label>Plaat uit bestand</Label><Select value={String(plate)} onValueChange={(value) => selectPlate(Number(value))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{selectedPlates.map((item) => <SelectItem key={item.number} value={String(item.number)}>Plaat {item.number}{item.name && item.name !== "Plaat " + item.number ? " · " + item.name : ""}</SelectItem>)}</SelectContent></Select></div>{selectedPlates.find((item) => item.number === plate)?.preview_data_url && <div className="overflow-hidden rounded-xl border bg-black"><img src={selectedPlates.find((item) => item.number === plate)?.preview_data_url} alt={`Preview van ${selectedPlates.find((item) => item.number === plate)?.name || `plaat ${plate}`}`} className="aspect-square w-full max-h-80 object-contain" /></div>}<div className="text-sm"><p className="font-semibold">{selectedPlates.length} printbare platen gevonden · plaat {plate} · {selectedPlates.find((item) => item.number === plate)?.name || `Plaat ${plate}`}</p><p className="text-muted-foreground">{colors.length} {colors.length === 1 ? "kleur" : "kleuren"} daadwerkelijk gebruikt · beste filamentmatches voorgeselecteerd</p></div></div>}
         {colors.map((draft, index) => <div key={draft.key} className="grid sm:grid-cols-[1fr_1fr_auto] gap-2 items-end rounded-lg bg-muted/40 p-3">
           <div><Label>Kleur {index + 1}{draft.materialLock ? ` (${draft.materialLock})` : ""}</Label><Select value={draft.inventoryId} onValueChange={(value) => { setMatchesApproved(false); setColors((current) => current.map((item) => item.key === draft.key ? { ...item, inventoryId: value } : item)); }}><SelectTrigger><SelectValue placeholder="Kies kleur" /></SelectTrigger><SelectContent>{colorOptions.filter((item) => !draft.materialLock || (item.material || "").toLowerCase() === draft.materialLock.toLowerCase()).map((item) => <SelectItem key={item.id} value={item.id}>{item.color_name || "Onbekend"} · {item.material || "—"}</SelectItem>)}</SelectContent></Select></div>
           <div><Label>AMS-plaats</Label><Select value={draft.slotId} onValueChange={(value) => { setMatchesApproved(false); setColors((current) => current.map((item) => item.key === draft.key ? { ...item, slotId: value } : item)); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="auto">Automatisch zodra aanwezig</SelectItem>{printerSlots.map((slot) => <SelectItem key={slot.id} value={slot.id}>AMS {slot.ams_unit + 1} · vak {slot.slot_number} ({slot.color_name || "onbekend"})</SelectItem>)}</SelectContent></Select></div>

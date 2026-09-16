@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { useMaterials } from "@/hooks/useMaterials";
-import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 import { ProductTile } from "@/components/ProductTile";
 import { PrebuiltOptions, ProductDetailDialog } from "@/components/ProductDetailDialog";
@@ -399,15 +399,10 @@ export default function NewOrder() {
   };
 
   // ===== Custom draft =====
-  const handleCustomPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const incoming = Array.from(e.target.files || []).filter((file) => file.type.startsWith("image/") || isHeicFile(file));
     e.target.value = "";
-    try {
-      const files = await Promise.all(incoming.map((file) => prepareImageFileForUpload(file)));
-      setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...files].slice(0, 5) }));
-    } catch (error) {
-      toast({ title: "HEIC-conversie mislukt", description: error instanceof Error ? error.message : "Onbekende fout", variant: "destructive" });
-    }
+    setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...incoming].slice(0, 5) }));
   };
 
   const addCustomToCart = () => {
@@ -939,14 +934,14 @@ export default function NewOrder() {
 
                           {/* FILE TAB */}
                           <TabsContent value="file" className="mt-6 space-y-4">
-                            <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-accent/50 transition-colors">
-                              <input type="file" accept={ACCEPTED_FILE_TYPES} multiple onChange={handleFileUpload} className="hidden" id="file-upload" />
-                              <label htmlFor="file-upload" className="cursor-pointer">
+                            <label className="relative block overflow-hidden border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-accent/50 transition-colors cursor-pointer">
+                              <input type="file" accept={ACCEPTED_FILE_TYPES} multiple onChange={handleFileUpload} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                              <span>
                                 <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                                 <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
                                 <p className="text-xs text-muted-foreground mt-1">STL, OBJ, 3MF, STEP — max 10MB per bestand</p>
-                              </label>
-                            </div>
+                              </span>
+                            </label>
                             {draftFiles.length > 0 && (
                               <div className="space-y-4">
                                 {draftFiles.map((uf) => (
@@ -1076,10 +1071,10 @@ export default function NewOrder() {
                                       </button>
                                     </div>
                                   ))}
-                                  <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                                  <label className="relative w-20 h-20 overflow-hidden rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
                                     <Camera className="w-5 h-5 text-muted-foreground" />
                                     <span className="text-[10px] text-muted-foreground mt-1">Foto</span>
-                                    <input type="file" accept="image/*,.heic,.heif" onChange={handleCustomPhotoUpload} className="hidden" multiple />
+                                    <input type="file" accept="image/*" onChange={handleCustomPhotoUpload} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" multiple />
                                   </label>
                                 </div>
                               </div>

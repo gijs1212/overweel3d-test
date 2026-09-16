@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMaterials } from "@/hooks/useMaterials";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { materialLabel, normalizeMaterialId } from "@/lib/productCatalog";
-import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { sendAutomaticNewsletters, type AutomaticNewsletterEvent } from "@/lib/automaticNewsletter";
 
 function SignedImg({ path, className }: { path: string; className?: string }) {
@@ -176,23 +176,17 @@ export default function AdminColors() {
     return productMaterials.length === 0 || productMaterials.includes(normalizeMaterialId(form.material));
   });
 
-  const handlePhotoInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const converted: File[] = [];
+    const accepted: File[] = [];
     for (const f of files) {
-      if (isHeicFile(f)) {
-        try {
-          converted.push(await prepareImageFileForUpload(f));
-        } catch {
-          toast({ title: `HEIC conversie mislukt voor ${f.name}`, variant: "destructive" });
-        }
-      } else if (f.type.startsWith("image/")) {
-        converted.push(f);
+      if (isHeicFile(f) || f.type.startsWith("image/")) {
+        accepted.push(f);
       } else {
         toast({ title: `${f.name} overgeslagen`, description: "Alleen afbeeldingen.", variant: "destructive" });
       }
     }
-    if (converted.length) setNewPhotoFiles((prev) => [...prev, ...converted]);
+    if (accepted.length) setNewPhotoFiles((prev) => [...prev, ...accepted]);
     e.target.value = "";
   };
 
@@ -201,10 +195,10 @@ export default function AdminColors() {
     for (const file of newPhotoFiles) {
       const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
       const path = `colors/${crypto.randomUUID()}-${safeName}`;
-      const { error } = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
-      if (error) throw new Error(`Upload van ${file.name} mislukt: ${error.message}`);
-      uploadedPaths.push(path);
-      paths.push(path);
+      const uploaded = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
+      if (uploaded.error) throw new Error(`Upload van ${file.name} mislukt: ${uploaded.error.message}`);
+      uploadedPaths.push(uploaded.path);
+      paths.push(uploaded.path);
     }
     return paths;
   };
@@ -417,9 +411,9 @@ export default function AdminColors() {
                       </button>
                     </div>
                   ))}
-                  <label className="w-24 h-24 rounded-xl border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted/50">
+                  <label className="relative w-24 h-24 overflow-hidden rounded-xl border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted/50">
                     <Upload className="w-5 h-5 text-muted-foreground" />
-                    <input type="file" multiple accept="image/*,.heic,.heif" onChange={handlePhotoInput} className="hidden" />
+                    <input type="file" multiple accept="image/*" onChange={handlePhotoInput} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                   </label>
                 </div>
               </div>

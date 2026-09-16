@@ -1,6 +1,6 @@
 # Installatie en printautomatisering
 
-Versie **1.20.1** gebruikt PocketBase voor status, wachtrij en handmatige Bambu-loginverzoeken en vervangt oude bridge-herstelgegevens veilig bij opnieuw koppelen.
+Versie **1.22.0** gebruikt PocketBase voor status, wachtrij en handmatige Bambu-loginverzoeken. Voor parsen wordt het volledige `.3mf`-bestand gedownload. De parser telt naast ingesloten G-code ook gevulde Bambu-plaatmetadata, werkt daarna het platenaantal in de website bij en bewaart dat resultaat bij volgende scans. Virtueel gegroepeerde losse G-codeplaten worden allemaal volledig gedownload en samengevoegd tot één platen- en kleurenkeuze in de website. Tijdelijke bestanden worden daarna verwijderd.
 De Home Assistant-add-on bestuurt de bestaande Home Assistant-entiteiten zelf en
 de Windows-VM-agent praat rechtstreeks met de add-on via poort 8766.
 

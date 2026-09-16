@@ -115,10 +115,16 @@ POWER_OFF_REQUESTED_FOR: set[str] = set()
 PREPARATION_LOCK = threading.Lock()
 PREPARATION_ACTIVE = False
 PREPARATION_RESULT: dict | None = None
+METADATA_LOCK = threading.Lock()
+METADATA_ACTIVE: set[str] = set()
 
 
 class BridgeAuthorizationError(RuntimeError):
     """The local bridge token no longer matches the selected website printer."""
+
+
+class MetadataDownloadCancelled(RuntimeError):
+    """Raised when the admin cancels a temporary FTPS metadata download."""
 
 
 def migrate_persistent_file(source: Path, destination: Path) -> bool:
@@ -209,6 +215,46 @@ def local_sd_access_available() -> bool:
     return bool(BAMBU_HOST and BAMBU_ACCESS_CODE)
 
 
+def apply_runtime_ftps_config(config: dict) -> bool:
+    """Apply website-managed FTPS settings without rotating bridge credentials."""
+    global BAMBU_HOST, BAMBU_ACCESS_CODE, FTPS_USERNAME, FTPS_PORT
+    previous = (BAMBU_HOST, BAMBU_ACCESS_CODE, FTPS_USERNAME, FTPS_PORT)
+    incoming_host = str(config.get("bambu_host") or "").strip()
+    incoming_access_code = str(config.get("bambu_access_code") or "").strip()
+    connection_confirmed = config.get("connection_found") is True
+    if incoming_host or connection_confirmed:
+        BAMBU_HOST = incoming_host
+    if incoming_access_code or connection_confirmed:
+        BAMBU_ACCESS_CODE = incoming_access_code
+    FTPS_USERNAME = str(config.get("ftps_username") or FTPS_USERNAME or "bblp").strip()
+    try:
+        FTPS_PORT = int(config.get("ftps_port") or FTPS_PORT or 990)
+    except (TypeError, ValueError):
+        FTPS_PORT = 990
+    return previous != (BAMBU_HOST, BAMBU_ACCESS_CODE, FTPS_USERNAME, FTPS_PORT)
+
+
+def persist_runtime_ftps_config() -> None:
+    """Merge live website FTPS settings into the restart-safe pairing file."""
+    try:
+        saved = json.loads(PAIRING_FILE.read_text(encoding="utf-8")) if PAIRING_FILE.exists() else {}
+        saved.update({
+            "bambu_host": BAMBU_HOST,
+            "bambu_access_code": BAMBU_ACCESS_CODE,
+            "ftps_username": FTPS_USERNAME,
+            "ftps_port": FTPS_PORT,
+        })
+        temporary = PAIRING_FILE.with_suffix(".tmp")
+        temporary.write_text(json.dumps(saved), encoding="utf-8")
+        temporary.replace(PAIRING_FILE)
+        try:
+            PAIRING_FILE.chmod(0o600)
+        except OSError:
+            pass
+    except (OSError, ValueError) as exc:
+        print(f"FTPS-instellingen konden niet blijvend worden opgeslagen: {exc}", flush=True)
+
+
 def printer_tls_context() -> ssl.SSLContext:
     # The printer uses a device-local certificate. Authentication is performed
     # with bblp + access code; no proprietary Bambu client certificate is needed.
@@ -223,7 +269,7 @@ def exchange_website_pairing() -> None:
     if PAIRING_FILE.exists():
         try:
             saved = json.loads(PAIRING_FILE.read_text(encoding="utf-8"))
-            if saved.get("pairing_code_hash") == expected_hash:
+            if saved.get("pairing_code_hash") == expected_hash and saved.get("token_mode") == "permanent":
                 apply_website_pairing(saved)
                 if all((BAMBU_SERIAL, PRINTER_ID, BRIDGE_TOKEN, BRIDGE_REFRESH_TOKEN)):
                     return
@@ -255,11 +301,8 @@ def exchange_website_pairing() -> None:
         PAIRING_FILE.chmod(0o600)
     except OSError:
         pass
-    # A newly redeemed pairing code rotates both bridge credentials. Persist
-    # the new access token immediately, otherwise a token from the previous
-    # pairing could overwrite it in load_saved_bridge_token(). The refresh
-    # token remains in the protected pairing file and is used for later
-    # automatic recovery.
+    # The permanent website pairing code is also the stable bridge credential.
+    # Persist it once; it is deliberately never rotated automatically.
     save_bridge_token(BRIDGE_TOKEN)
     print("Website-koppelcode geaccepteerd; printergegevens zijn intern opgeslagen.", flush=True)
 
@@ -285,38 +328,10 @@ def save_bridge_token(token: str) -> None:
 
 
 def refresh_bridge_token(rejected_token: str = "") -> str:
-    global BRIDGE_TOKEN
-    if not BRIDGE_REFRESH_TOKEN:
-        raise BridgeAuthorizationError(
-            "Het bridge-token is verlopen en er is nog geen herstel-token ingesteld. "
-            "Maak in Admin → Printproductie één keer nieuwe koppelgegevens."
-        )
-    with BRIDGE_TOKEN_LOCK:
-        if rejected_token and BRIDGE_TOKEN != rejected_token:
-            return BRIDGE_TOKEN
-        request = urllib.request.Request(
-            WEBSITE_API_URL + "/bridge/refresh",
-            data=b"{}",
-            method="POST",
-            headers={
-                "content-type": "application/json",
-                "x-printer-id": PRINTER_ID,
-                "x-bridge-refresh-token": BRIDGE_REFRESH_TOKEN,
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=15) as response:
-                result = json.loads(response.read().decode() or "{}")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")
-            raise BridgeAuthorizationError(f"Automatisch bridge-token vernieuwen mislukt ({exc.code}): {detail[:300]}") from exc
-        token = str(result.get("access_token") or "")
-        if not token:
-            raise BridgeAuthorizationError("De website gaf geen nieuw bridge-token terug.")
-        BRIDGE_TOKEN = token
-        save_bridge_token(token)
-        print("Bridge-koppeling automatisch vernieuwd; handmatig herbouwen is niet nodig.", flush=True)
-        return token
+    raise BridgeAuthorizationError(
+        "PocketBase weigert de blijvende bridge-token. Automatische tokenvernieuwing staat uit; "
+        "controleer de website-koppelcode in de add-oninstellingen."
+    )
 
 
 def api(path: str, method: str = "GET", payload: dict | None = None, token: str | None = None) -> dict | list:
@@ -559,7 +574,7 @@ def status_payload(report: dict) -> dict:
     }
 
 
-def forward(payload: dict, retry_after_refresh: bool = True) -> None:
+def forward(payload: dict, retry_after_refresh: bool = False) -> None:
     token_used = BRIDGE_TOKEN
     request = urllib.request.Request(
         WEBSITE_API_URL + "/bridge/status",
@@ -577,11 +592,10 @@ def forward(payload: dict, retry_after_refresh: bool = True) -> None:
             message = str(json.loads(detail).get("error") or detail)
         except (json.JSONDecodeError, AttributeError):
             message = detail or exc.reason
-        if exc.code == 403 and retry_after_refresh:
-            refresh_bridge_token(token_used)
-            return forward(payload, retry_after_refresh=False)
         if exc.code == 403:
-            raise BridgeAuthorizationError("PocketBase weigert ook het automatisch vernieuwde bridge-token.") from exc
+            raise BridgeAuthorizationError(
+                "PocketBase weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
+            ) from exc
         raise RuntimeError(f"Status doorsturen mislukt ({exc.code}): {message[:300]}") from exc
 
 
@@ -639,7 +653,7 @@ def publish_scan_state(state: str, kind: str, request_id: int, detail: str = "")
         print(f"HA-scanstatus kon niet worden bijgewerkt: {exc}", flush=True)
 
 
-def queue_request(payload: dict, retry_after_refresh: bool = True) -> dict:
+def queue_request(payload: dict, retry_after_refresh: bool = False) -> dict:
     token_used = BRIDGE_TOKEN
     request = urllib.request.Request(
         WEBSITE_API_URL + "/bridge/queue",
@@ -652,9 +666,10 @@ def queue_request(payload: dict, retry_after_refresh: bool = True) -> dict:
             return json.loads(response.read().decode() or "{}")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")
-        if exc.code == 403 and retry_after_refresh:
-            refresh_bridge_token(token_used)
-            return queue_request(payload, retry_after_refresh=False)
+        if exc.code == 403:
+            raise BridgeAuthorizationError(
+                "PocketBase weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
+            ) from exc
         raise RuntimeError(f"Printerwachtrij synchroniseren mislukt ({exc.code}): {detail[:300]}") from exc
 
 
@@ -696,11 +711,12 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             names = archive.namelist()
+            name_lookup = {name.lower(): name for name in names}
             for member in names:
                 match = re.search(r"(?:^|/)plate_(\d+)\.gcode$", member, re.I)
                 if match:
                     number = int(match.group(1))
-                    plates[number] = {"number": number, "name": f"Plaat {number}", "detected_filaments": []}
+                    plates[number] = {"number": number, "name": f"Plaat {number}", "detected_filaments": [], "printable": True}
 
             for name in [item for item in names if item.lower().endswith("project_settings.config")]:
                 try:
@@ -713,6 +729,58 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
                     item = {"material": str(materials[index]).upper() if index < len(materials) else None, "color_name": None, "color_hex": str(color)[:7].upper()}
                     if re.fullmatch(r"#[0-9A-F]{6}", item["color_hex"]) and item not in configured_filaments:
                         configured_filaments.append(item)
+
+            # A Bambu project can contain several populated plates even when only
+            # one (or none) has embedded G-code.  The per-plate JSON files are the
+            # most reliable inventory in both sliced and unsliced 3MF exports.
+            # Previously these were ignored, which made such files appear as one
+            # plate because the fast SD scan deliberately starts with a placeholder.
+            for member in names:
+                match = re.search(r"(?:^|/)plate_(\d+)\.json$", member, re.I)
+                if not match:
+                    continue
+                try:
+                    plate_json = json.loads(archive.read(member))
+                except (json.JSONDecodeError, UnicodeDecodeError, AttributeError, KeyError):
+                    continue
+                objects = plate_json.get("bbox_objects")
+                # Do not count empty/template plates. Older exports may omit
+                # bbox_objects entirely, in which case bbox_all still proves that
+                # the plate has content.
+                if isinstance(objects, list) and not objects:
+                    continue
+                if objects is None and not plate_json.get("bbox_all"):
+                    continue
+                number = int(match.group(1))
+                entry = plates.setdefault(number, {
+                    "number": number,
+                    "name": f"Plaat {number}",
+                    "detected_filaments": [],
+                    "printable": False,
+                })
+                json_colors = plate_json.get("filament_colors") or []
+                json_ids = plate_json.get("filament_ids") or []
+                json_filaments: list[dict] = []
+                for position, raw_color in enumerate(json_colors):
+                    color = str(raw_color)[:7].upper()
+                    try:
+                        filament_index = int(json_ids[position]) if position < len(json_ids) else position
+                    except (TypeError, ValueError):
+                        filament_index = position
+                    configured = configured_filaments[filament_index] if 0 <= filament_index < len(configured_filaments) else None
+                    item = {
+                        "filament_index": filament_index + 1,
+                        "material": configured.get("material") if configured else None,
+                        "color_name": None,
+                        "color_hex": color if re.fullmatch(r"#[0-9A-F]{6}", color) else None,
+                    }
+                    if item["color_hex"] and not any(existing.get("color_hex") == item["color_hex"] and existing.get("material") == item["material"] for existing in json_filaments):
+                        json_filaments.append(item)
+                if json_filaments and not entry["detected_filaments"]:
+                    entry["detected_filaments"] = json_filaments
+                for item in json_filaments:
+                    if not any(existing.get("color_hex") == item["color_hex"] and existing.get("material") == item["material"] for existing in used_filaments):
+                        used_filaments.append(item)
 
             for name in [item for item in names if item.lower().endswith(("slice_info.config", "model_settings.config"))]:
                 try:
@@ -741,17 +809,32 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
                             plate_filaments.append(item)
                         if re.fullmatch(r"#[0-9A-F]{6}", color) and not any(existing["color_hex"] == color and existing["material"] == item["material"] for existing in used_filaments):
                             used_filaments.append(item)
-                    has_gcode = bool(metadata.get("gcode_file")) or number in plates
-                    if has_gcode or plate_filaments:
+                    gcode_file = str(metadata.get("gcode_file") or "")
+                    has_gcode = bool(gcode_file) or bool(plates.get(number, {}).get("printable"))
+                    has_models = any(element.tag.lower().endswith(("object", "model_instance")) for element in plate_element)
+                    if has_gcode or has_models or plate_filaments or number in plates:
                         plate_name = metadata.get("plater_name") or metadata.get("plate_name") or metadata.get("name") or plate_element.attrib.get("name")
-                        entry = plates.setdefault(number, {"number": number, "name": plate_name or f"Plaat {number}", "detected_filaments": []})
+                        entry = plates.setdefault(number, {"number": number, "name": plate_name or f"Plaat {number}", "detected_filaments": [], "printable": False})
+                        if gcode_file and gcode_file.lower() in name_lookup:
+                            entry["printable"] = True
                         if plate_name:
                             entry["name"] = plate_name
                         if plate_filaments:
                             entry["detected_filaments"] = plate_filaments
                         thumbnail_path = metadata.get("thumbnail_file")
-                        if thumbnail_path and thumbnail_path in names and archive.getinfo(thumbnail_path).file_size <= 2 * 1024 * 1024:
-                            entry["preview_data_url"] = "data:image/png;base64," + base64.b64encode(archive.read(thumbnail_path)).decode("ascii")
+                        resolved_thumbnail = name_lookup.get(str(thumbnail_path or "").lower())
+                        if resolved_thumbnail and archive.getinfo(resolved_thumbnail).file_size <= 2 * 1024 * 1024:
+                            entry["preview_data_url"] = "data:image/png;base64," + base64.b64encode(archive.read(resolved_thumbnail)).decode("ascii")
+
+            # Some project-only exports have no plate nodes in slice_info and no
+            # thumbnail reference in model_settings. Attach the conventional
+            # plate_N.png preview after all plate sources have been merged.
+            for number, entry in plates.items():
+                if entry.get("preview_data_url"):
+                    continue
+                preview = name_lookup.get(f"metadata/plate_{number}.png")
+                if preview and archive.getinfo(preview).file_size <= 2 * 1024 * 1024:
+                    entry["preview_data_url"] = "data:image/png;base64," + base64.b64encode(archive.read(preview)).decode("ascii")
     except (zipfile.BadZipFile, OSError):
         return [], []
     filaments = used_filaments or configured_filaments
@@ -798,7 +881,7 @@ def parse_gcode_metadata(content: bytes, plate_number: int = 1, plate_name: str 
     return ([{"number": plate_number, "name": name, "detected_filaments": filaments}], filaments)
 
 
-def read_remote_print_metadata(ftp: ImplicitFTP_TLS, path: str, size: int | None, plate_number: int = 1, plate_name: str = "") -> tuple[list[dict], list[dict]]:
+def read_remote_print_metadata(ftp: ImplicitFTP_TLS, path: str, size: int | None, plate_number: int = 1, plate_name: str = "", cancellation_check=None, progress_callback=None) -> tuple[list[dict], list[dict]]:
     if size is not None and size > 256 * 1024 * 1024:
         raise ValueError("Printbestand is groter dan de veilige parseerlimiet van 256 MB")
     temporary_path: Path | None = None
@@ -806,7 +889,23 @@ def read_remote_print_metadata(ftp: ImplicitFTP_TLS, path: str, size: int | None
         suffix = ".gcode" if path.lower().endswith(".gcode") else ".3mf"
         with tempfile.NamedTemporaryFile(prefix="overweel3d-", suffix=suffix, delete=False) as temporary:
             temporary_path = Path(temporary.name)
-            ftp.retrbinary(f"RETR {path}", temporary.write, blocksize=256 * 1024)
+            last_cancel_check = 0.0
+            downloaded_bytes = 0
+            def receive_block(block: bytes) -> None:
+                nonlocal last_cancel_check, downloaded_bytes
+                temporary.write(block)
+                downloaded_bytes += len(block)
+                now = time.monotonic()
+                if cancellation_check and (last_cancel_check == 0.0 or now - last_cancel_check >= 1.0):
+                    last_cancel_check = now
+                    cancelled = progress_callback(downloaded_bytes, size) if progress_callback else cancellation_check()
+                    if cancelled:
+                        raise MetadataDownloadCancelled("Download geannuleerd door de admin.")
+            ftp.retrbinary(f"RETR {path}", receive_block, blocksize=256 * 1024)
+            if progress_callback:
+                progress_callback(downloaded_bytes, size)
+            if cancellation_check and cancellation_check():
+                raise MetadataDownloadCancelled("Download geannuleerd door de admin.")
         print(f"Printbestand tijdelijk gedownload voor lokaal parsen ({temporary_path.stat().st_size} bytes).", flush=True)
         content = temporary_path.read_bytes()
         return parse_gcode_metadata(content, plate_number, plate_name) if suffix == ".gcode" else parse_3mf_metadata(content)
@@ -923,7 +1022,7 @@ def list_sd_files(scan_paths: list[str], include_print_files: bool = True) -> tu
                         })
                         group["size_bytes"] += listed_size or 0
                         plate_name = re.sub(r"[_-]?plate[_-]?\d+$", "", Path(filename).stem, flags=re.I).strip("_- ") or f"Plaat {number}"
-                        group["plates"].append({"number": number, "name": plate_name, "path": normalized.lstrip("/"), "detected_filaments": detected})
+                        group["plates"].append({"number": number, "name": plate_name, "path": normalized.lstrip("/"), "size_bytes": listed_size, "detected_filaments": detected})
                         for filament in detected:
                             if filament not in group["detected_filaments"]:
                                 group["detected_filaments"].append(filament)
@@ -965,7 +1064,7 @@ def list_sd_files(scan_paths: list[str], include_print_files: bool = True) -> tu
 
 def sync_sd_files(scan_paths: list[str], request_id: int = 0) -> None:
     if not BAMBU_HOST or not BAMBU_ACCESS_CODE:
-        return
+        raise RuntimeError("FTPS-scan kan nog niet starten: printer-IP of lokale toegangscode ontbreekt in de websitekoppeling")
     last_error = None
     for attempt in range(1, 4):
         try:
@@ -984,43 +1083,98 @@ def sync_sd_files(scan_paths: list[str], request_id: int = 0) -> None:
 
 
 def sync_sd_directories(request_id: int = 0) -> None:
+    if not BAMBU_HOST or not BAMBU_ACCESS_CODE:
+        raise RuntimeError("FTPS-mappenscan kan nog niet starten: printer-IP of lokale toegangscode ontbreekt in de websitekoppeling")
     _, listing = list_sd_files(["/"], include_print_files=False)
     queue_request({"action": "sync_directories", "directory_listing": listing, "request_id": request_id})
     count = sum(1 for entry in listing if entry.get("type") == "directory")
     print(f"FTPS-mappen vernieuwd: {count} map(pen) gevonden.", flush=True)
 
 
+def metadata_download_targets(request: dict) -> list[dict]:
+    """Return every physical file that belongs to one selected SD-card item."""
+    virtual_path = str(request.get("path") or "").lstrip("/")
+    requested_plate = int(request.get("metadata_requested_plate_number") or 1)
+    if virtual_path.startswith("gcode-group:"):
+        targets = []
+        for item in sorted(request.get("plates") or [], key=lambda plate: int(plate.get("number") or 0)):
+            item_path = str(item.get("path") or "").lstrip("/")
+            if not item_path:
+                continue
+            targets.append({
+                "path": item_path,
+                "size": int(item["size_bytes"]) if item.get("size_bytes") is not None else None,
+                "plate_number": int(item.get("number") or 1),
+                "plate_name": str(item.get("name") or f"Plaat {int(item.get('number') or 1)}"),
+            })
+        if not targets:
+            raise ValueError("Deze G-codegroep bevat geen downloadbare platen; scan de bestanden opnieuw.")
+        return targets
+    if not virtual_path:
+        raise ValueError("Het bestandspad ontbreekt; scan de bestanden opnieuw.")
+    return [{
+        "path": virtual_path,
+        "size": int(request["size_bytes"]) if request.get("size_bytes") is not None else None,
+        "plate_number": requested_plate,
+        "plate_name": str(request.get("display_name") or f"Plaat {requested_plate}"),
+    }]
+
+
 def sync_requested_file_metadata(request: dict) -> None:
     file_id = str(request.get("id") or "")
-    path = str(request.get("path") or "").lstrip("/")
     request_id = int(request.get("metadata_request_id") or 0)
-    size = int(request["size_bytes"]) if request.get("size_bytes") is not None else None
-    requested_plate = int(request.get("metadata_requested_plate_number") or 1)
-    plate_name = f"Plaat {requested_plate}"
-    if path.startswith("gcode-group:"):
-        matching_plate = next((item for item in (request.get("plates") or []) if int(item.get("number") or 0) == requested_plate), None)
-        if not matching_plate or not matching_plate.get("path"):
-            error = f"Bestandspad voor plaat {requested_plate} ontbreekt; scan de bestanden opnieuw."
-            queue_request({"action": "sync_file_metadata", "file_id": file_id, "request_id": request_id, "error": error, "plates": [], "detected_filaments": []})
-            print(error, flush=True)
-            return
-        path = str(matching_plate["path"]).lstrip("/")
-        plate_name = str(matching_plate.get("name") or plate_name)
-        size = None
-    if not file_id or not path or not request_id:
+    if not file_id or not request_id:
         return
-    print(f"3MF-metadata-aanvraag #{request_id} ontvangen voor {path}.", flush=True)
+    targets = metadata_download_targets(request)
+    print(
+        f"Volledige tijdelijke parse gestart voor {request.get('display_name') or request.get('path')} "
+        f"(aanvraag #{request_id}, {len(targets)} bestand(en)).",
+        flush=True,
+    )
     ftp = ImplicitFTP_TLS(timeout=30, context=printer_tls_context())
     try:
         ftp.connect(BAMBU_HOST, FTPS_PORT)
         ftp.login(FTPS_USERNAME, BAMBU_ACCESS_CODE)
         ftp.prot_p()
-        plates, filaments = read_remote_print_metadata(ftp, "/" + path, size, requested_plate, plate_name)
-        queue_request({"action": "sync_file_metadata", "file_id": file_id, "request_id": request_id, "plates": plates, "detected_filaments": filaments})
-        print(f"3MF-metadata-aanvraag #{request_id} voltooid: {len(plates)} plaat/platen en {len(filaments)} kleur(en).", flush=True)
+        for target in targets:
+            if target["size"] is None:
+                try:
+                    target["size"] = ftp.size("/" + target["path"])
+                except ftplib.all_errors:
+                    target["size"] = None
+        total_size = sum(target["size"] for target in targets) if all(target["size"] is not None for target in targets) else None
+        def cancelled() -> bool:
+            status = queue_request({"action": "metadata_status", "file_id": file_id, "request_id": request_id})
+            return bool(status.get("cancelled"))
+        def report_progress(downloaded: int, total: int | None) -> bool:
+            status = queue_request({"action": "metadata_progress", "file_id": file_id, "request_id": request_id, "downloaded_bytes": downloaded, "total_bytes": total})
+            percent = min(100, round(downloaded * 100 / total)) if total else 0
+            print(f"Tijdelijke metadata-download: {percent}% ({downloaded}/{total or '?'} bytes).", flush=True)
+            return bool(status.get("cancelled"))
+        report_progress(0, total_size)
+        plates: list[dict] = []
+        filaments: list[dict] = []
+        downloaded_before_target = 0
+        for target in targets:
+            target_downloaded = 0
+            def target_progress(downloaded: int, _target_size: int | None) -> bool:
+                nonlocal target_downloaded
+                target_downloaded = downloaded
+                return report_progress(downloaded_before_target + downloaded, total_size)
+            parsed_plates, parsed_filaments = read_remote_print_metadata(
+                ftp, "/" + target["path"], target["size"], target["plate_number"], target["plate_name"], cancelled, target_progress,
+            )
+            plates.extend(parsed_plates)
+            for filament in parsed_filaments:
+                if filament not in filaments:
+                    filaments.append(filament)
+            downloaded_before_target += target_downloaded
+        plates.sort(key=lambda item: int(item.get("number") or 0))
+        queue_request({"action": "sync_file_metadata", "file_id": file_id, "request_id": request_id, "plate_count": len(plates), "plates": plates, "detected_filaments": filaments})
+        print(f"Volledige parse #{request_id} voltooid: {len(plates)} plaat/platen en {len(filaments)} kleur(en).", flush=True)
     except Exception as exc:
         queue_request({"action": "sync_file_metadata", "file_id": file_id, "request_id": request_id, "error": str(exc), "plates": [], "detected_filaments": []})
-        print(f"3MF-metadata-aanvraag #{request_id} mislukt voor {path}: {exc}", flush=True)
+        print(f"Volledige parse #{request_id} mislukt: {exc}", flush=True)
     finally:
         try:
             ftp.quit()
@@ -1028,43 +1182,73 @@ def sync_requested_file_metadata(request: dict) -> None:
             ftp.close()
 
 
+def start_requested_file_metadata(request: dict) -> bool:
+    """Parse in a worker so a slow FTPS transfer never blocks new commands."""
+    request_key = f"{request.get('id')}:{request.get('metadata_request_id')}"
+    with METADATA_LOCK:
+        if request_key in METADATA_ACTIVE:
+            return False
+        METADATA_ACTIVE.add(request_key)
+
+    def worker() -> None:
+        try:
+            sync_requested_file_metadata(request)
+        finally:
+            with METADATA_LOCK:
+                METADATA_ACTIVE.discard(request_key)
+
+    threading.Thread(target=worker, name=f"metadata-{request.get('id')}", daemon=True).start()
+    return True
+
+
 def sd_sync_loop() -> None:
-    if not local_sd_access_available():
-        print(
-            "Automatisch SD-kaart uitlezen is uitgeschakeld omdat lokaal IP-adres of toegangscode ontbreekt. "
-            "De cloudbridge blijft actief en handmatige 3MF-registratie blijft beschikbaar.",
-            flush=True,
-        )
-        return
-    last_request: int | None = None
-    last_folder_request: int | None = None
-    print("Automatische SD-synchronisatie staat uit; de bridge wacht op handmatige scanverzoeken.", flush=True)
+    if local_sd_access_available():
+        access_state = f"FTPS gereed op {BAMBU_HOST}:{FTPS_PORT} als {FTPS_USERNAME}"
+    else:
+        access_state = "FTPS-configuratie ontbreekt; verzoeken worden wel ontvangen en met een duidelijke fout gemeld"
+    print(
+        f"Handmatige SD-scanlistener gestart voor websiteprinter {PRINTER_ID}; {access_state}.",
+        flush=True,
+    )
     while True:
         try:
             config = queue_request({"action": "scan_config"})
+            if apply_runtime_ftps_config(config):
+                persist_runtime_ftps_config()
+                print(f"Bijgewerkte FTPS-instellingen ontvangen: {BAMBU_HOST or 'geen IP'}:{FTPS_PORT} als {FTPS_USERNAME}.", flush=True)
             paths = [str(path) for path in (config.get("scan_paths") or ["/", "/cache"])][:25]
             request_marker = int(config.get("scan_request_id") or 0)
             folder_request_marker = int(config.get("folder_scan_request_id") or 0)
             completed_request = int(config.get("scan_completed_request_id") or 0)
             completed_folder_request = int(config.get("folder_scan_completed_request_id") or 0)
             metadata_request = config.get("metadata_request")
-            if last_request is None:
-                last_request = completed_request
-                last_folder_request = completed_folder_request
-            if folder_request_marker > completed_folder_request and folder_request_marker != last_folder_request:
-                print(f"Mappenscanverzoek #{folder_request_marker} ontvangen.", flush=True)
+            if config.get("metadata_lookup_error"):
+                raise RuntimeError(f"PocketBase kon open downloadverzoeken niet lezen: {config['metadata_lookup_error']}")
+            # PocketBase is de bron van waarheid. Een verzoek blijft openstaan totdat
+            # sync_directories/sync_files de bijbehorende completed-id opslaat. Gebruik
+            # hier bewust geen lokale last_request-filter: na een tijdelijke FTPS- of
+            # API-fout moet exact hetzelfde verzoek opnieuw worden uitgevoerd.
+            if folder_request_marker > completed_folder_request:
+                print(
+                    f"Mappenscanverzoek #{folder_request_marker} ontvangen "
+                    f"(laatst bevestigd: #{completed_folder_request}).",
+                    flush=True,
+                )
                 publish_scan_state("bezig", "mappen", folder_request_marker)
                 sync_sd_directories(folder_request_marker)
                 publish_scan_state("voltooid", "mappen", folder_request_marker)
-                last_folder_request = folder_request_marker
-            if request_marker > completed_request and request_marker != last_request:
-                print(f"Bestandsscanverzoek #{request_marker} ontvangen.", flush=True)
+            if request_marker > completed_request:
+                print(
+                    f"Bestandsscanverzoek #{request_marker} ontvangen "
+                    f"(laatst bevestigd: #{completed_request}; mappen: {paths}).",
+                    flush=True,
+                )
                 publish_scan_state("bezig", "bestanden", request_marker)
                 sync_sd_files(paths, request_marker)
                 publish_scan_state("voltooid", "bestanden", request_marker)
-                last_request = request_marker
             if isinstance(metadata_request, dict):
-                sync_requested_file_metadata(metadata_request)
+                if start_requested_file_metadata(metadata_request):
+                    print(f"Metadata-downloadworker gestart voor aanvraag #{metadata_request.get('metadata_request_id')}.", flush=True)
         except Exception as exc:
             print(f"Handmatige SD-scan tijdelijk niet beschikbaar: {exc}", flush=True)
             try:
@@ -1127,10 +1311,30 @@ def publish_host_pc_status(online: bool) -> None:
         print(f"Pc-status kon niet naar de website: {exc}", flush=True)
 
 
+def publish_vm_status(online: bool) -> None:
+    """Publish informational VM state; print decisions never consume this value."""
+    try:
+        queue_request({"action": "sync_vm_status", "status": "on" if online else "off"})
+    except Exception as exc:
+        print(f"VM-status kon niet naar de website: {exc}", flush=True)
+
+
 def host_status_loop() -> None:
     """Status-only loop; its result is intentionally never used for print startup."""
     while True:
         publish_host_pc_status(ping_host(HOST_PC_IP))
+        time.sleep(max(30, HOST_STATUS_INTERVAL_SECONDS))
+
+
+def vm_status_loop() -> None:
+    """Ping the VM every minute for display only, never for print orchestration."""
+    last_status: bool | None = None
+    while True:
+        online = ping_host(VM_IP)
+        publish_vm_status(online)
+        if online != last_status:
+            print(f"VM-weergavestatus bijgewerkt: {'aan' if online else 'uit'}.", flush=True)
+            last_status = online
         time.sleep(max(30, HOST_STATUS_INTERVAL_SECONDS))
 
 
@@ -1144,7 +1348,7 @@ def guest_client_allowed(client_ip: str) -> bool:
 
 
 class GuestApiHandler(BaseHTTPRequestHandler):
-    server_version = "Overweel3DGuestAPI/1.20.1"
+    server_version = "Overweel3DGuestAPI/1.22.0"
 
     def log_message(self, pattern: str, *args: object) -> None:
         print("VM-API " + (pattern % args), flush=True)
@@ -1680,17 +1884,29 @@ def main() -> None:
     save_persistent_settings()
     exchange_website_pairing()
     load_saved_bridge_token()
-    # Start website control before cloud login, so an admin can request a new
-    # e-mail code even while the old Bambu session is no longer usable.
+    # Start all website controls before cloud login. SD/FTPS requests are local
+    # printer operations and must blijven werken wanneer Bambu Cloud offline is
+    # of om een nieuwe e-mailcode vraagt.
     threading.Thread(target=bambu_login_request_loop, name="bambu-login-requests", daemon=True).start()
-    session = login()
+    threading.Thread(target=sd_sync_loop, name="printer-sd-sync", daemon=True).start()
+    threading.Thread(target=host_status_loop, name="host-pc-status", daemon=True).start()
+    threading.Thread(target=start_guest_api, name="vm-guest-api", daemon=True).start()
+    threading.Thread(target=vm_status_loop, name="vm-display-status", daemon=True).start()
+    while True:
+        try:
+            session = login()
+            break
+        except Exception as exc:
+            print(
+                f"Bambu Cloud-login tijdelijk niet beschikbaar: {exc}. "
+                "Website-, FTPS- en loginverzoeken blijven actief; nieuwe poging over 30 seconden.",
+                flush=True,
+            )
+            time.sleep(30)
     save_persistent_settings()
     if "--login-only" in sys.argv[1:]:
         print(f"Bambu-sessie voor {session['account']} is veilig in het Docker-volume opgeslagen.", flush=True)
         return
-    threading.Thread(target=sd_sync_loop, name="printer-sd-sync", daemon=True).start()
-    threading.Thread(target=host_status_loop, name="host-pc-status", daemon=True).start()
-    threading.Thread(target=start_guest_api, name="vm-guest-api", daemon=True).start()
     serial = choose_serial(session["access_token"])
     threading.Thread(
         target=cloud_presence_loop,

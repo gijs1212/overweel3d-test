@@ -11,7 +11,7 @@ SD-kaart, zonder slicercertificaten en zonder de cloudmodus uit te schakelen.
 Alle instellingen, sessies en koppeltokens worden blijvend in
 `/config/overweel3d` opgeslagen, ook bij een herinstallatie van de add-on.
 
-Versie 1.20.1 pingt de host-pc iedere minuut alleen voor de websiteweergave, communiceert met PocketBase en ondersteunt volledige tokenrotatie.
+Versie 1.22.0 downloadt en parseert altijd het volledige gekozen printbestand. Een `.3mf` levert na verwerking alle gevulde platen, previews en plaatkleuren op; een samengevoegde G-codegroep verwerkt alle fysieke plaatbestanden voordat de resultaten naar de website gaan. Het werkelijk gevonden platenaantal vervangt daarna de voorlopige scanwaarde en blijft bij volgende scans bewaard. Daarna kiest de admin de plaat en filamentmatches.
 Printklikken gebruiken altijd een verse ping en sturen de taak rechtstreeks naar
 VM-agent 2.3.2 via de lokale, beveiligde API op poort 8766. Er draait geen
 Windows-host-runner meer.

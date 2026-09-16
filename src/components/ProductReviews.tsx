@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { isHeicFile, prepareImageFileForUpload, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
 
 interface Review { id: string; rating: number; title: string; body: string; photos: Json; verified: boolean; created_at: string }
 interface ReviewOrder { id: string; order_number: string; catalog_items: Json }
@@ -45,9 +45,8 @@ export function ProductReviews({ productId }: { productId: string }) {
     try {
       const paths: string[] = [];
       for (const file of photos) {
-        const prepared = await prepareImageFileForUpload(file);
-        const path = `reviews/${user.id}/${crypto.randomUUID()}-${prepared.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-        const uploaded = await uploadFileWithHeicConversion("orders", path, prepared, { upsert: false });
+        const path = `reviews/${user.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+        const uploaded = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
         if (uploaded.error) throw uploaded.error;
         paths.push(uploaded.path);
       }

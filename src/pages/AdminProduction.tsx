@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, FileArchive, KeyRound, Loader2, Plus, Printer, RefreshCw, ShieldCheck, TriangleAlert, Trash2, Wrench } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, FileArchive, KeyRound, Loader2, Plus, Printer, RefreshCw, Save, ShieldCheck, TriangleAlert, Trash2, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Footer } from "@/components/Footer";
@@ -35,12 +35,40 @@ const hostPcStatus = (printer: PrinterRow) => {
   return { label: "Pc nog niet gecontroleerd", dot: "bg-amber-400", text: "text-amber-700" };
 };
 
+const vmStatus = (printer: PrinterRow) => {
+  const raw = printer.raw_status && typeof printer.raw_status === "object" && !Array.isArray(printer.raw_status)
+    ? printer.raw_status as Record<string, unknown>
+    : {};
+  if (raw.vm_status === "on") return { label: "VM aan", dot: "bg-emerald-500", text: "text-emerald-700", checkedAt: String(raw.vm_checked_at || "") };
+  if (raw.vm_status === "off") return { label: "VM uit", dot: "bg-neutral-400", text: "text-black/55", checkedAt: String(raw.vm_checked_at || "") };
+  return { label: "VM nog niet gecontroleerd", dot: "bg-amber-400", text: "text-amber-700", checkedAt: "" };
+};
+
+const copyTextToClipboard = async (value: string) => {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied;
+  }
+};
+
 export default function AdminProduction() {
   const { isAdmin, loading: authLoading } = useAuth(); const { toast } = useToast(); const navigate = useNavigate();
   const [printers, setPrinters] = useState<PrinterRow[]>([]); const [jobs, setJobs] = useState<JobRow[]>([]); const [slots, setSlots] = useState<SlotRow[]>([]); const [orders, setOrders] = useState<OrderChoice[]>([]); const [loading, setLoading] = useState(true);
   const [printerForm, setPrinterForm] = useState({ name: "P1S", serial: "" });
   const [pairingForm, setPairingForm] = useState({ printerId: "", host: "", accessCode: "", ftpsUsername: "bblp", ftpsPort: "990" });
   const [creatingPairingCode, setCreatingPairingCode] = useState(false);
+  const [savingConnection, setSavingConnection] = useState(false);
   const [requestingLoginCode, setRequestingLoginCode] = useState<string | null>(null);
   const [bridgeConfig, setBridgeConfig] = useState("");
   const [deletePrinter, setDeletePrinter] = useState<PrinterRow | null>(null);
@@ -75,6 +103,21 @@ export default function AdminProduction() {
   }, [isAdmin, load]);
   useEffect(() => () => disposeThreeMfInspection(inspection), [inspection]);
   useEffect(() => { if (!pairingForm.printerId && printers[0]) setPairingForm((current) => ({ ...current, printerId: printers[0].id })); }, [pairingForm.printerId, printers]);
+  useEffect(() => {
+    if (!isAdmin || !pairingForm.printerId) return;
+    let cancelled = false;
+    void supabase.functions.invoke("printer-pair", { body: { action: "get_connection", printer_id: pairingForm.printerId } }).then(({ data, error }) => {
+      if (cancelled || error || !data) return;
+      setPairingForm((current) => current.printerId !== pairingForm.printerId ? current : ({
+        ...current,
+        host: String(data.bambu_host || ""),
+        accessCode: String(data.bambu_access_code || ""),
+        ftpsUsername: String(data.ftps_username || "bblp"),
+        ftpsPort: String(data.ftps_port || 990),
+      }));
+    });
+    return () => { cancelled = true; };
+  }, [isAdmin, pairingForm.printerId]);
 
   const selectedOrder = orders.find(order => order.id === jobForm.orderId);
   const selectedPrinter = printers.find(printer => printer.id === jobForm.printerId);
@@ -102,9 +145,9 @@ export default function AdminProduction() {
         toast({ title: "Koppelcode maken mislukt", description: data?.error || error?.message || "Onbekende fout", variant: "destructive" });
         return false;
       }
-      const expires = new Date(data.expires_at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
-      setBridgeConfig(`${data.code}\n\nGeldig tot ${expires}. Deze code kan één keer worden gebruikt.`);
-      toast({ title: "Website-koppelcode gemaakt", description: "Vul alleen deze code in bij de Home Assistant-app en start de app opnieuw." });
+      const copied = await copyTextToClipboard(String(data.code));
+      setBridgeConfig(`${data.code}\n\nDeze code blijft geldig en kan na een herstart of herinstallatie opnieuw worden gebruikt.`);
+      toast({ title: "Website-koppelcode gemaakt", description: copied ? "De code staat op het klembord. Plak hem in de Home Assistant-app en start die opnieuw." : "Kopiëren naar het klembord werd door de browser geblokkeerd; kopieer de zichtbare code handmatig." });
       return true;
     } catch (error) {
       toast({ title: "Koppelcode maken mislukt", description: error instanceof Error ? error.message : "De koppeling kon niet worden voorbereid.", variant: "destructive" });
@@ -129,6 +172,27 @@ export default function AdminProduction() {
   const renewBridgeToken = async (printer: PrinterRow) => {
     setPairingForm((current) => ({ ...current, printerId: printer.id }));
     await createPairingCode(printer.id, pairingForm.host, pairingForm.accessCode, pairingForm.ftpsUsername, pairingForm.ftpsPort);
+  };
+
+  const saveConnectionSettings = async () => {
+    if (!pairingForm.printerId) return;
+    setSavingConnection(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("printer-pair", { body: {
+        action: "update_connection",
+        printer_id: pairingForm.printerId,
+        bambu_host: pairingForm.host.trim(),
+        bambu_access_code: pairingForm.accessCode.trim(),
+        ftps_username: pairingForm.ftpsUsername.trim() || "bblp",
+        ftps_port: Number(pairingForm.ftpsPort) || 990,
+      } });
+      if (error || !data?.success) throw error || new Error(data?.error || "Opslaan mislukt");
+      toast({ title: "Printerverbinding opgeslagen", description: "De actieve add-on neemt de nieuwe gegevens automatisch over; opnieuw koppelen is niet nodig." });
+    } catch (error) {
+      toast({ title: "Printerverbinding opslaan mislukt", description: error instanceof Error ? error.message : "Onbekende fout", variant: "destructive" });
+    } finally {
+      setSavingConnection(false);
+    }
   };
 
   const requestBambuLoginCode = async (printer: PrinterRow) => {
@@ -270,7 +334,7 @@ export default function AdminProduction() {
   return <div className="min-h-screen"><Navbar /><main className="pt-20 pb-16"><div className="container mx-auto px-4 py-8 max-w-7xl">
     <div className="flex flex-wrap items-center justify-between gap-3 mb-8"><div className="flex items-center gap-3"><Button variant="ghost" onClick={() => navigate("/admin")}><ArrowLeft className="w-4 h-4" /> Terug</Button><div><h1 className="text-2xl font-bold text-primary">Printproductie</h1><p className="text-muted-foreground">P1S-status, AMS-voorraad, 3MF-controle en plaatkoppelingen.</p></div></div><Button variant="outline" onClick={() => void load()}><RefreshCw className="w-4 h-4" /> Vernieuwen</Button></div>
 
-    <div className="grid lg:grid-cols-3 gap-6 mb-8"><section className="lg:col-span-2 rounded-2xl border bg-card p-5"><h2 className="font-bold mb-4 flex items-center gap-2"><Printer className="w-5 h-5 text-accent" /> Printers</h2><div className="grid md:grid-cols-2 gap-4">{printers.map(printer => { const pc = hostPcStatus(printer); return <div key={printer.id} className="rounded-xl border p-4"><div className="flex justify-between"><div><h3 className="font-bold">{printer.name}</h3><p className="text-xs text-muted-foreground">{printer.model} · {livePrinterStatus(printer)}</p><p className={`mt-1 flex items-center gap-1.5 text-xs font-semibold ${pc.text}`}><span className={`h-2 w-2 rounded-full ${pc.dot}`} />{pc.label}</p>{printer.host_pc_checked_at && <p className="mt-0.5 text-[10px] text-muted-foreground">Gecontroleerd bij printactie: {new Date(printer.host_pc_checked_at).toLocaleString("nl-NL")}</p>}</div><span className={`w-3 h-3 rounded-full ${livePrinterStatus(printer) === "printing" ? "bg-blue-500 animate-pulse" : livePrinterStatus(printer) === "idle" ? "bg-emerald-500" : livePrinterStatus(printer) === "error" ? "bg-destructive" : "bg-muted-foreground"}`} /></div><div className="mt-3 text-sm space-y-1"><p className="truncate">Bestand: {printer.current_file || "—"}</p><p>Plaat: {printer.current_plate ?? "—"} · voortgang: {Number(printer.progress).toFixed(0)}% · laag {printer.current_layer || 0}/{printer.total_layers || 0}</p><p>Resterend: {printer.remaining_minutes ?? "—"} min · nozzle {printer.nozzle_temperature ?? "—"}°C</p><p className="text-xs text-muted-foreground">Laatst gezien: {printer.last_seen_at ? new Date(printer.last_seen_at).toLocaleString("nl-NL") : "nooit"}</p></div><div className="flex flex-wrap gap-2 mt-3"><Button size="sm" variant="outline" onClick={() => supabase.from("printers").update({ status: printer.status === "maintenance" ? "idle" : "maintenance" }).eq("id", printer.id).then(() => void load())}><Wrench className="w-3 h-3" /> {printer.status === "maintenance" ? "Vrijgeven" : "Onderhoud"}</Button><Button size="sm" variant="outline" onClick={() => void renewBridgeToken(printer)}><KeyRound className="w-3 h-3" /> Nieuwe koppelcode</Button><Button size="sm" variant="outline" onClick={() => setDeletePrinter(printer)}><Trash2 className="w-3 h-3 text-destructive" /> Verwijderen</Button></div></div>})}</div>{!printers.length && <p className="text-sm text-muted-foreground">Voeg hieronder uw P1S toe.</p>}</section>
+    <div className="grid lg:grid-cols-3 gap-6 mb-8"><section className="lg:col-span-2 rounded-2xl border bg-card p-5"><h2 className="font-bold mb-4 flex items-center gap-2"><Printer className="w-5 h-5 text-accent" /> Printers</h2><div className="grid md:grid-cols-2 gap-4">{printers.map(printer => { const pc = hostPcStatus(printer); const vm = vmStatus(printer); return <div key={printer.id} className="rounded-xl border p-4"><div className="flex justify-between"><div><h3 className="font-bold">{printer.name}</h3><p className="text-xs text-muted-foreground">{printer.model} · {livePrinterStatus(printer)}</p><p className={`mt-1 flex items-center gap-1.5 text-xs font-semibold ${pc.text}`}><span className={`h-2 w-2 rounded-full ${pc.dot}`} />{pc.label}</p><p className={`mt-1 flex items-center gap-1.5 text-xs font-semibold ${vm.text}`}><span className={`h-2 w-2 rounded-full ${vm.dot}`} />{vm.label}</p>{vm.checkedAt && <p className="mt-0.5 text-[10px] text-muted-foreground">VM gecontroleerd: {new Date(vm.checkedAt).toLocaleString("nl-NL")}</p>}{printer.host_pc_checked_at && <p className="mt-0.5 text-[10px] text-muted-foreground">Pc gecontroleerd: {new Date(printer.host_pc_checked_at).toLocaleString("nl-NL")}</p>}</div><span className={`w-3 h-3 rounded-full ${livePrinterStatus(printer) === "printing" ? "bg-blue-500 animate-pulse" : livePrinterStatus(printer) === "idle" ? "bg-emerald-500" : livePrinterStatus(printer) === "error" ? "bg-destructive" : "bg-muted-foreground"}`} /></div><div className="mt-3 text-sm space-y-1"><p className="truncate">Bestand: {printer.current_file || "—"}</p><p>Plaat: {printer.current_plate ?? "—"} · voortgang: {Number(printer.progress).toFixed(0)}% · laag {printer.current_layer || 0}/{printer.total_layers || 0}</p><p>Resterend: {printer.remaining_minutes ?? "—"} min · nozzle {printer.nozzle_temperature ?? "—"}°C</p><p className="text-xs text-muted-foreground">Laatst gezien: {printer.last_seen_at ? new Date(printer.last_seen_at).toLocaleString("nl-NL") : "nooit"}</p></div><div className="flex flex-wrap gap-2 mt-3"><Button size="sm" variant="outline" onClick={() => supabase.from("printers").update({ status: printer.status === "maintenance" ? "idle" : "maintenance" }).eq("id", printer.id).then(() => void load())}><Wrench className="w-3 h-3" /> {printer.status === "maintenance" ? "Vrijgeven" : "Onderhoud"}</Button><Button size="sm" variant="outline" onClick={() => void renewBridgeToken(printer)}><KeyRound className="w-3 h-3" /> Nieuwe koppelcode</Button><Button size="sm" variant="outline" onClick={() => setDeletePrinter(printer)}><Trash2 className="w-3 h-3 text-destructive" /> Verwijderen</Button></div></div>})}</div>{!printers.length && <p className="text-sm text-muted-foreground">Voeg hieronder uw P1S toe.</p>}</section>
       <section className="rounded-2xl border bg-card p-5"><h2 className="font-bold mb-4">AMS-filament</h2><div className="space-y-3">{slots.map(slot => <div key={slot.id} className="flex items-center gap-3"><span className="w-7 h-7 rounded-full border" style={{ backgroundColor: slot.color_hex || "#808080" }} /><div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">AMS {slot.ams_unit + 1} · vak {slot.slot_number}: {slot.color_name || "Onbekend"}</p><p className="text-xs text-muted-foreground">{slot.material || "—"} · {slot.remaining_grams != null ? `${Number(slot.remaining_grams).toFixed(0)} g` : slot.remaining_percent != null ? `${Number(slot.remaining_percent).toFixed(0)}%` : "voorraad onbekend"}</p></div></div>)}{!slots.length && <p className="text-sm text-muted-foreground">AMS-data verschijnt bij een LAN-bridge. Bambu Connect geeft deze livegegevens niet vrij aan websites.</p>}</div></section></div>
 
     <section className="rounded-2xl border bg-card p-5 mb-8">
@@ -284,10 +348,11 @@ export default function AdminProduction() {
         <div><Label>FTPS-gebruikersnaam</Label><Input value={pairingForm.ftpsUsername} onChange={event => setPairingForm({ ...pairingForm, ftpsUsername: event.target.value })} placeholder="bblp" /></div>
         <div><Label>FTPS-poort</Label><Input type="number" min={1} max={65535} value={pairingForm.ftpsPort} onChange={event => setPairingForm({ ...pairingForm, ftpsPort: event.target.value })} placeholder="990" /></div>
       </div>
+      <Button className="mt-3" variant="outline" disabled={!pairingForm.printerId || savingConnection} onClick={() => void saveConnectionSettings()}>{savingConnection ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Verbindingsgegevens opslaan</Button>
       <Button className="mt-4" onClick={addPrinter}><Cpu className="w-4 h-4" /> Printer toevoegen en koppelen</Button>
       <div className="mt-5 border-t pt-5">
         <h3 className="font-semibold mb-1">Website-koppelcode maken</h3>
-        <p className="text-sm text-muted-foreground mb-4">Voor een bestaande printer kunt u zonder certificaatbestanden een nieuwe eenmalige code maken.</p>
+        <p className="text-sm text-muted-foreground mb-4">Voor een bestaande printer kunt u zonder certificaatbestanden een blijvend geldige koppelcode maken.</p>
         <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-3">
           <div><Label>Printer</Label><Select value={pairingForm.printerId} onValueChange={printerId => setPairingForm({ ...pairingForm, printerId })}><SelectTrigger><SelectValue placeholder="Kies printer" /></SelectTrigger><SelectContent>{printers.map(printer => <SelectItem key={printer.id} value={printer.id}>{printer.name}</SelectItem>)}</SelectContent></Select></div>
           <div className="flex items-end"><Button variant="outline" disabled={!pairingForm.printerId || creatingPairingCode} onClick={() => void createPairingCode(pairingForm.printerId, pairingForm.host, pairingForm.accessCode, pairingForm.ftpsUsername, pairingForm.ftpsPort)}>{creatingPairingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Toegangs- en hersteltoken vervangen</Button></div>
@@ -297,7 +362,7 @@ export default function AdminProduction() {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground mt-3">De add-on gebruikt FTPS met TLS-sessiehergebruik en de lokale toegangscode. Er zijn geen slicercertificaten nodig; de Bambu-cloudverbinding blijft actief.</p>
-      {bridgeConfig && <div className="mt-4 rounded-xl bg-slate-950 text-slate-100 p-4"><p className="text-xs mb-2"><ShieldCheck className="inline w-4 h-4" /> Eenmalige website-koppelcode:</p><pre className="text-lg font-bold tracking-wider whitespace-pre-wrap">{bridgeConfig}</pre></div>}
+      {bridgeConfig && <div className="mt-4 rounded-xl bg-slate-950 text-slate-100 p-4"><p className="text-xs mb-2"><ShieldCheck className="inline w-4 h-4" /> Blijvend geldige website-koppelcode:</p><pre className="text-lg font-bold tracking-wider whitespace-pre-wrap">{bridgeConfig}</pre></div>}
     </section>
 
     {inspection && <section className="rounded-2xl border bg-card p-5 mb-8"><div className="flex items-center justify-between gap-3 mb-3"><Button variant="outline" size="icon" onClick={() => selectPlate(-1)} disabled={inspection.plates.length < 2} aria-label="Vorige plaat"><ChevronLeft className="w-4 h-4" /></Button><div className="text-center"><h2 className="font-bold">{inspection.plates.find((plate) => plate.number === jobForm.plate)?.name || `Plaat ${jobForm.plate}`}</h2><p className="text-xs text-muted-foreground">{inspection.plates.findIndex((plate) => plate.number === jobForm.plate) + 1} van {inspection.plates.length}</p></div><Button variant="outline" size="icon" onClick={() => selectPlate(1)} disabled={inspection.plates.length < 2} aria-label="Volgende plaat"><ChevronRight className="w-4 h-4" /></Button></div>{inspection.plates.find((plate) => plate.number === jobForm.plate)?.previewUrl ? <img src={inspection.plates.find((plate) => plate.number === jobForm.plate)?.previewUrl} alt={`Kleurenvoorbeeld van plaat ${jobForm.plate}`} className="w-full max-h-[520px] object-contain rounded-xl bg-slate-950" /> : <ModelViewer file={threeMf} height={420} />}{threeMf && <Button className="mt-3 w-full" variant="outline" asChild><a href={URL.createObjectURL(threeMf)} download={threeMf.name}><Download className="w-4 h-4" /> Download voor Bambu Connect</a></Button>}</section>}

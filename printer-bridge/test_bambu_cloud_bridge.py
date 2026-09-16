@@ -1,6 +1,8 @@
 import importlib.util
 import io
 import json
+import threading
+import time
 import unittest
 import urllib.error
 import zipfile
@@ -16,30 +18,55 @@ SPEC.loader.exec_module(bridge)
 
 
 class ForwardStatusTests(unittest.TestCase):
-    def test_403_requests_a_new_bridge_token(self):
+    def test_403_never_rotates_permanent_bridge_token(self):
         response = io.BytesIO(b'{"error":"Ongeldige bridge-token"}')
         error = urllib.error.HTTPError("https://example.invalid", 403, "Forbidden", {}, response)
 
-        with patch.object(bridge.urllib.request, "urlopen", side_effect=error):
-            with self.assertRaisesRegex(bridge.BridgeAuthorizationError, "herstel-token"):
+        with patch.object(bridge.urllib.request, "urlopen", side_effect=error), \
+                patch.object(bridge, "refresh_bridge_token") as refresh:
+            with self.assertRaisesRegex(bridge.BridgeAuthorizationError, "automatische tokenvernieuwing staat uit"):
                 bridge.forward({"status": "idle"})
+        refresh.assert_not_called()
 
-    def test_403_refreshes_and_retries_with_rotated_token(self):
+    def test_queue_403_never_rotates_permanent_bridge_token(self):
         forbidden = urllib.error.HTTPError("https://example.invalid", 403, "Forbidden", {}, io.BytesIO(b'{"error":"expired"}'))
-        success = MagicMock()
-        success.__enter__.return_value.status = 200
-        with patch.object(bridge.urllib.request, "urlopen", side_effect=[forbidden, success]), \
-                patch.object(bridge, "refresh_bridge_token", return_value="new-token") as refresh, \
-                patch.object(bridge, "BRIDGE_TOKEN", "old-token"):
-            def rotate(rejected_token):
-                bridge.BRIDGE_TOKEN = "new-token"
-                return "new-token"
-            refresh.side_effect = rotate
-            bridge.forward({"status": "idle"})
-        refresh.assert_called_once_with("old-token")
+        with patch.object(bridge.urllib.request, "urlopen", side_effect=forbidden), \
+                patch.object(bridge, "refresh_bridge_token") as refresh:
+            with self.assertRaisesRegex(bridge.BridgeAuthorizationError, "automatische tokenvernieuwing staat uit"):
+                bridge.queue_request({"action": "poll"})
+        refresh.assert_not_called()
 
 
 class AddonLoginTests(unittest.TestCase):
+    def test_empty_runtime_connection_never_erases_saved_ip_or_access_code(self):
+        with patch.object(bridge, "BAMBU_HOST", "192.168.2.3"), \
+                patch.object(bridge, "BAMBU_ACCESS_CODE", "19159570"), \
+                patch.object(bridge, "FTPS_USERNAME", "bblp"), \
+                patch.object(bridge, "FTPS_PORT", 990):
+            changed = bridge.apply_runtime_ftps_config({"bambu_host": "", "bambu_access_code": ""})
+            self.assertFalse(changed)
+            self.assertEqual(bridge.BAMBU_HOST, "192.168.2.3")
+            self.assertEqual(bridge.BAMBU_ACCESS_CODE, "19159570")
+
+    def test_runtime_connection_is_merged_into_restart_safe_pairing_file(self):
+        pairing_file = MagicMock()
+        temporary = MagicMock()
+        pairing_file.exists.return_value = True
+        pairing_file.read_text.return_value = json.dumps({"bridge_token": "stable", "printer_id": "printer-1"})
+        pairing_file.with_suffix.return_value = temporary
+        with patch.object(bridge, "PAIRING_FILE", pairing_file), \
+                patch.object(bridge, "BAMBU_HOST", "192.168.2.3"), \
+                patch.object(bridge, "BAMBU_ACCESS_CODE", "19159570"), \
+                patch.object(bridge, "FTPS_USERNAME", "bblp"), \
+                patch.object(bridge, "FTPS_PORT", 990):
+            bridge.persist_runtime_ftps_config()
+        saved = json.loads(temporary.write_text.call_args.args[0])
+        self.assertEqual(saved["bridge_token"], "stable")
+        self.assertEqual(saved["printer_id"], "printer-1")
+        self.assertEqual(saved["bambu_host"], "192.168.2.3")
+        self.assertEqual(saved["bambu_access_code"], "19159570")
+        temporary.replace.assert_called_once_with(pairing_file)
+
     def test_configured_addon_code_logs_in_without_requesting_another_code(self):
         options_file = MagicMock()
         options_file.exists.return_value = True
@@ -142,6 +169,18 @@ class PrinterQueueTests(unittest.TestCase):
         plates, _ = bridge.parse_3mf_metadata(buffer.getvalue())
         self.assertEqual([plate["number"] for plate in plates], [1, 4])
 
+    def test_project_3mf_detects_every_populated_plate_json(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("Metadata/plate_1.json", json.dumps({"bbox_objects": [{"name": "A"}]}))
+            archive.writestr("Metadata/plate_2.json", json.dumps({"bbox_objects": []}))
+            archive.writestr("Metadata/plate_4.json", json.dumps({"bbox_objects": [{"name": "B"}]}))
+            archive.writestr("Metadata/plate_1.png", b"preview")
+        plates, _ = bridge.parse_3mf_metadata(buffer.getvalue())
+        self.assertEqual([plate["number"] for plate in plates], [1, 4])
+        self.assertFalse(plates[0]["printable"])
+        self.assertIn("preview_data_url", plates[0])
+
     def test_input_button_only_fires_when_press_timestamp_changes(self):
         button = bridge.InputButtonPress()
         self.assertFalse(button.update("2026-09-09T10:00:00+00:00"))
@@ -238,6 +277,19 @@ class PrinterQueueTests(unittest.TestCase):
         publish.assert_called_once_with(True)
         call_entity.assert_not_called()
 
+    def test_vm_display_status_never_operates_or_starts_a_print(self):
+        with patch.object(bridge, "ping_host", side_effect=[True, KeyboardInterrupt]) as ping, \
+                patch.object(bridge, "publish_vm_status") as publish, \
+                patch.object(bridge, "call_home_assistant_entity") as call_entity, \
+                patch.object(bridge, "queue_print_command") as queue_print, \
+                patch.object(bridge.time, "sleep"):
+            with self.assertRaises(KeyboardInterrupt):
+                bridge.vm_status_loop()
+        publish.assert_called_once_with(True)
+        ping.assert_any_call(bridge.VM_IP)
+        call_entity.assert_not_called()
+        queue_print.assert_not_called()
+
     def test_home_assistant_button_uses_press_service(self):
         response = MagicMock()
         response.__enter__.return_value.status = 200
@@ -300,6 +352,77 @@ class FtpsConnectionTests(unittest.TestCase):
         self.assertEqual(bridge.FTPS_USERNAME, "operator")
         self.assertEqual(bridge.FTPS_PORT, 1990)
 
+    def test_runtime_ftps_settings_can_be_changed_and_cleared(self):
+        with patch.object(bridge, "BAMBU_HOST", "192.168.2.3"), \
+                patch.object(bridge, "BAMBU_ACCESS_CODE", "old"), \
+                patch.object(bridge, "FTPS_USERNAME", "bblp"), \
+                patch.object(bridge, "FTPS_PORT", 990):
+            changed = bridge.apply_runtime_ftps_config({
+                "bambu_host": "192.168.2.4",
+                "bambu_access_code": "new",
+                "ftps_username": "operator",
+                "ftps_port": 1990,
+            })
+            self.assertTrue(changed)
+            self.assertEqual((bridge.BAMBU_HOST, bridge.BAMBU_ACCESS_CODE, bridge.FTPS_USERNAME, bridge.FTPS_PORT), ("192.168.2.4", "new", "operator", 1990))
+            bridge.apply_runtime_ftps_config({"bambu_host": "", "bambu_access_code": "", "connection_found": True})
+            self.assertEqual((bridge.BAMBU_HOST, bridge.BAMBU_ACCESS_CODE), ("", ""))
+
+    def test_successful_sd_scan_does_not_reference_metadata_download_locals(self):
+        ftp = MagicMock()
+        entries = [{"name": "voorbeeld.gcode.3mf", "type": "file", "size_bytes": 1024}]
+        with patch.object(bridge, "BAMBU_HOST", "192.168.2.3"), \
+                patch.object(bridge, "BAMBU_ACCESS_CODE", "19159570"), \
+                patch.object(bridge, "ImplicitFTP_TLS", return_value=ftp), \
+                patch.object(bridge, "ftp_directory_entries", return_value=entries):
+            files, listing = bridge.list_sd_files(["/cache"])
+        self.assertEqual(files[0]["display_name"], "voorbeeld.gcode.3mf")
+        self.assertEqual(listing[0]["size_bytes"], 1024)
+        ftp.connect.assert_called_once_with("192.168.2.3", bridge.FTPS_PORT)
+        ftp.login.assert_called_once_with(bridge.FTPS_USERNAME, "19159570")
+
+    def test_gcode_group_metadata_targets_include_every_plate(self):
+        targets = bridge.metadata_download_targets({
+            "path": "gcode-group:abc",
+            "metadata_requested_plate_number": 2,
+            "plates": [
+                {"number": 2, "name": "Achterkant", "path": "cache/model_plate_2.gcode", "size_bytes": 20},
+                {"number": 1, "name": "Voorkant", "path": "cache/model_plate_1.gcode", "size_bytes": 10},
+            ],
+        })
+        self.assertEqual([target["plate_number"] for target in targets], [1, 2])
+        self.assertEqual([target["path"] for target in targets], ["cache/model_plate_1.gcode", "cache/model_plate_2.gcode"])
+
+    def test_group_parse_downloads_all_files_before_saving_plates_and_colors(self):
+        ftp = MagicMock()
+        request = {
+            "id": "file-1", "path": "gcode-group:abc", "display_name": "Model",
+            "metadata_request_id": 4,
+            "plates": [
+                {"number": 1, "name": "Voorkant", "path": "cache/model_plate_1.gcode", "size_bytes": 10},
+                {"number": 2, "name": "Achterkant", "path": "cache/model_plate_2.gcode", "size_bytes": 20},
+            ],
+        }
+        def parse_file(_ftp, path, _size, plate_number, plate_name, _cancelled, progress):
+            progress(10 if plate_number == 1 else 20, _size)
+            filament = {"material": "PLA", "color_hex": "#FFFFFF" if plate_number == 1 else "#000000"}
+            return ([{"number": plate_number, "name": plate_name, "detected_filaments": [filament]}], [filament])
+        with patch.object(bridge, "ImplicitFTP_TLS", return_value=ftp), \
+                patch.object(bridge, "read_remote_print_metadata", side_effect=parse_file) as read_metadata, \
+                patch.object(bridge, "queue_request", return_value={}) as queue:
+            bridge.sync_requested_file_metadata(request)
+        self.assertEqual(read_metadata.call_count, 2)
+        completed = [call.args[0] for call in queue.call_args_list if call.args[0].get("action") == "sync_file_metadata"][-1]
+        self.assertEqual([plate["number"] for plate in completed["plates"]], [1, 2])
+        self.assertEqual(len(completed["detected_filaments"]), 2)
+
+    def test_scan_without_local_credentials_is_reported_instead_of_silently_ignored(self):
+        with patch.object(bridge, "BAMBU_HOST", ""), patch.object(bridge, "BAMBU_ACCESS_CODE", ""):
+            with self.assertRaisesRegex(RuntimeError, "printer-IP of lokale toegangscode ontbreekt"):
+                bridge.sync_sd_files(["/cache"], 12)
+            with self.assertRaisesRegex(RuntimeError, "printer-IP of lokale toegangscode ontbreekt"):
+                bridge.sync_sd_directories(13)
+
     def test_filament_is_inferred_without_downloading_3mf(self):
         self.assertEqual(bridge.infer_filament_from_name("cadeau_PLA_Blauw_plate_2.gcode"), ("PLA", "Blauw"))
         self.assertEqual(bridge.infer_filament_from_name("onderdeel_PETG_zwart.3mf"), ("PETG", "Zwart"))
@@ -325,6 +448,43 @@ class FtpsConnectionTests(unittest.TestCase):
         self.assertEqual(len(plates[0]["detected_filaments"]), 2)
         self.assertEqual([item["color_hex"] for item in filaments], ["#0A2989", "#FFFFFF"])
         self.assertEqual([item["material"] for item in filaments], ["PLA", "PETG"])
+
+    def test_remote_download_can_be_cancelled_and_temp_file_is_removed(self):
+        ftp = MagicMock()
+        def transfer(_command, callback, blocksize):
+            self.assertEqual(blocksize, 256 * 1024)
+            callback(b"partial download")
+        ftp.retrbinary.side_effect = transfer
+        with self.assertRaisesRegex(bridge.MetadataDownloadCancelled, "geannuleerd"):
+            bridge.read_remote_print_metadata(ftp, "/cache/test.gcode.3mf", None, cancellation_check=lambda: True)
+
+    def test_remote_download_reports_received_bytes_and_total(self):
+        ftp = MagicMock()
+        ftp.retrbinary.side_effect = lambda _command, callback, blocksize: callback(b"12345")
+        progress = MagicMock(return_value=False)
+        with patch.object(bridge, "parse_3mf_metadata", return_value=([], [])):
+            bridge.read_remote_print_metadata(
+                ftp, "/cache/test.gcode.3mf", 10,
+                cancellation_check=lambda: False,
+                progress_callback=progress,
+            )
+        progress.assert_any_call(5, 10)
+
+    def test_metadata_worker_does_not_start_same_request_twice(self):
+        request = {"id": "file-1", "metadata_request_id": 7}
+        gate = threading.Event()
+        def work(_request):
+            gate.wait(1)
+        with patch.object(bridge, "sync_requested_file_metadata", side_effect=work):
+            self.assertTrue(bridge.start_requested_file_metadata(request))
+            self.assertFalse(bridge.start_requested_file_metadata(request))
+            gate.set()
+            for _ in range(100):
+                with bridge.METADATA_LOCK:
+                    if not bridge.METADATA_ACTIVE:
+                        break
+                time.sleep(0.001)
+        self.assertFalse(bridge.METADATA_ACTIVE)
 
 if __name__ == "__main__":
     unittest.main()
