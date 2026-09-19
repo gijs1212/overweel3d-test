@@ -11,9 +11,13 @@ SD-kaart, zonder slicercertificaten en zonder de cloudmodus uit te schakelen.
 Alle instellingen, sessies en koppeltokens worden blijvend in
 `/config/overweel3d` opgeslagen, ook bij een herinstallatie van de add-on.
 
-Versie 1.22.0 downloadt en parseert altijd het volledige gekozen printbestand. Een `.3mf` levert na verwerking alle gevulde platen, previews en plaatkleuren op; een samengevoegde G-codegroep verwerkt alle fysieke plaatbestanden voordat de resultaten naar de website gaan. Het werkelijk gevonden platenaantal vervangt daarna de voorlopige scanwaarde en blijft bij volgende scans bewaard. Daarna kiest de admin de plaat en filamentmatches.
+Versie 1.29.0 synchroniseert host-pc, VM, printerstatus en AMS-rollen via de knop **Alles verversen** op de website. Tijdelijke downloads worden pas voltooid gemeld nadat de bridge het echte cachebestand heeft gecontroleerd en het volledige bestand opnieuw heeft geparseerd; het bijgewerkte aantal platen verschijnt daarna direct op ieder apparaat. De live MQTT-verbinding blijft intern beschikbaar voor veilige printbevestiging, maar schrijft niet meer op een timer naar de database. AMS-vakken gebruiken één stabiele sleutel, zodat rollen niet meer dubbel verschijnen. Na een bevestigde VM-stop wordt de host uitsluitend uitgezet wanneer de add-on deze voor dezelfde printactie zelf heeft aangezet.
+
+De handmatige knop **Alles verversen** voert één geordende cyclus uit: status en
+AMS, daarna mappen, daarna printbestanden. Er draait hiervoor geen
+websiteververstimer.
 Printklikken gebruiken altijd een verse ping en sturen de taak rechtstreeks naar
-VM-agent 2.3.2 via de lokale, beveiligde API op poort 8766. Er draait geen
+VM-agent 2.5.0 via de lokale, beveiligde API op poort 8766. Er draait geen
 Windows-host-runner meer.
 Het toegestane VM-IP is rechtstreeks bewerkbaar in de add-onconfiguratie en staat
 standaard op `192.168.2.42`.

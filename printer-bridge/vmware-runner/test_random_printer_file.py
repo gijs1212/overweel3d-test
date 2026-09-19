@@ -95,7 +95,7 @@ def parse_mapping(value: str, fallback: list[int]) -> list[int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Overweel3D willekeurige Bambu Connect-printtest 2.3.2")
+    parser = argparse.ArgumentParser(description="Overweel3D willekeurige Bambu Connect-printtest 2.7.0")
     parser.add_argument("--config", default=str(ROOT / "vm-guest.json"))
     parser.add_argument("--root", action="append", dest="roots", help="FTPS-startmap; mag vaker worden opgegeven")
     parser.add_argument("--search", default="", help="Beperk willekeurige keuze tot namen met deze tekst")

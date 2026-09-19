@@ -14,7 +14,7 @@ PocketBase-programma en herstart PocketBase. Controleer vervolgens:
 GET https://api.gijsoverweel.nl/api/overweel3d/health
 ```
 
-Een geldig antwoord bevat `"ok": true` en versie `1.3.14`.
+Een geldig antwoord bevat `"ok": true` en versie `1.3.16`.
 
 Vanaf versie 1.3.4 staan gedeelde functies in `overweel3d-core.js`. Versie 1.3.5 maakt printerkoppelcodes blijvend en herbruikbaar, zodat een herstart of herinstallatie geen nieuwe code vereist. De kleine
 `overweel3d.pb.js`-registratie laadt deze module binnen iedere routehandler,

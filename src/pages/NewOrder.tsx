@@ -151,21 +151,21 @@ export default function NewOrder() {
   });
 
   useEffect(() => {
-    if (profile) {
+    if (profile || user) {
       setFormData((prev) => ({
         ...prev,
-        name: profile.full_name || prev.name,
-        email: profile.email || prev.email,
-        phone: profile.phone || prev.phone,
-        company_name: profile.company_name || prev.company_name,
-        billing_address: profile.shipping_address ? profile.billing_address || "" : prev.billing_address,
-        shipping_address: profile.shipping_address || profile.billing_address || prev.shipping_address,
-        postal_code: profile.postal_code || prev.postal_code,
-        city: profile.city || prev.city,
-        country: profile.country || prev.country,
+        name: profile?.full_name || prev.name,
+        email: profile?.email || user?.email || prev.email,
+        phone: profile?.phone || prev.phone,
+        company_name: profile?.company_name || prev.company_name,
+        billing_address: profile?.shipping_address ? profile.billing_address || "" : prev.billing_address,
+        shipping_address: profile?.shipping_address || profile?.billing_address || prev.shipping_address,
+        postal_code: profile?.postal_code || prev.postal_code,
+        city: profile?.city || prev.city,
+        country: profile?.country || prev.country,
       }));
     }
-  }, [profile]);
+  }, [profile, user]);
 
   useEffect(() => {
     Promise.all([
@@ -831,7 +831,7 @@ export default function NewOrder() {
   };
 
   return (
-    <OrderAuthGate>
+    <OrderAuthGate active={step === 2} onBackToCart={() => setStep(1)}>
       <div className="min-h-screen">
         <Navbar />
         <main className="pt-20 pb-16">

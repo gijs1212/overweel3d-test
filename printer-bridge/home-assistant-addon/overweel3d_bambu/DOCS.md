@@ -1,8 +1,22 @@
 # Installatie en printautomatisering
 
-Versie **1.22.0** gebruikt PocketBase voor status, wachtrij en handmatige Bambu-loginverzoeken. Voor parsen wordt het volledige `.3mf`-bestand gedownload. De parser telt naast ingesloten G-code ook gevulde Bambu-plaatmetadata, werkt daarna het platenaantal in de website bij en bewaart dat resultaat bij volgende scans. Virtueel gegroepeerde losse G-codeplaten worden allemaal volledig gedownload en samengevoegd tot één platen- en kleurenkeuze in de website. Tijdelijke bestanden worden daarna verwijderd.
+Versie **1.29.0** controleert na iedere volledige FTPS-download of het bestand werkelijk in de 48-uurscache staat. Daarna wordt het volledige bestand opnieuw geparseerd en worden het nieuwe aantal platen, de previews en filamentgegevens bevestigd door PocketBase voordat de website de download als voltooid toont. **Alles verversen** controleert ook direct de bereikbaarheid van host-pc en VM, vraagt printerstatus en AMS-rollen op en scant vervolgens mappen en bestanden. De interne MQTT-status blijft live voor printbevestiging. AMS-vakken worden door PocketBase op printer, AMS-eenheid en vaknummer ontdubbeld. Via **Volledige keten testen** worden host, VM, FTPS-download, printerkeuze, plaat, AMS-mapping en leveling echt voorbereid; verzenden en bevestigen blijven altijd geblokkeerd.
+
+De website voert geen periodieke productie-refresh meer uit. De knop **Alles
+verversen** vraagt in vaste volgorde een actuele printer- en AMS-status op,
+scant daarna de mappen en vernieuwt als laatste alle printbestanden in de
+geselecteerde mappen.
 De Home Assistant-add-on bestuurt de bestaande Home Assistant-entiteiten zelf en
 de Windows-VM-agent praat rechtstreeks met de add-on via poort 8766.
+
+Na een bevestigde print drukt de add-on eenmaal op
+`button.pc_gijs_overweel3d` om de VM netjes te stoppen. `vm_power.ps1` wacht
+tot VMware bevestigt dat de VM volledig uit staat en meldt dit rechtstreeks aan
+`http://homeassistant.local:8766/guest/vm-stopped`. Alleen wanneer de add-on de
+host-pc voor diezelfde printactie zelf met `script.pc_aanzetten` heeft gestart,
+voert zij vijf seconden later `script.pc_en_stekker_uit` uit. Een pc die vóór de
+print al aanstond blijft altijd aan. De losse Home Assistant-webhookautomatisering
+is daardoor niet meer nodig.
 
 1. Kopieer de map `overweel3d_bambu` naar `/addons` op Home Assistant.
 2. Open **Instellingen → Apps → Appwinkel**.
@@ -45,7 +59,7 @@ vanaf de VM (`192.168.2.30`).
 
 ## VM-agent installeren
 
-De VM-agentversie is **2.3.2** en automatiseert **Bambu Connect** via Bambu Labs
+De VM-agentversie is **2.5.0** en automatiseert **Bambu Connect** via Bambu Labs
 officiële `bambu-connect://import-file`-protocol. Alleen de keuzes in de geopende
 Connect-dialoog worden met Windows UI Automation bediend. Printer, AMS-slots,
 kalibratieopties en verzendknoppen worden automatisch herkend; handmatig klikken

@@ -57,6 +57,15 @@ function cleanRecord(record) {
   return result;
 }
 
+function mutableJsonObject(value) {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try { value = JSON.parse(value); } catch (_) { return {}; }
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return {};
+  try { return JSON.parse(JSON.stringify(value)); } catch (_) { return {}; }
+}
+
 function randomCode(prefix) {
   return prefix + $security.randomString(10).toUpperCase();
 }
@@ -241,10 +250,20 @@ routerAdd("POST", "/api/overweel3d/rpc/{name}", function (e) {
     return json(e, newColor.getString("supabase_id"));
   }
 
-  if (name === "request_printer_ftps_scan") {
+  if (name === "request_printer_ftps_scan" || name === "request_printer_full_refresh") {
     requireAdmin(e);
     var printer = byId("printers", p.p_printer_id);
     if (!printer) fail("Printer niet gevonden.");
+    if (name === "request_printer_full_refresh") {
+      printer.set("ftps_scan_paths", p.p_scan_paths || ["/", "/cache"]);
+      printer.set("ftps_folder_scan_request_id", printer.getInt("ftps_folder_scan_request_id") + 1);
+      printer.set("ftps_scan_request_id", printer.getInt("ftps_scan_request_id") + 1);
+      var refreshRequestedAt = new Date().toISOString();
+      printer.set("ftps_folder_scan_requested_at", refreshRequestedAt);
+      printer.set("ftps_scan_requested_at", refreshRequestedAt);
+      $app.save(printer);
+      return json(e, { folder_request_id: printer.getInt("ftps_folder_scan_request_id"), file_request_id: printer.getInt("ftps_scan_request_id") });
+    }
     var kind = p.p_kind;
     if (kind !== "files" && kind !== "folders") fail("Onbekend scantype.");
     var field = kind === "files" ? "ftps_scan_request_id" : "ftps_folder_scan_request_id";
@@ -304,7 +323,7 @@ routerAdd("POST", "/api/overweel3d/rpc/{name}", function (e) {
 });
 
 routerAdd("GET", "/api/overweel3d/health", function (e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.3.14" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.3.16" });
 });
 
 function sendMail(to, subject, html, replyTo) {
@@ -1172,27 +1191,40 @@ routerAdd("POST", "/api/overweel3d/bridge/status", function (e) {
     var fields = ["current_file", "current_plate", "progress", "remaining_minutes", "current_layer", "total_layers", "nozzle_temperature", "bed_temperature", "chamber_temperature"];
     fields.forEach(function (field) { if (p[field] !== undefined) printer.set(field, p[field]); });
     if (p.raw_status !== undefined) {
-      var incomingRaw = p.raw_status && typeof p.raw_status === "object" ? p.raw_status : {};
-      var storedRaw = printer.get("raw_status");
-      if (storedRaw && typeof storedRaw === "object") {
-        if (storedRaw.vm_status !== undefined) incomingRaw.vm_status = storedRaw.vm_status;
-        if (storedRaw.vm_checked_at !== undefined) incomingRaw.vm_checked_at = storedRaw.vm_checked_at;
-      }
+      var incomingRaw = mutableJsonObject(p.raw_status);
+      var storedRaw = mutableJsonObject(printer.get("raw_status"));
+      if (storedRaw.vm_status !== undefined) incomingRaw.vm_status = storedRaw.vm_status;
+      if (storedRaw.vm_checked_at !== undefined) incomingRaw.vm_checked_at = storedRaw.vm_checked_at;
       printer.set("raw_status", incomingRaw);
     }
   }
   $app.save(printer);
 
   if (Array.isArray(p.ams_slots)) {
+    var seenAmsSlots = {};
     p.ams_slots.forEach(function (slot) {
       var unit = Number(slot.ams_unit || 0); var number = Number(slot.slot_number || 1);
-      var existing = null;
-      try { existing = $app.findFirstRecordByFilter("printer_ams_slots", "printer_id = {:printer} && ams_unit = {:unit} && slot_number = {:slot}", { printer: printer.getString("supabase_id"), unit: unit, slot: number }); } catch (_) {}
+      var slotKey = unit + ":" + number;
+      if (seenAmsSlots[slotKey]) return;
+      seenAmsSlots[slotKey] = true;
+      var canonicalPrinterId = printer.getString("supabase_id") || printer.id;
+      var printerIds = [canonicalPrinterId];
+      if (printer.id !== canonicalPrinterId) printerIds.push(printer.id);
+      var matches = [];
+      printerIds.forEach(function (lookupPrinterId) {
+        try {
+          ($app.findRecordsByFilter("printer_ams_slots", "printer_id = {:printer} && ams_unit = {:unit} && slot_number = {:slot}", "", 100, 0, { printer: lookupPrinterId, unit: unit, slot: number }) || []).forEach(function (candidate) {
+            if (!matches.some(function (known) { return known.id === candidate.id; })) matches.push(candidate);
+          });
+        } catch (_) {}
+      });
+      var existing = matches[0] || null;
       var capacity = Math.max(1, Number(slot.spool_capacity_grams || 1000));
       var percent = slot.remaining_percent === null || slot.remaining_percent === undefined ? null : Math.max(0, Math.min(100, Number(slot.remaining_percent)));
       var grams = slot.remaining_grams === null || slot.remaining_grams === undefined ? (percent === null ? null : capacity * percent / 100) : Math.max(0, Number(slot.remaining_grams));
-      var values = { printer_id: printer.getString("supabase_id"), ams_unit: unit, slot_number: number, material: slot.material || null, color_name: slot.color_name || null, color_hex: slot.color_hex || null, tray_uuid: slot.tray_uuid || null, remaining_percent: percent, remaining_grams: grams, spool_capacity_grams: capacity, raw_status: slot.raw_status || slot };
+      var values = { printer_id: canonicalPrinterId, ams_unit: unit, slot_number: number, material: slot.material || null, color_name: slot.color_name || null, color_hex: slot.color_hex || null, tray_uuid: slot.tray_uuid || null, remaining_percent: percent, remaining_grams: grams, spool_capacity_grams: capacity, raw_status: slot.raw_status || slot };
       if (existing) { Object.keys(values).forEach(function (key) { existing.set(key, values[key]); }); $app.save(existing); } else save("printer_ams_slots", values);
+      matches.slice(1).forEach(function (duplicate) { try { $app.delete(duplicate); } catch (_) {} });
     });
   }
   return e.json(200, { success: true, heartbeat_only: p.heartbeat_only === true, status: status });
@@ -1249,8 +1281,7 @@ routerAdd("POST", "/api/overweel3d/bridge/queue", function (e) {
   if (action === "ack_print_start") { printer.set("print_start_completed_request_id", Number(p.request_id || 0)); $app.save(printer); return e.json(200, { success: true }); }
   if (action === "sync_host_pc_status") { printer.set("host_pc_status", p.status === "on" ? "on" : "off"); printer.set("host_pc_checked_at", new Date().toISOString()); printer.set("host_pc_uptime_seconds", p.status === "on" ? Number(p.uptime_seconds || 0) : null); $app.save(printer); return e.json(200, { success: true }); }
   if (action === "sync_vm_status") {
-    var vmRaw = printer.get("raw_status");
-    if (!vmRaw || typeof vmRaw !== "object") vmRaw = {};
+    var vmRaw = mutableJsonObject(printer.get("raw_status"));
     vmRaw.vm_status = p.status === "on" ? "on" : "off";
     vmRaw.vm_checked_at = new Date().toISOString();
     printer.set("raw_status", vmRaw); $app.save(printer);
@@ -1286,7 +1317,9 @@ routerAdd("POST", "/api/overweel3d/bridge/queue", function (e) {
   }
   if (action === "sync_file_metadata") {
     var file = byId("printer_sd_files", p.file_id); if (!file) throw new NotFoundError("Printbestand niet gevonden.");
-    file.set("detected_filaments", p.detected_filaments || []); file.set("detected_material", (p.detected_filaments || [])[0]?.material || null); file.set("detected_color_name", (p.detected_filaments || [])[0]?.color_name || null); if (!p.error && Array.isArray(p.plates)) file.set("plates", p.plates); file.set("metadata_completed_request_id", Number(p.request_id || 0)); file.set("metadata_last_error", p.error || null); $app.save(file);
+    var completedDownloaded = Math.max(0, Number(p.downloaded_bytes || 0)); var completedTotal = Math.max(completedDownloaded, Number(p.total_bytes || 0)); var cacheExpires = Math.max(0, Number(p.cache_expires_at || 0));
+    var completedState = !p.error ? "DOWNLOAD_COMPLETE:" + completedDownloaded + ":" + completedTotal + ":" + cacheExpires : null;
+    file.set("detected_filaments", p.detected_filaments || []); file.set("detected_material", (p.detected_filaments || [])[0]?.material || null); file.set("detected_color_name", (p.detected_filaments || [])[0]?.color_name || null); if (!p.error && Array.isArray(p.plates)) file.set("plates", p.plates); file.set("metadata_completed_request_id", Number(p.request_id || 0)); file.set("metadata_last_error", p.error || completedState); $app.save(file);
     return e.json(200, { success: true, plate_count: Array.isArray(p.plates) ? p.plates.length : 0 });
   }
   if (action === "metadata_progress") {

@@ -1,4 +1,4 @@
-# Overweel3D VM-agent 2.3.2
+# Overweel3D VM-agent 2.7.0
 
 Deze map bevat uitsluitend de agent die **in de Windows-VM** draait. Een aparte
 runner of statusscript op de normale Windows-host is niet meer nodig.
@@ -15,7 +15,7 @@ zijn:
 
 ```json
 {
-  "addon_url": "http://homeassistant.local:8766",
+  "addon_url": "http://192.168.2.18:8766",
   "addon_token": "Gijs1212!"
 }
 ```

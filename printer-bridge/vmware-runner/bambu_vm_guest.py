@@ -12,6 +12,7 @@ import ssl
 import tempfile
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from pywinauto import Desktop
 
 ROOT = Path(__file__).resolve().parent
 LOG = logging.getLogger("overweel3d-vm-guest")
-VM_AGENT_VERSION = "2.3.2"
+VM_AGENT_VERSION = "2.7.0"
 
 
 class ImplicitFTP_TLS(ftplib.FTP_TLS):
@@ -40,14 +41,41 @@ class ImplicitFTP_TLS(ftplib.FTP_TLS):
 
 def addon_request(url: str, token: str, path: str, payload: dict | None = None) -> dict:
     data = json.dumps(payload).encode() if payload is not None else None
-    request = urllib.request.Request(
-        url.rstrip("/") + path,
-        data=data,
-        method="POST" if data is not None else "GET",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode() or "{}")
+    endpoint = url.rstrip("/") + path
+    for attempt in range(1, 4):
+        request = urllib.request.Request(
+            endpoint,
+            data=data,
+            method="POST" if data is not None else "GET",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "X-Overweel3D-Token": token,
+                "Content-Type": "application/json",
+                "Connection": "close",
+                "User-Agent": f"Overweel3D-VM-Agent/{VM_AGENT_VERSION}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode() or "{}")
+        except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                server = str(exc.headers.get("Server") or "onbekende server")
+                raise RuntimeError(
+                    "Home Assistant weigert de VM-agent. Controleer of addon_token gelijk is aan guest_api_token "
+                    f"en of add-on 1.27.0 of nieuwer actief is; antwoord kwam van {server}"
+                ) from exc
+            if exc.code == 404 and path == "/guest/health":
+                server = str(exc.headers.get("Server") or "onbekende server")
+                raise RuntimeError(f"De actieve add-on is te oud en heeft geen healthcheck ({server}); installeer versie 1.27.0 of nieuwer") from exc
+            raise
+        except (ConnectionResetError, TimeoutError, urllib.error.URLError, OSError) as exc:
+            if attempt >= 3:
+                raise RuntimeError(f"Home Assistant-add-on bleef onbereikbaar na 3 pogingen: {exc}") from exc
+            delay = attempt * 2
+            LOG.warning("Verbinding met add-on verbroken; poging %s/3 over %s seconden: %s", attempt + 1, delay, exc)
+            time.sleep(delay)
+    raise RuntimeError("Home Assistant-add-on gaf geen antwoord")
 
 
 def temporary_sd_download(printer: dict, remote_path: str, destination: Path) -> None:
@@ -311,7 +339,7 @@ def log_connect_controls(window) -> None:
         LOG.warning("UI-elementen konden niet worden uitgelezen: %s", exc)
 
 
-def automate_bambu_connect(file_path: Path, job: dict, config: dict) -> None:
+def automate_bambu_connect(file_path: Path, job: dict, config: dict, dry_run: bool = False) -> None:
     import_url = build_bambu_connect_import_url(file_path)
     LOG.info("Opent lokaal bestand via de officiële Bambu Connect import-file-koppeling: %s", file_path.name)
     os.startfile(import_url)
@@ -392,6 +420,13 @@ def automate_bambu_connect(file_path: Path, job: dict, config: dict) -> None:
                     if not automatic:
                         raise
 
+        if dry_run:
+            LOG.info(
+                "VEILIGE TEST VOLTOOID: bestand, printer, plaat, AMS-kleuren en kalibratie zijn voorbereid; "
+                "de verzend- en bevestigingsknoppen worden bewust niet uitgevoerd"
+            )
+            return
+
         if automatic:
             try:
                 click_action_automatically(window, "send")
@@ -434,6 +469,7 @@ def process_job(addon_url: str, addon_token: str, job_id: str, config: dict) -> 
             "/guest/job?" + urllib.parse.urlencode({"job_id": job_id}),
         )
         job = payload["job"]
+        dry_run = bool(job.get("dry_run"))
         printer = payload["printer"]
         remote_path = str(job.get("sd_file_path") or "").strip()
         if not remote_path:
@@ -444,7 +480,11 @@ def process_job(addon_url: str, addon_token: str, job_id: str, config: dict) -> 
             temporary_sd_download(printer, remote_path, local_file)
             LOG.info("FTPS-bestand gedownload: %s (%s bytes)", local_file.name, local_file.stat().st_size)
             addon_request(addon_url, addon_token, "/guest/event", {"event": "automating_bambu_connect", "job_id": job_id})
-            automate_bambu_connect(local_file, job, config)
+            automate_bambu_connect(local_file, job, config, dry_run=dry_run)
+            if dry_run:
+                addon_request(addon_url, addon_token, "/guest/event", {"event": "dry_run_complete", "job_id": job_id})
+                LOG.info("Veilige wachtrijtest afgerond; er is geen printopdracht verzonden")
+                return True
             addon_request(addon_url, addon_token, "/guest/event", {"event": "waiting_for_printer_confirmation", "job_id": job_id})
             # Houd de tijdelijke 3MF beschikbaar terwijl Bambu Connect hem verwerkt.
             time.sleep(int(config.get("keep_download_seconds") or 120))
@@ -465,7 +505,20 @@ def run_startup_agent(config: dict) -> int:
         raise RuntimeError("vm-guest.json mist addon_url of addon_token")
     poll_seconds = max(2, int(config.get("poll_seconds") or 3))
     handled_jobs: set[str] = set()
-    LOG.info("VM-agent %s actief; meldt zich rechtstreeks bij de Home Assistant-add-on", VM_AGENT_VERSION)
+    health = addon_request(addon_url, addon_token, "/guest/health")
+    addon_version = str(health.get("version") or "onbekend")
+    try:
+        version_parts = tuple(int(part) for part in addon_version.split(".")[:3])
+    except (TypeError, ValueError):
+        version_parts = ()
+    if len(version_parts) < 2 or version_parts[0] != 1 or version_parts[1] < 27:
+        raise RuntimeError(f"Verkeerde Home Assistant-add-on actief: {addon_version}; installeer Overweel3D Bambu Bridge 1.27.0 of nieuwer")
+    LOG.info(
+        "VM-agent %s verbonden met add-on %s; Home Assistant ziet deze VM als %s",
+        VM_AGENT_VERSION,
+        addon_version,
+        health.get("client_ip") or "onbekend",
+    )
     while True:
         try:
             response = addon_request(

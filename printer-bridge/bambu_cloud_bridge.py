@@ -14,6 +14,7 @@ import base64
 import getpass
 import ftplib
 import hashlib
+import ipaddress
 import io
 import json
 import os
@@ -43,6 +44,8 @@ TOKEN_FILE = CONFIG_DIR / "bambu-session.json"
 BRIDGE_TOKEN_FILE = CONFIG_DIR / "overweel-bridge-token.json"
 PAIRING_FILE = CONFIG_DIR / "website-pairing.json"
 PERSISTED_OPTIONS_FILE = CONFIG_DIR / "settings.json"
+DOWNLOAD_CACHE_DIR = CONFIG_DIR / "download-cache"
+DOWNLOAD_CACHE_TTL_SECONDS = 2 * 24 * 60 * 60
 ADDON_OPTIONS_FILE = Path("/data/options.json")
 
 
@@ -112,11 +115,18 @@ GUEST_LAST_SEEN = 0.0
 GUEST_PENDING_JOB: dict | None = None
 GUEST_LAST_EVENT: dict | None = None
 POWER_OFF_REQUESTED_FOR: set[str] = set()
+HOST_STARTED_BY_ADDON_FOR: set[str] = set()
+HOST_SHUTDOWN_PENDING_FOR: set[str] = set()
+HOST_POWER_OFF_COMPLETED_FOR: set[str] = set()
 PREPARATION_LOCK = threading.Lock()
 PREPARATION_ACTIVE = False
 PREPARATION_RESULT: dict | None = None
 METADATA_LOCK = threading.Lock()
 METADATA_ACTIVE: set[str] = set()
+LATEST_REPORT_LOCK = threading.Lock()
+LATEST_PRINTER_REPORT: dict = {}
+MANUAL_STATUS_REFRESH_REQUESTED = threading.Event()
+MANUAL_STATUS_REFRESH_COMPLETED = threading.Event()
 
 
 class BridgeAuthorizationError(RuntimeError):
@@ -125,6 +135,38 @@ class BridgeAuthorizationError(RuntimeError):
 
 class MetadataDownloadCancelled(RuntimeError):
     """Raised when the admin cancels a temporary FTPS metadata download."""
+
+
+def cleanup_download_cache(now: float | None = None) -> int:
+    """Remove completed and partial cached downloads after 48 hours."""
+    current = time.time() if now is None else now
+    DOWNLOAD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    removed = 0
+    for cached in DOWNLOAD_CACHE_DIR.iterdir():
+        try:
+            if cached.is_file() and current - cached.stat().st_mtime >= DOWNLOAD_CACHE_TTL_SECONDS:
+                cached.unlink(missing_ok=True)
+                removed += 1
+        except OSError as exc:
+            print(f"Downloadcachebestand kon niet worden gecontroleerd: {cached}: {exc}", flush=True)
+    if removed:
+        print(f"Downloadcache opgeschoond: {removed} bestand(en) ouder dan 48 uur verwijderd.", flush=True)
+    return removed
+
+
+def download_cache_path(remote_path: str, expected_size: int | None) -> Path:
+    suffix = ".gcode" if remote_path.lower().endswith(".gcode") else ".3mf"
+    identity = f"{remote_path.lstrip('/')}\0{expected_size if expected_size is not None else 'unknown'}"
+    return DOWNLOAD_CACHE_DIR / f"{hashlib.sha256(identity.encode('utf-8')).hexdigest()}{suffix}"
+
+
+def download_cache_cleanup_loop() -> None:
+    while True:
+        try:
+            cleanup_download_cache()
+        except Exception as exc:
+            print(f"Downloadcache opschonen mislukt: {exc}", flush=True)
+        time.sleep(60 * 60)
 
 
 def migrate_persistent_file(source: Path, destination: Path) -> bool:
@@ -142,8 +184,9 @@ def migrate_persistent_file(source: Path, destination: Path) -> bool:
 
 def initialize_persistent_storage() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    DOWNLOAD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
-        for directory in (CONFIG_DIR,):
+        for directory in (CONFIG_DIR, DOWNLOAD_CACHE_DIR):
             try:
                 directory.chmod(0o700)
             except OSError:
@@ -574,6 +617,29 @@ def status_payload(report: dict) -> dict:
     }
 
 
+def remember_latest_report(report: dict) -> None:
+    with LATEST_REPORT_LOCK:
+        LATEST_PRINTER_REPORT.clear()
+        LATEST_PRINTER_REPORT.update(json.loads(json.dumps(report)))
+
+
+def request_manual_status_refresh(timeout_seconds: int = 20) -> bool:
+    """Refresh host, VM, printer and AMS data before an SD scan."""
+    refresh_machine_reachability()
+    MANUAL_STATUS_REFRESH_COMPLETED.clear()
+    MANUAL_STATUS_REFRESH_REQUESTED.set()
+    if MANUAL_STATUS_REFRESH_COMPLETED.wait(timeout=max(1, timeout_seconds)):
+        return True
+    with LATEST_REPORT_LOCK:
+        snapshot = json.loads(json.dumps(LATEST_PRINTER_REPORT)) if LATEST_PRINTER_REPORT else {}
+    if snapshot:
+        forward(status_payload(snapshot))
+        print("Handmatige statusrefresh gebruikte de laatste live MQTT-status na een printertimeout.", flush=True)
+        return True
+    print("Handmatige statusrefresh kreeg nog geen MQTT-data; mappen- en bestandsscan gaan wel door.", flush=True)
+    return False
+
+
 def forward(payload: dict, retry_after_refresh: bool = False) -> None:
     token_used = BRIDGE_TOKEN
     request = urllib.request.Request(
@@ -884,11 +950,23 @@ def parse_gcode_metadata(content: bytes, plate_number: int = 1, plate_name: str 
 def read_remote_print_metadata(ftp: ImplicitFTP_TLS, path: str, size: int | None, plate_number: int = 1, plate_name: str = "", cancellation_check=None, progress_callback=None) -> tuple[list[dict], list[dict]]:
     if size is not None and size > 256 * 1024 * 1024:
         raise ValueError("Printbestand is groter dan de veilige parseerlimiet van 256 MB")
-    temporary_path: Path | None = None
+    cleanup_download_cache()
+    suffix = ".gcode" if path.lower().endswith(".gcode") else ".3mf"
+    cached_path = download_cache_path(path, size)
+    if cached_path.is_file():
+        cached_size = cached_path.stat().st_size
+        if size is None or cached_size == size:
+            os.utime(cached_path, None)
+            if progress_callback:
+                progress_callback(cached_size, size or cached_size)
+            print(f"Printbestand uit 48-uurscache gebruikt ({cached_size} bytes): {path}", flush=True)
+            content = cached_path.read_bytes()
+            return parse_gcode_metadata(content, plate_number, plate_name) if suffix == ".gcode" else parse_3mf_metadata(content)
+        cached_path.unlink(missing_ok=True)
+
+    partial_path = cached_path.with_name(cached_path.name + f".{uuid.uuid4().hex}.part")
     try:
-        suffix = ".gcode" if path.lower().endswith(".gcode") else ".3mf"
-        with tempfile.NamedTemporaryFile(prefix="overweel3d-", suffix=suffix, delete=False) as temporary:
-            temporary_path = Path(temporary.name)
+        with partial_path.open("wb") as temporary:
             last_cancel_check = 0.0
             downloaded_bytes = 0
             def receive_block(block: bytes) -> None:
@@ -902,43 +980,110 @@ def read_remote_print_metadata(ftp: ImplicitFTP_TLS, path: str, size: int | None
                     if cancelled:
                         raise MetadataDownloadCancelled("Download geannuleerd door de admin.")
             ftp.retrbinary(f"RETR {path}", receive_block, blocksize=256 * 1024)
+            if size is not None and downloaded_bytes != size:
+                raise IOError(f"Download onvolledig: {downloaded_bytes} van {size} bytes ontvangen")
             if progress_callback:
                 progress_callback(downloaded_bytes, size)
             if cancellation_check and cancellation_check():
                 raise MetadataDownloadCancelled("Download geannuleerd door de admin.")
-        print(f"Printbestand tijdelijk gedownload voor lokaal parsen ({temporary_path.stat().st_size} bytes).", flush=True)
-        content = temporary_path.read_bytes()
+        partial_path.replace(cached_path)
+        print(f"Printbestand gedownload en 48 uur gecachet ({cached_path.stat().st_size} bytes): {path}", flush=True)
+        content = cached_path.read_bytes()
         return parse_gcode_metadata(content, plate_number, plate_name) if suffix == ".gcode" else parse_3mf_metadata(content)
-    finally:
-        if temporary_path is not None:
-            temporary_path.unlink(missing_ok=True)
-            print("Tijdelijk printbestand verwijderd.", flush=True)
+    except Exception:
+        partial_path.unlink(missing_ok=True)
+        raise
+
+
+def parse_ftp_directory_line(line: str) -> dict | None:
+    """Parse common Unix, BusyBox and DOS FTP directory-listing formats."""
+    text = str(line or "").strip()
+    if not text or text.lower().startswith("total "):
+        return None
+
+    unix = re.match(
+        r"^(?P<mode>[bcdlps-][^\s]*)\s+\d+\s+\S+\s+\S+\s+(?P<size>\d+)\s+"
+        r"\S+\s+\d+\s+(?:\d{1,2}:\d{2}|\d{4})\s+(?P<name>.+)$",
+        text,
+    )
+    if unix:
+        name = unix.group("name").split(" -> ", 1)[0].strip()
+        if name in {".", ".."}:
+            return None
+        return {
+            "name": name,
+            "type": "directory" if unix.group("mode").startswith("d") else "file",
+            "size_bytes": int(unix.group("size")),
+        }
+
+    dos = re.match(
+        r"^\d{2}[-/]\d{2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?:\s?[AP]M)?\s+"
+        r"(?P<size><DIR>|\d+)\s+(?P<name>.+)$",
+        text,
+        re.I,
+    )
+    if dos:
+        name = dos.group("name").strip()
+        if name in {".", ".."}:
+            return None
+        is_directory = dos.group("size").upper() == "<DIR>"
+        return {"name": name, "type": "directory" if is_directory else "file", "size_bytes": None if is_directory else int(dos.group("size"))}
+
+    # Last-resort parser for unusual embedded FTP servers. maxsplit preserves
+    # spaces inside the file name.
+    parts = text.split(maxsplit=8)
+    if len(parts) < 4:
+        return None
+    name = parts[-1].strip()
+    if name in {".", ".."}:
+        return None
+    is_directory = parts[0].startswith("d") or any(part.upper() == "<DIR>" for part in parts[:-1])
+    size = None
+    for candidate in (parts[4:5] + parts[2:3]):
+        try:
+            size = int(candidate)
+            break
+        except (TypeError, ValueError):
+            pass
+    return {"name": name, "type": "directory" if is_directory else "file", "size_bytes": size}
 
 
 def ftp_directory_entries(ftp: ImplicitFTP_TLS, directory: str) -> list[dict]:
-    """Read a directory with DIR, matching the proven standalone FTPS client."""
+    """Read a directory using MLSD first and a tolerant DIR fallback."""
     previous = ftp.pwd()
-    lines: list[str] = []
     try:
         ftp.cwd(directory)
-        ftp.dir(lines.append)
+        try:
+            entries = []
+            for name, facts in ftp.mlsd():
+                clean_name = str(name or "").replace("\x00", "").strip()
+                entry_type = str(facts.get("type") or "").lower()
+                if clean_name in {"", ".", ".."} or entry_type in {"cdir", "pdir"}:
+                    continue
+                size = None
+                try:
+                    size = int(facts["size"]) if facts.get("size") is not None else None
+                except (TypeError, ValueError):
+                    pass
+                entries.append({"name": clean_name, "type": "directory" if entry_type == "dir" else "file", "size_bytes": size})
+            if entries:
+                return entries
+            # Some embedded FTP implementations accept MLSD but return an empty
+            # result for non-empty directories. Verify once through DIR.
+            lines: list[str] = []
+            ftp.dir(lines.append)
+            return [entry for line in lines if (entry := parse_ftp_directory_line(line)) is not None]
+        except (AttributeError, ftplib.Error, OSError, EOFError):
+            lines: list[str] = []
+            ftp.dir(lines.append)
+            return [entry for line in lines if (entry := parse_ftp_directory_line(line)) is not None]
     finally:
         ftp.cwd(previous)
-    entries = []
-    for line in lines:
-        parts = line.split(maxsplit=8)
-        if len(parts) < 4:
-            continue
-        name = parts[-1].strip()
-        if name in {".", ".."}:
-            continue
-        is_directory = parts[0].startswith("d") or ("0" in parts[1:-1] and "." not in name)
-        try:
-            size = int(parts[4]) if len(parts) > 4 else None
-        except ValueError:
-            size = None
-        entries.append({"name": name, "type": "directory" if is_directory else "file", "size_bytes": size})
-    return entries
+
+
+def is_supported_print_file(path: str) -> bool:
+    clean = str(path or "").strip().lower()
+    return clean.endswith((".gcode.3mf", ".3mf", ".gcode"))
 
 
 def infer_filaments_from_name(filename: str) -> list[dict[str, str | None]]:
@@ -979,7 +1124,8 @@ def list_sd_files(scan_paths: list[str], include_print_files: bool = True) -> tu
         readable_directories = 0
         pending_directories = list(scan_paths)
         visited_directories: set[str] = set()
-        while pending_directories and len(visited_directories) < 200:
+        failed_directories: list[str] = []
+        while pending_directories and len(visited_directories) < 5000:
             directory = pending_directories.pop(0)
             directory = "/" + str(directory or "/").strip().strip("/")
             if directory == "//":
@@ -987,9 +1133,17 @@ def list_sd_files(scan_paths: list[str], include_print_files: bool = True) -> tu
             if directory in visited_directories:
                 continue
             visited_directories.add(directory)
-            try:
-                entries = ftp_directory_entries(ftp, directory)
-            except ftplib.all_errors:
+            entries = None
+            for directory_attempt in range(1, 4):
+                try:
+                    entries = ftp_directory_entries(ftp, directory)
+                    break
+                except ftplib.all_errors as exc:
+                    if directory_attempt < 3:
+                        print(f"FTPS-map {directory} lezen mislukt (poging {directory_attempt}/3): {exc}", flush=True)
+                        time.sleep(directory_attempt)
+            if entries is None:
+                failed_directories.append(directory)
                 continue
             readable_directories += 1
             for entry in entries:
@@ -1026,8 +1180,21 @@ def list_sd_files(scan_paths: list[str], include_print_files: bool = True) -> tu
                         for filament in detected:
                             if filament not in group["detected_filaments"]:
                                 group["detected_filaments"].append(filament)
+                    else:
+                        detected = infer_filaments_from_name(filename)
+                        material = detected[0]["material"] if detected else None
+                        color = detected[0]["color_name"] if detected else None
+                        found[normalized] = {
+                            "path": normalized.lstrip("/"),
+                            "display_name": filename,
+                            "size_bytes": listed_size,
+                            "plates": [{"number": 1, "name": Path(filename).stem, "path": normalized.lstrip("/"), "size_bytes": listed_size, "detected_filaments": detected}],
+                            "detected_material": material,
+                            "detected_color_name": color,
+                            "detected_filaments": detected,
+                        }
                     continue
-                if not normalized.lower().endswith((".3mf", ".gcode.3mf")):
+                if not is_supported_print_file(normalized):
                     continue
                 size = listed_size
                 detected = infer_filaments_from_name(Path(normalized).name)
@@ -1050,6 +1217,10 @@ def list_sd_files(scan_paths: list[str], include_print_files: bool = True) -> tu
                 }
         if not readable_directories:
             raise ConnectionError("Geen van de gekozen FTPS-mappen kon worden gelezen")
+        if pending_directories:
+            print(f"FTPS-scan bereikte de veiligheidslimiet van 5000 mappen; {len(pending_directories)} map(pen) wachten nog.", flush=True)
+        if failed_directories:
+            print(f"FTPS-scan kon {len(failed_directories)} map(pen) na drie pogingen niet lezen: {', '.join(failed_directories[:10])}", flush=True)
         for group in gcode_groups.values():
             group["plates"].sort(key=lambda plate: plate["number"])
             virtual_path = "gcode-group:" + hashlib.sha256((group["display_name"] + group["path"]).encode()).hexdigest()[:16]
@@ -1154,6 +1325,7 @@ def sync_requested_file_metadata(request: dict) -> None:
         report_progress(0, total_size)
         plates: list[dict] = []
         filaments: list[dict] = []
+        cached_files: list[dict] = []
         downloaded_before_target = 0
         for target in targets:
             target_downloaded = 0
@@ -1164,14 +1336,62 @@ def sync_requested_file_metadata(request: dict) -> None:
             parsed_plates, parsed_filaments = read_remote_print_metadata(
                 ftp, "/" + target["path"], target["size"], target["plate_number"], target["plate_name"], cancelled, target_progress,
             )
+            cached_path = download_cache_path(target["path"], target["size"])
+            if not cached_path.is_file():
+                raise IOError(f"Download is verwerkt maar ontbreekt in de 48-uurscache: {target['path']}")
+            cached_size = cached_path.stat().st_size
+            if cached_size <= 0:
+                raise IOError(f"Leeg bestand in de 48-uurscache: {target['path']}")
+            cached_files.append({
+                "path": target["path"],
+                "cache_file": cached_path.name,
+                "size_bytes": cached_size,
+                "expires_at": int(cached_path.stat().st_mtime + DOWNLOAD_CACHE_TTL_SECONDS),
+            })
             plates.extend(parsed_plates)
             for filament in parsed_filaments:
                 if filament not in filaments:
                     filaments.append(filament)
             downloaded_before_target += target_downloaded
-        plates.sort(key=lambda item: int(item.get("number") or 0))
-        queue_request({"action": "sync_file_metadata", "file_id": file_id, "request_id": request_id, "plate_count": len(plates), "plates": plates, "detected_filaments": filaments})
-        print(f"Volledige parse #{request_id} voltooid: {len(plates)} plaat/platen en {len(filaments)} kleur(en).", flush=True)
+        # Rebuild the plate list from the fully downloaded content.  A quick SD
+        # scan may contain a one-plate placeholder, but it must never survive a
+        # successful full parse. Merge duplicate discoveries by plate number and
+        # keep the richest metadata (name, preview, filaments and printability).
+        merged_plates: dict[int, dict] = {}
+        for parsed_plate in plates:
+            number = int(parsed_plate.get("number") or 0)
+            if number <= 0:
+                continue
+            current = merged_plates.get(number, {})
+            merged = {**current, **{key: value for key, value in parsed_plate.items() if value not in (None, "", [])}}
+            merged["number"] = number
+            if current.get("detected_filaments") and not parsed_plate.get("detected_filaments"):
+                merged["detected_filaments"] = current["detected_filaments"]
+            merged_plates[number] = merged
+        plates = [merged_plates[number] for number in sorted(merged_plates)]
+        if not plates:
+            raise ValueError("Het volledige bestand is gedownload, maar er zijn geen printbare platen gevonden.")
+        completed_total = total_size if total_size is not None else downloaded_before_target
+        cache_expires_at = min(item["expires_at"] for item in cached_files)
+        completion = queue_request({
+            "action": "sync_file_metadata",
+            "file_id": file_id,
+            "request_id": request_id,
+            "plate_count": len(plates),
+            "plates": plates,
+            "detected_filaments": filaments,
+            "downloaded_bytes": downloaded_before_target,
+            "total_bytes": completed_total,
+            "cache_expires_at": cache_expires_at,
+            "cached_files": cached_files,
+        })
+        if completion.get("success") is not True:
+            raise RuntimeError("PocketBase heeft de bijgewerkte plaat- en cachegegevens niet bevestigd.")
+        print(
+            f"Volledige parse #{request_id} voltooid en bevestigd: {len(plates)} plaat/platen, "
+            f"{len(filaments)} kleur(en) en {len(cached_files)} bestand(en) 48 uur in cache.",
+            flush=True,
+        )
     except Exception as exc:
         queue_request({"action": "sync_file_metadata", "file_id": file_id, "request_id": request_id, "error": str(exc), "plates": [], "detected_filaments": []})
         print(f"Volledige parse #{request_id} mislukt: {exc}", flush=True)
@@ -1210,6 +1430,7 @@ def sd_sync_loop() -> None:
         f"Handmatige SD-scanlistener gestart voor websiteprinter {PRINTER_ID}; {access_state}.",
         flush=True,
     )
+    last_status_refresh_marker: tuple[int, int] | None = None
     while True:
         try:
             config = queue_request({"action": "scan_config"})
@@ -1224,6 +1445,12 @@ def sd_sync_loop() -> None:
             metadata_request = config.get("metadata_request")
             if config.get("metadata_lookup_error"):
                 raise RuntimeError(f"PocketBase kon open downloadverzoeken niet lezen: {config['metadata_lookup_error']}")
+            refresh_marker = (folder_request_marker, request_marker)
+            refresh_pending = folder_request_marker > completed_folder_request or request_marker > completed_request
+            if refresh_pending and refresh_marker != last_status_refresh_marker:
+                print("Handmatige volledige refresh: eerst printerstatus en AMS opvragen.", flush=True)
+                request_manual_status_refresh()
+                last_status_refresh_marker = refresh_marker
             # PocketBase is de bron van waarheid. Een verzoek blijft openstaan totdat
             # sync_directories/sync_files de bijbehorende completed-id opslaat. Gebruik
             # hier bewust geen lokale last_request-filter: na een tijdelijke FTPS- of
@@ -1319,6 +1546,20 @@ def publish_vm_status(online: bool) -> None:
         print(f"VM-status kon niet naar de website: {exc}", flush=True)
 
 
+def refresh_machine_reachability() -> tuple[bool, bool]:
+    """Run fresh display-only checks when the admin requests a full refresh."""
+    host_online = ping_host(HOST_PC_IP)
+    vm_online = guest_is_ready() or ping_host(VM_IP)
+    publish_host_pc_status(host_online)
+    publish_vm_status(vm_online)
+    print(
+        f"Handmatige bereikbaarheid vernieuwd: pc={'aan' if host_online else 'uit'}, "
+        f"VM={'aan' if vm_online else 'uit'}.",
+        flush=True,
+    )
+    return host_online, vm_online
+
+
 def host_status_loop() -> None:
     """Status-only loop; its result is intentionally never used for print startup."""
     while True:
@@ -1327,10 +1568,10 @@ def host_status_loop() -> None:
 
 
 def vm_status_loop() -> None:
-    """Ping the VM every minute for display only, never for print orchestration."""
+    """Publish VM reachability or a recent agent heartbeat for display only."""
     last_status: bool | None = None
     while True:
-        online = ping_host(VM_IP)
+        online = guest_is_ready() or ping_host(VM_IP)
         publish_vm_status(online)
         if online != last_status:
             print(f"VM-weergavestatus bijgewerkt: {'aan' if online else 'uit'}.", flush=True)
@@ -1344,22 +1585,38 @@ def guest_is_ready() -> bool:
 
 
 def guest_client_allowed(client_ip: str) -> bool:
-    return not VM_IP or str(client_ip or "").strip() == VM_IP
+    """Accept token-authenticated clients from private/LAN address space.
+
+    Home Assistant can see a VMware guest through a NAT or Docker proxy address,
+    so comparing the source with the configured display/ping IP is unreliable.
+    """
+    try:
+        address = ipaddress.ip_address(str(client_ip or "").strip())
+        return address.is_private or address.is_loopback
+    except ValueError:
+        return False
+
+
+class GuestThreadingHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+    request_queue_size = 32
 
 
 class GuestApiHandler(BaseHTTPRequestHandler):
-    server_version = "Overweel3DGuestAPI/1.22.0"
+    server_version = "Overweel3DGuestAPI/1.29.0"
 
     def log_message(self, pattern: str, *args: object) -> None:
         print("VM-API " + (pattern % args), flush=True)
 
     def authorized(self) -> bool:
         supplied = self.headers.get("Authorization", "")
+        supplied_token = self.headers.get("X-Overweel3D-Token", "")
         client_ip = str(self.client_address[0] if self.client_address else "")
         if not guest_client_allowed(client_ip):
-            print(f"VM-API verzoek geweigerd vanaf {client_ip}; ingesteld VM-IP is {VM_IP}.", flush=True)
+            print(f"VM-API verzoek geweigerd vanaf niet-privéadres {client_ip}.", flush=True)
             return False
-        return secrets.compare_digest(supplied, f"Bearer {GUEST_API_TOKEN}")
+        return secrets.compare_digest(supplied, f"Bearer {GUEST_API_TOKEN}") or secrets.compare_digest(supplied_token, GUEST_API_TOKEN)
 
     def read_json(self) -> dict:
         length = min(int(self.headers.get("Content-Length", "0") or 0), 1024 * 1024)
@@ -1371,15 +1628,25 @@ class GuestApiHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
+        self.wfile.flush()
+        self.close_connection = True
 
     def do_GET(self) -> None:
         global GUEST_LAST_SEEN
+        parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/guest/health":
+            client_ip = str(self.client_address[0] if self.client_address else "")
+            if not guest_client_allowed(client_ip):
+                self.answer(403, {"error": "private network required"})
+                return
+            self.answer(200, {"ok": True, "service": "overweel3d-vm-api", "version": "1.29.0", "client_ip": client_ip})
+            return
         if not self.authorized():
             self.answer(401, {"error": "unauthorized"})
             return
-        parsed = urllib.parse.urlsplit(self.path)
         if parsed.path == "/guest/printer":
             self.answer(200, {
                 "host": BAMBU_HOST,
@@ -1407,13 +1674,18 @@ class GuestApiHandler(BaseHTTPRequestHandler):
             self.answer(401, {"error": "unauthorized"})
             return
         payload = self.read_json()
+        if self.path == "/guest/vm-stopped":
+            accepted = handle_vm_stopped_callback(payload)
+            self.answer(200, {"ok": True, "host_shutdown_scheduled": accepted})
+            return
         with GUEST_LOCK:
             GUEST_LAST_SEEN = time.monotonic()
             if self.path == "/guest/ready":
                 pending = GUEST_PENDING_JOB
                 GUEST_LOCK.notify_all()
-                self.answer(200, {"ok": True, "runner_job_id": pending.get("runner_job_id", "") if pending else ""})
-                return
+                runner_job_id = pending.get("runner_job_id", "") if pending else ""
+            else:
+                runner_job_id = None
             if self.path == "/guest/event":
                 pending = GUEST_PENDING_JOB
                 if not pending or str(payload.get("job_id") or "") != str(pending.get("runner_job_id") or ""):
@@ -1421,6 +1693,9 @@ class GuestApiHandler(BaseHTTPRequestHandler):
                     return
                 GUEST_LAST_EVENT = payload
                 GUEST_LOCK.notify_all()
+        if self.path == "/guest/ready":
+            self.answer(200, {"ok": True, "runner_job_id": runner_job_id or ""})
+            return
         if self.path == "/guest/event":
             self.answer(200, {"ok": True})
             return
@@ -1428,21 +1703,29 @@ class GuestApiHandler(BaseHTTPRequestHandler):
 
 
 def start_guest_api() -> None:
-    server = ThreadingHTTPServer(("0.0.0.0", GUEST_API_PORT), GuestApiHandler)
-    print(f"VM-agent-API luistert op poort {GUEST_API_PORT}; toegestaan VM-IP: {VM_IP or 'ieder lokaal adres'}.", flush=True)
+    server = GuestThreadingHTTPServer(("0.0.0.0", GUEST_API_PORT), GuestApiHandler)
+    print(f"VM-agent-API luistert op poort {GUEST_API_PORT}; privé-LAN-clients gebruiken tokenauthenticatie.", flush=True)
     server.serve_forever()
 
 
 def dispatch_to_vm_guest(item: dict) -> dict:
     """Run the requested power sequence and hand one job directly to the VM."""
     global GUEST_PENDING_JOB
+    item = dict(item)
+    item["dry_run"] = queue_item_is_dry_run(item)
+    item_id = str(item.get("id") or "")
     host_online = ping_host(HOST_PC_IP)
     publish_host_pc_status(host_online)
     if host_online:
+        with GUEST_LOCK:
+            HOST_STARTED_BY_ADDON_FOR.discard(item_id)
         print(f"Host-pc {HOST_PC_IP} reageert; wacht {HOST_ONLINE_DELAY_SECONDS} seconden.", flush=True)
         time.sleep(max(0, HOST_ONLINE_DELAY_SECONDS))
     else:
         call_home_assistant_entity(PC_POWER_ON_ENTITY)
+        with GUEST_LOCK:
+            if item_id:
+                HOST_STARTED_BY_ADDON_FOR.add(item_id)
         print(f"Host-pc reageert niet; {PC_POWER_ON_ENTITY} eenmaal uitgevoerd.", flush=True)
         while not ping_host(HOST_PC_IP):
             time.sleep(5)
@@ -1506,18 +1789,61 @@ def pending_guest_snapshot() -> dict | None:
         return dict(GUEST_PENDING_JOB) if GUEST_PENDING_JOB else None
 
 
-def stop_vm_then_host(item_id: str) -> None:
+def abandon_host_power_ownership(item_id: str) -> None:
+    """Forget a failed job without ever powering off an already-started host."""
+    with GUEST_LOCK:
+        HOST_STARTED_BY_ADDON_FOR.discard(str(item_id or ""))
+        HOST_SHUTDOWN_PENDING_FOR.discard(str(item_id or ""))
+
+
+def handle_vm_stopped_callback(payload: dict | None = None) -> bool:
+    """Power off the host only for jobs whose host was started by this add-on."""
+    with GUEST_LOCK:
+        eligible = [
+            item_id for item_id in HOST_SHUTDOWN_PENDING_FOR
+            if item_id in HOST_STARTED_BY_ADDON_FOR and item_id not in HOST_POWER_OFF_COMPLETED_FOR
+        ]
+        if not eligible:
+            print("VM-stop bevestigd, maar de host-pc was niet door de add-on gestart; pc blijft aan.", flush=True)
+            return False
+        for item_id in eligible:
+            HOST_POWER_OFF_COMPLETED_FOR.add(item_id)
+            HOST_SHUTDOWN_PENDING_FOR.discard(item_id)
+
+    def worker() -> None:
+        try:
+            time.sleep(5)
+            call_home_assistant_entity(PC_POWER_OFF_ENTITY)
+            print(f"VM is volledig uit; {PC_POWER_OFF_ENTITY} eenmaal uitgevoerd voor add-onactie {', '.join(eligible)}.", flush=True)
+        except Exception as exc:
+            print(f"VM is uit, maar automatisch uitschakelen van de host mislukte; pc blijft aan: {exc}", flush=True)
+        finally:
+            with GUEST_LOCK:
+                for item_id in eligible:
+                    HOST_STARTED_BY_ADDON_FOR.discard(item_id)
+
+    threading.Thread(target=worker, name="host-power-off-after-vm-stopped", daemon=True).start()
+    return True
+
+
+def stop_vm_then_host(item_id: str, reason: str = "Print bevestigd") -> None:
+    item_id = str(item_id or "")
     with GUEST_LOCK:
         if item_id in POWER_OFF_REQUESTED_FOR:
             return
         POWER_OFF_REQUESTED_FOR.add(item_id)
+        host_was_started_by_addon = item_id in HOST_STARTED_BY_ADDON_FOR
+        if host_was_started_by_addon:
+            HOST_SHUTDOWN_PENDING_FOR.add(item_id)
     try:
         call_home_assistant_entity(VM_START_ENTITY)
-        print(f"Print bevestigd; {VM_START_ENTITY} eenmaal uitgevoerd om de VM te stoppen.", flush=True)
-        time.sleep(30)
-        call_home_assistant_entity(PC_POWER_OFF_ENTITY)
-        print(f"{PC_POWER_OFF_ENTITY} eenmaal uitgevoerd.", flush=True)
+        print(f"{reason}; {VM_START_ENTITY} eenmaal uitgevoerd om de VM te stoppen.", flush=True)
+        if host_was_started_by_addon:
+            print("Host-pc is door de add-on gestart; wacht op de bevestigde VM-stopcallback voordat de pc uitgaat.", flush=True)
+        else:
+            print("Host-pc draaide al vóór deze add-onactie en blijft daarom aan.", flush=True)
     except Exception as exc:
+        abandon_host_power_ownership(item_id)
         print(f"Automatisch uitschakelen mislukt; pc blijft veilig aan: {exc}", flush=True)
 
 
@@ -1541,8 +1867,9 @@ def start_vm_preparation(item: dict) -> None:
             outcome = {"item": item, "result": result, "error": ""}
         except Exception as exc:
             clear_guest_job(str(item.get("id") or ""))
+            abandon_host_power_ownership(str(item.get("id") or ""))
             try:
-                queue_request({"action": "ack", "item_id": item["id"], "status": "queued", "error": str(exc)})
+                queue_request({"action": "ack", "item_id": item["id"], "status": "queued", "error": queue_retry_error(item, str(exc))})
             except Exception as queue_exc:
                 print(f"Printstartfout kon niet naar de wachtrij: {queue_exc}", flush=True)
             notify_admin_manual_intervention(item, str(exc), f"prepare-{item.get('id')}-{int(time.time())}")
@@ -1649,6 +1976,16 @@ def queue_print_command(item: dict) -> dict:
     }}
 
 
+def queue_item_is_dry_run(item: dict) -> bool:
+    """Recognise a safe end-to-end queue test without relying on a new DB field."""
+    return bool(item.get("dry_run")) or str(item.get("bridge_error") or "").upper().startswith("DRY_RUN_PENDING")
+
+
+def queue_retry_error(item: dict, error: str) -> str:
+    """Keep failed dry runs recognisable so a retry can never become a real print."""
+    return f"DRY_RUN_PENDING: {error}" if queue_item_is_dry_run(item) else error
+
+
 def send_print_command(cloud_socket: ssl.SSLSocket, request_topic: str, report_topic: str, command: dict) -> tuple[str, dict | None]:
     """Send only through the authenticated Bambu Cloud MQTT session."""
     print("MQTT UITGAAND naar printer: " + json.dumps(command, ensure_ascii=False, separators=(",", ":")), flush=True)
@@ -1670,7 +2007,8 @@ def run(session: dict, serial: str) -> None:
         read_packet(sock)
         sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": "0", "command": "pushall"}}))
         print(f"Verbonden met Bambu-printer {serial}; live status wordt doorgestuurd.", flush=True)
-        complete, last_sent, last_ping = {}, 0.0, time.monotonic()
+        complete, last_ping = {}, time.monotonic()
+        manual_status_pending = False
         next_plate_button = InputButtonPress()
         active_item = None
         active_sequence_id = None
@@ -1722,9 +2060,20 @@ def run(session: dict, serial: str) -> None:
                             command_sent_at = 0.0
                 else:
                     merge(complete, print_update)
+                    remember_latest_report(complete)
+                    if manual_status_pending:
+                        forward(status_payload(complete))
+                        manual_status_pending = False
+                        MANUAL_STATUS_REFRESH_COMPLETED.set()
+                        print("Handmatige printer- en AMS-statusrefresh voltooid.", flush=True)
             # PINGRESP (type 13) is only an acknowledgement; a client must not answer it.
 
             now = time.monotonic()
+            if MANUAL_STATUS_REFRESH_REQUESTED.is_set() and not manual_status_pending:
+                sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": next_print_sequence_id(), "command": "pushall"}}))
+                MANUAL_STATUS_REFRESH_REQUESTED.clear()
+                manual_status_pending = True
+                print("Handmatige pushall-statusaanvraag naar de Bambu-printer verzonden.", flush=True)
             if now - last_ping >= 30:
                 sock.sendall(bytes([0xC0, 0x00]))
                 last_ping = now
@@ -1769,12 +2118,34 @@ def run(session: dict, serial: str) -> None:
                 print(f"PRINTERSTATUS: {last_reported_state or 'ONBEKEND'} -> {state}; print_error={complete.get('print_error', 0)}; fail_reason={complete.get('fail_reason', 0)}", flush=True)
                 last_reported_state = state
             guest_event = take_guest_event(active_sequence_id) if active_item and active_runner else None
-            if guest_event and guest_event.get("event") == "guest_failed":
+            if guest_event and guest_event.get("event") == "dry_run_complete":
+                completed_test_item = active_item
+                queue_request({"action": "ack", "item_id": completed_test_item, "status": "paused", "error": "DRY_RUN_COMPLETE"})
+                clear_guest_job(completed_test_item)
+                print(
+                    f"Veilige wachtrijtest voor opdracht #{active_sequence_id} voltooid; "
+                    "Bambu Connect is voorbereid maar er is niets naar de printer verzonden.",
+                    flush=True,
+                )
+                threading.Thread(
+                    target=stop_vm_then_host,
+                    args=(completed_test_item, "Wachtrijtest voltooid"),
+                    name="vm-host-power-off-dry-run",
+                    daemon=True,
+                ).start()
+                active_item = None
+                active_sequence_id = None
+                active_ack_received = False
+                active_runner = False
+                observed_running = False
+                command_sent_at = 0.0
+            elif guest_event and guest_event.get("event") == "guest_failed":
                 error = str(guest_event.get("error") or "VM-agent kon de print niet starten")
-                queue_request({"action": "ack", "item_id": active_item, "status": "queued", "error": error})
                 failed_payload = GUEST_PENDING_JOB["payload"]["job"] if GUEST_PENDING_JOB else {"id": active_item}
+                queue_request({"action": "ack", "item_id": active_item, "status": "queued", "error": queue_retry_error(failed_payload, error)})
                 notify_admin_manual_intervention(failed_payload, error, str(active_sequence_id or active_item))
                 clear_guest_job(active_item)
+                abandon_host_power_ownership(active_item)
                 print(f"VM-agentfout: {error}. Item staat weer in queued; pc blijft aan.", flush=True)
                 active_item = None
                 active_sequence_id = None
@@ -1782,13 +2153,14 @@ def run(session: dict, serial: str) -> None:
                 active_runner = False
                 observed_running = False
                 command_sent_at = 0.0
-            if active_item and state == "RUNNING" and not observed_running:
-                active_payload = GUEST_PENDING_JOB["payload"]["job"] if GUEST_PENDING_JOB else {}
+            active_payload = GUEST_PENDING_JOB["payload"]["job"] if GUEST_PENDING_JOB else {}
+            if active_item and state == "RUNNING" and not observed_running and not queue_item_is_dry_run(active_payload):
                 if active_runner and not selected_print_matches(active_payload, complete):
                     error = "Printer draait, maar bestandsnaam of plaat komt niet overeen met de geselecteerde wachtrijprint."
-                    queue_request({"action": "ack", "item_id": active_item, "status": "queued", "error": error})
+                    queue_request({"action": "ack", "item_id": active_item, "status": "queued", "error": queue_retry_error(active_payload, error)})
                     notify_admin_manual_intervention(active_payload or {"id": active_item}, error, str(active_sequence_id or active_item))
                     clear_guest_job(active_item)
+                    abandon_host_power_ownership(active_item)
                     print(error + " De pc blijft aan.", flush=True)
                     active_item = None
                     active_sequence_id = None
@@ -1816,10 +2188,11 @@ def run(session: dict, serial: str) -> None:
                 confirmation = "ACK ontvangen, maar RUNNING bleef uit" if active_ack_received else "geen ACK en geen RUNNING ontvangen"
                 wait_seconds = 900 if active_runner else 90
                 error = f"Printerstart niet bevestigd binnen {wait_seconds} seconden: {confirmation}; print_error={complete.get('print_error', 0)}; fail_reason={complete.get('fail_reason', 0)}."
-                queue_request({"action": "ack", "item_id": active_item, "status": "queued", "error": error})
                 timeout_payload = GUEST_PENDING_JOB["payload"]["job"] if GUEST_PENDING_JOB else {"id": active_item}
+                queue_request({"action": "ack", "item_id": active_item, "status": "queued", "error": queue_retry_error(timeout_payload, error)})
                 notify_admin_manual_intervention(timeout_payload, error, str(active_sequence_id or active_item))
                 clear_guest_job(active_item)
+                abandon_host_power_ownership(active_item)
                 print(error + " Item is veilig teruggezet in de wachtrij.", flush=True)
                 active_item = None
                 active_sequence_id = None
@@ -1842,8 +2215,13 @@ def run(session: dict, serial: str) -> None:
                     try:
                         if GUEST_API_PORT:
                             start_vm_preparation(item)
-                            print("Printstart wordt op de achtergrond voorbereid; Bambu Cloud blijft verbonden.", flush=True)
+                            if queue_item_is_dry_run(item):
+                                print("Veilige wachtrijtest wordt voorbereid; de VM-agent mag geen printopdracht verzenden.", flush=True)
+                            else:
+                                print("Printstart wordt op de achtergrond voorbereid; Bambu Cloud blijft verbonden.", flush=True)
                             continue
+                        if queue_item_is_dry_run(item):
+                            raise RuntimeError("Veilige wachtrijtest vereist de VM-agent; rechtstreeks verzenden is bewust geblokkeerd")
                         command = queue_print_command(item)
                         command_channel, immediate_ack = send_print_command(sock, request_topic, report_topic, command)
                         active_item = str(item["id"])
@@ -1864,16 +2242,15 @@ def run(session: dict, serial: str) -> None:
                             ack_text = "ACK ontvangen; wacht op RUNNING" if active_ack_received else "wacht op ACK of RUNNING"
                             print(f"Startopdracht via {command_channel} verzonden: {item.get('file_name')} · plaat {item.get('plate_number')}; {ack_text}.", flush=True)
                     except Exception as exc:
-                        queue_request({"action": "ack", "item_id": item["id"], "status": "queued", "error": str(exc)})
+                        queue_request({"action": "ack", "item_id": item["id"], "status": "queued", "error": queue_retry_error(item, str(exc))})
                         clear_guest_job(str(item["id"]))
                         raise
                 elif manual_queue_trigger or website_queue_trigger:
                     reason = result.get("reason", "geen beschikbaar wachtrij-item") if isinstance(result, dict) else "onbekende reactie"
                     print(f"Knop volgende plaat ontvangen, maar er is niets gestart: {reason}.", flush=True)
 
-            if time.time() - last_sent >= 2:
-                forward(status_payload(complete))
-                last_sent = time.time()
+            # MQTT blijft live voor veilige printbevestiging. Printer- en
+            # AMS-status worden alleen na de websiteknop naar PocketBase geschreven.
 
 
 def main() -> None:
@@ -1890,6 +2267,7 @@ def main() -> None:
     threading.Thread(target=bambu_login_request_loop, name="bambu-login-requests", daemon=True).start()
     threading.Thread(target=sd_sync_loop, name="printer-sd-sync", daemon=True).start()
     threading.Thread(target=host_status_loop, name="host-pc-status", daemon=True).start()
+    threading.Thread(target=download_cache_cleanup_loop, name="download-cache-cleanup", daemon=True).start()
     threading.Thread(target=start_guest_api, name="vm-guest-api", daemon=True).start()
     threading.Thread(target=vm_status_loop, name="vm-display-status", daemon=True).start()
     while True:
@@ -1908,12 +2286,6 @@ def main() -> None:
         print(f"Bambu-sessie voor {session['account']} is veilig in het Docker-volume opgeslagen.", flush=True)
         return
     serial = choose_serial(session["access_token"])
-    threading.Thread(
-        target=cloud_presence_loop,
-        args=(session["access_token"], serial),
-        name="bambu-cloud-presence",
-        daemon=True,
-    ).start()
     while True:
         try:
             run(session, serial)

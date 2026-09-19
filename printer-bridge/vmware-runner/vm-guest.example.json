@@ -1,5 +1,5 @@
 {
-  "addon_url": "http://homeassistant.local:8766",
+  "addon_url": "http://192.168.2.18:8766",
   "addon_token": "Gijs1212!",
   "poll_seconds": 3,
   "automatic_ui_detection": true,
