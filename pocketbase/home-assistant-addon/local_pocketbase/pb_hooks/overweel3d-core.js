@@ -66,6 +66,35 @@ function mutableJsonObject(value) {
   try { return JSON.parse(JSON.stringify(value)); } catch (_) { return {}; }
 }
 
+function nozzleDiameter(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (Array.isArray(value)) {
+    for (var index = 0; index < value.length; index += 1) {
+      var arrayDiameter = nozzleDiameter(value[index]);
+      if (arrayDiameter !== null) return arrayDiameter;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    var keys = ["installed_nozzle_diameter", "nozzle_diameter", "nozzle_diameter_mm", "machine_nozzle_size", "diameter", "value"];
+    for (var keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+      var objectDiameter = nozzleDiameter(value[keys[keyIndex]]);
+      if (objectDiameter !== null) return objectDiameter;
+    }
+    return null;
+  }
+  var match = String(value).replace(",", ".").match(/(?:^|\D)(0\.\d+|1(?:\.0)?)(?:\D|$)/);
+  if (!match) return null;
+  var parsed = Number(match[1]);
+  return isFinite(parsed) && parsed >= 0.1 && parsed <= 1.2 ? Math.round(parsed * 1000) / 1000 : null;
+}
+
+function normalizedPrintFileName(value) {
+  var name = String(value || "").replace(/\\/g, "/").split("/").pop().toLowerCase().trim();
+  name = name.replace(/\.gcode\.3mf$/i, "").replace(/\.3mf$/i, "").replace(/\.gcode$/i, "");
+  return name.replace(/[^a-z0-9]+/g, "");
+}
+
 function randomCode(prefix) {
   return prefix + $security.randomString(10).toUpperCase();
 }
@@ -250,61 +279,17 @@ function route0(e) {
     return json(e, newColor.getString("supabase_id"));
   }
 
-  if (name === "request_printer_ftps_scan" || name === "request_printer_full_refresh") {
+  if (name === "request_printer_ams_refresh") {
     requireAdmin(e);
-    var printer = byId("printers", p.p_printer_id);
-    if (!printer) fail("Printer niet gevonden.");
-    if (name === "request_printer_full_refresh") {
-      printer.set("ftps_scan_paths", p.p_scan_paths || ["/", "/cache"]);
-      printer.set("ftps_folder_scan_request_id", printer.getInt("ftps_folder_scan_request_id") + 1);
-      printer.set("ftps_scan_request_id", printer.getInt("ftps_scan_request_id") + 1);
-      var refreshRequestedAt = new Date().toISOString();
-      printer.set("ftps_folder_scan_requested_at", refreshRequestedAt);
-      printer.set("ftps_scan_requested_at", refreshRequestedAt);
-      $app.save(printer);
-      return json(e, { folder_request_id: printer.getInt("ftps_folder_scan_request_id"), file_request_id: printer.getInt("ftps_scan_request_id") });
-    }
-    var kind = p.p_kind;
-    if (kind !== "files" && kind !== "folders") fail("Onbekend scantype.");
-    var field = kind === "files" ? "ftps_scan_request_id" : "ftps_folder_scan_request_id";
-    var timeField = kind === "files" ? "ftps_scan_requested_at" : "ftps_folder_scan_requested_at";
-    if (kind === "files") printer.set("ftps_scan_paths", p.p_scan_paths || []);
-    printer.set(field, printer.getInt(field) + 1);
-    printer.set(timeField, new Date().toISOString());
-    $app.save(printer);
-    return json(e, printer.getInt(field));
-  }
-
-  if (name === "request_printer_queue_start" || name === "request_printer_file_metadata" || name === "cancel_printer_file_metadata") {
-    requireAdmin(e);
-    if (name === "request_printer_queue_start") {
-      var queuePrinter = byId("printers", p.p_printer_id);
-      if (!queuePrinter) fail("Printer niet gevonden.");
-      var nextStart = queuePrinter.getInt("print_start_request_id") + 1;
-      queuePrinter.set("print_start_request_id", nextStart); $app.save(queuePrinter);
-      return json(e, nextStart);
-    }
-    var sdFile = byId("printer_sd_files", p.p_file_id);
-    if (!sdFile) fail("Printbestand niet gevonden.");
-    if (name === "cancel_printer_file_metadata") {
-      var cancelledRequest = sdFile.getInt("metadata_request_id");
-      sdFile.set("metadata_completed_request_id", cancelledRequest);
-      sdFile.set("metadata_last_error", "Download geannuleerd door de admin.");
-      $app.save(sdFile);
-      return json(e, cancelledRequest);
-    }
-    var nextMetadata = sdFile.getInt("metadata_request_id") + 1;
-    sdFile.set("metadata_request_id", nextMetadata); sdFile.set("metadata_requested_plate_number", p.p_plate_number || null); sdFile.set("metadata_last_error", null); $app.save(sdFile);
-    return json(e, nextMetadata);
-  }
-
-  if (name === "reorder_printer_queue") {
-    requireAdmin(e);
-    (p.p_item_ids || []).forEach(function (id, index) {
-      var item = byId("printer_queue_items", id);
-      if (item) { item.set("position", index + 1); $app.save(item); }
-    });
-    return json(e, true);
+    var amsPrinter = byId("printers", p.p_printer_id);
+    if (!amsPrinter) fail("Printer niet gevonden.");
+    var amsRaw = mutableJsonObject(amsPrinter.get("raw_status"));
+    var nextAmsRequest = Number(amsRaw.ams_refresh_request_id || 0) + 1;
+    amsRaw.ams_refresh_request_id = nextAmsRequest;
+    amsRaw.ams_refresh_requested_at = new Date().toISOString();
+    amsPrinter.set("raw_status", amsRaw);
+    $app.save(amsPrinter);
+    return json(e, nextAmsRequest);
   }
 
   if (name === "request_bambu_login_code") {
@@ -323,7 +308,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.3.16" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.4.0" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -781,31 +766,6 @@ function route2(e) {
   }
 
   if (name === "printer-pair") {
-    if (p.action === "get_connection" || p.action === "update_connection") {
-      requireAdmin(e);
-      var settingsPrinter = byId("printers", p.printer_id);
-      if (!settingsPrinter) throw new NotFoundError("Printer niet gevonden.");
-      var settingsPrinterId = settingsPrinter.getString("supabase_id") || settingsPrinter.id;
-      var pairingSettings = $app.findRecordsByFilter("printer_pairing_codes", "printer_id = {:printer}", "", 100, 0, { printer: settingsPrinterId });
-      if (p.action === "get_connection") {
-        var currentSettings = pairingSettings[0] || null;
-        return e.json(200, {
-          bambu_host: currentSettings ? currentSettings.getString("bambu_host") : "",
-          bambu_access_code: currentSettings ? currentSettings.getString("bambu_access_code") : "",
-          ftps_username: currentSettings ? (currentSettings.getString("ftps_username") || "bblp") : "bblp",
-          ftps_port: currentSettings ? (currentSettings.getInt("ftps_port") || 990) : 990
-        });
-      }
-      if (!pairingSettings.length) throw new NotFoundError("Maak eerst een website-koppelcode voor deze printer.");
-      pairingSettings.forEach(function (connection) {
-        connection.set("bambu_host", String(p.bambu_host || "").trim());
-        connection.set("bambu_access_code", String(p.bambu_access_code || "").trim());
-        connection.set("ftps_username", String(p.ftps_username || "bblp").trim() || "bblp");
-        connection.set("ftps_port", Number(p.ftps_port || 990));
-        $app.save(connection);
-      });
-      return e.json(200, { success: true, updated_codes: pairingSettings.length });
-    }
     if (p.action === "create") {
       requireAdmin(e);
       var pairPrinter = byId("printers", p.printer_id);
@@ -814,10 +774,6 @@ function route2(e) {
       save("printer_pairing_codes", {
         printer_id: pairPrinter.getString("supabase_id") || pairPrinter.id,
         code_hash: $security.sha256(code),
-        bambu_host: String(p.bambu_host || ""),
-        bambu_access_code: String(p.bambu_access_code || ""),
-        ftps_username: String(p.ftps_username || "bblp"),
-        ftps_port: Number(p.ftps_port || 990),
         // De gebruiker beheert deze code lokaal in Home Assistant. Bewaar hem
         // herbruikbaar zodat een herstart of herinstallatie opnieuw kan koppelen.
         expires_at: null,
@@ -842,10 +798,6 @@ function route2(e) {
       var pairingResult = {
         printer_id: pairedPrinter.getString("supabase_id") || pairedPrinter.id,
         bambu_serial: pairedPrinter.getString("device_serial"),
-        bambu_host: pairing.getString("bambu_host"),
-        bambu_access_code: pairing.getString("bambu_access_code"),
-        ftps_username: pairing.getString("ftps_username") || "bblp",
-        ftps_port: pairing.getInt("ftps_port") || 990,
         bridge_token: accessToken,
         bridge_refresh_token: refreshToken,
         token_mode: "permanent"
@@ -853,31 +805,6 @@ function route2(e) {
       pairing.set("redeemed_at", new Date().toISOString());
       $app.save(pairing);
       return e.json(200, pairingResult);
-    }
-    if (p.action === "exchange") {
-      var pair = one("printer_pairing_codes", "code_hash", $security.sha256(String(p.code || "").replace(/[^A-Z0-9]/gi, "").toUpperCase()));
-      if (!pair) fail("Koppelcode is ongeldig.");
-      var pairExpiry = pair.getString("expires_at");
-      if (pairExpiry && new Date(pairExpiry) <= new Date()) fail("Koppelcode is verlopen.");
-      var linkedPrinter = byId("printers", pair.getString("printer_id"));
-      if (!linkedPrinter) fail("Printer niet gevonden.");
-      var access = $security.randomString(64);
-      var refresh = $security.randomString(80);
-      linkedPrinter.set("bridge_token_hash", $security.sha256(access));
-      linkedPrinter.set("bridge_refresh_token_hash", $security.sha256(refresh));
-      linkedPrinter.set("bridge_token_refreshed_at", new Date().toISOString());
-      $app.save(linkedPrinter);
-      pair.set("redeemed_at", new Date().toISOString()); $app.save(pair);
-      return e.json(200, {
-        printer_id: linkedPrinter.getString("supabase_id") || linkedPrinter.id,
-        bambu_serial: linkedPrinter.getString("device_serial"),
-        bridge_token: access,
-        bridge_refresh_token: refresh,
-        bambu_host: pair.getString("bambu_host"),
-        bambu_access_code: pair.getString("bambu_access_code"),
-        ftps_username: pair.getString("ftps_username") || "bblp",
-        ftps_port: Number(p.ftps_port || 990)
-      });
     }
     fail("Onbekende koppelactie.");
   }
@@ -1107,7 +1034,7 @@ function route2(e) {
     return e.json(200, { success: true, selectedCount: selected, sentCount: reminders });
   }
 
-  if (["bridge-token-refresh", "printer-status-ingest", "printer-queue-bridge"].indexOf(name) >= 0) {
+  if (["bridge-token-refresh", "printer-status-ingest"].indexOf(name) >= 0) {
     return e.json(410, { error: "Deze Edge Function is gemigreerd naar /api/overweel3d/bridge en wordt door add-on 1.20.9 rechtstreeks gebruikt." });
   }
 
@@ -1180,25 +1107,65 @@ function route5(e) {
 function route6(e) {
   var printer = bridgePrinter(e, false);
   var p = body(e);
+  var amsOnly = p.ams_only === true;
   var allowed = ["offline", "idle", "printing", "paused", "error", "maintenance"];
   var status = allowed.indexOf(String(p.status || "")) >= 0 ? String(p.status) : "offline";
   var now = new Date().toISOString();
-  printer.set("status", printer.getString("status") === "maintenance" ? "maintenance" : status);
-  printer.set("last_seen_at", now);
-  printer.set("offline_since", status === "offline" ? (printer.getString("offline_since") || now) : null);
-  if (status !== "offline") printer.set("offline_alert_sent_at", null);
-  if (!p.heartbeat_only) {
+  if (!amsOnly) {
+    printer.set("status", printer.getString("status") === "maintenance" ? "maintenance" : status);
+    printer.set("last_seen_at", now);
+    printer.set("offline_since", status === "offline" ? (printer.getString("offline_since") || now) : null);
+    if (status !== "offline") printer.set("offline_alert_sent_at", null);
+  }
+  if (!amsOnly && !p.heartbeat_only) {
     var fields = ["current_file", "current_plate", "progress", "remaining_minutes", "current_layer", "total_layers", "nozzle_temperature", "bed_temperature", "chamber_temperature"];
     fields.forEach(function (field) { if (p[field] !== undefined) printer.set(field, p[field]); });
     if (p.raw_status !== undefined) {
       var incomingRaw = mutableJsonObject(p.raw_status);
       var storedRaw = mutableJsonObject(printer.get("raw_status"));
-      if (storedRaw.vm_status !== undefined) incomingRaw.vm_status = storedRaw.vm_status;
-      if (storedRaw.vm_checked_at !== undefined) incomingRaw.vm_checked_at = storedRaw.vm_checked_at;
+      ["ams_refresh_request_id", "ams_refresh_requested_at", "ams_refresh_completed_request_id", "ams_refresh_completed_at", "ams_last_refreshed_at"].forEach(function (key) {
+        if (storedRaw[key] !== undefined) incomingRaw[key] = storedRaw[key];
+      });
       printer.set("raw_status", incomingRaw);
     }
   }
+  if (!amsOnly && p.installed_nozzle_diameter !== undefined) {
+    var nozzleRaw = mutableJsonObject(printer.get("raw_status"));
+    var installedNozzle = nozzleDiameter(p.installed_nozzle_diameter);
+    if (installedNozzle !== null) nozzleRaw.installed_nozzle_diameter = installedNozzle;
+    printer.set("raw_status", nozzleRaw);
+  }
+  if (amsOnly) {
+    var amsStatusRaw = mutableJsonObject(printer.get("raw_status"));
+    amsStatusRaw.ams_last_refreshed_at = now;
+    printer.set("raw_status", amsStatusRaw);
+  }
   $app.save(printer);
+
+  // Een actieve Bambu-print blijft rechtstreeks aan bestaande bestelplaten
+  // gekoppeld. Dit is alleen een adminvoorstel; de bridge start geen prints en
+  // telt zonder expliciete goedkeuring niets als geprint.
+  if (!amsOnly && ["printing", "paused"].indexOf(status) >= 0 && p.current_file) {
+    var observedName = String(p.current_file).slice(0, 500);
+    var normalizedObserved = normalizedPrintFileName(observedName);
+    var reportedPlate = Number(p.current_plate || 0);
+    var candidates = [];
+    try { candidates = $app.findRecordsByFilter("print_jobs", "active = true", "", 5000, 0) || []; } catch (_) {}
+    candidates.forEach(function (job) {
+      if (["completed", "cancelled"].indexOf(job.getString("status")) >= 0) return;
+      if (job.getInt("runs_completed") >= Math.max(1, job.getInt("runs_required"))) return;
+      if (normalizedPrintFileName(job.getString("expected_file_name")) !== normalizedObserved) return;
+      var sourcePlate = job.getInt("source_plate_number");
+      if (reportedPlate > 0 && sourcePlate > 0 && sourcePlate !== reportedPlate) return;
+      var linkedOrder = byId("orders", job.getString("order_id"));
+      if (!linkedOrder || ["completed", "cancelled"].indexOf(linkedOrder.getString("status")) >= 0) return;
+      if (["approved", "printing", "paused"].indexOf(job.getString("status")) < 0) job.set("status", "suggested");
+      job.set("printer_id", printer.getString("supabase_id") || printer.id);
+      job.set("observed_file_name", observedName);
+      job.set("suggested_at", now);
+      $app.save(job);
+    });
+  }
 
   if (Array.isArray(p.ams_slots)) {
     var seenAmsSlots = {};
@@ -1225,52 +1192,141 @@ function route6(e) {
       var values = { printer_id: canonicalPrinterId, ams_unit: unit, slot_number: number, material: slot.material || null, color_name: slot.color_name || null, color_hex: slot.color_hex || null, tray_uuid: slot.tray_uuid || null, remaining_percent: percent, remaining_grams: grams, spool_capacity_grams: capacity, raw_status: slot.raw_status || slot };
       if (existing) { Object.keys(values).forEach(function (key) { existing.set(key, values[key]); }); $app.save(existing); } else save("printer_ams_slots", values);
       matches.slice(1).forEach(function (duplicate) { try { $app.delete(duplicate); } catch (_) {} });
+
+      // Houd per printer en AMS-vak precies een actuele voorraadregel bij. Een
+      // nieuwe rol in hetzelfde vak vervangt daarmee het gemeten totaalgewicht,
+      // terwijl een handmatige admincorrectie intact blijft.
+      var inventoryKey = "ams:" + canonicalPrinterId + ":" + unit + ":" + number;
+      var inventory = null;
+      try { inventory = $app.findFirstRecordByFilter("filament_inventory", "inventory_key = {:key}", { key: inventoryKey }); } catch (_) {}
+      var material = String(slot.material || "").trim();
+      var colorName = String(slot.color_name || "").trim();
+      var colorHex = String(slot.color_hex || "").trim().toUpperCase();
+      if (colorHex && colorHex.charAt(0) !== "#") colorHex = "#" + colorHex;
+      if (!/^#[0-9A-F]{6}$/.test(colorHex)) colorHex = "";
+      var linkedColor = null;
+      try {
+        var candidateColors = $app.findRecordsByFilter("filament_colors", "material = {:material}", "sort_order", 500, 0, { material: material }) || [];
+        linkedColor = candidateColors.find(function (candidate) {
+          var candidateHex = String(candidate.getString("hex") || "").trim().toUpperCase();
+          var candidateName = String(candidate.getString("name") || "").trim().toLowerCase();
+          return (colorHex && candidateHex === colorHex) || (colorName && candidateName === colorName.toLowerCase());
+        }) || null;
+        if (!linkedColor && material && colorHex) {
+          var automaticName = colorName && colorName.toLowerCase() !== material.toLowerCase() ? colorName : material + " " + colorHex;
+          var maxSortOrder = candidateColors.reduce(function (maximum, candidate) { return Math.max(maximum, candidate.getInt("sort_order")); }, -1);
+          linkedColor = save("filament_colors", {
+            name: automaticName,
+            material: material,
+            hex: colorHex,
+            description: "Automatisch herkend vanuit een gekoppelde AMS.",
+            sort_order: maxSortOrder + 1,
+            active: true
+          });
+        }
+      } catch (_) {}
+      var inventoryValues = {
+        inventory_key: inventoryKey,
+        color_name: colorName || null,
+        material: material || null,
+        color_hex: colorHex || null,
+        filament_color_id: linkedColor ? (linkedColor.getString("supabase_id") || linkedColor.id) : null,
+        tray_uuid: slot.tray_uuid || null,
+        spool_capacity_grams: capacity,
+        total_weight_grams: grams,
+        remaining_percent: percent,
+        source_printer_id: canonicalPrinterId,
+        source_ams_unit: unit,
+        source_slot_number: number,
+        last_seen_at: now
+      };
+      if (inventory) {
+        Object.keys(inventoryValues).forEach(function (key) { inventory.set(key, inventoryValues[key]); });
+        $app.save(inventory);
+      } else {
+        save("filament_inventory", inventoryValues);
+      }
     });
   }
-  return e.json(200, { success: true, heartbeat_only: p.heartbeat_only === true, status: status });
+  return e.json(200, { success: true, heartbeat_only: p.heartbeat_only === true, ams_only: amsOnly, status: status });
 }
 
 function route7(e) {
   var printer = bridgePrinter(e, false);
   var p = body(e); var action = String(p.action || "");
-  var printerId = printer.getString("supabase_id") || printer.id;
   if (action === "scan_config") {
-    var metadata = null;
-    var metadataLookupError = null;
-    var connection = null;
-    try {
-      var bridgeTokenHash = $security.sha256(String(e.requestInfo().headers["x_bridge_token"] || ""));
-      connection = $app.findFirstRecordByFilter("printer_pairing_codes", "printer_id = {:printer} && code_hash = {:hash}", { printer: printerId, hash: bridgeTokenHash });
-    } catch (_) {
-      try { connection = ($app.findRecordsByFilter("printer_pairing_codes", "printer_id = {:printer}", "", 100, 0, { printer: printerId }) || [])[0] || null; } catch (_) {}
-    }
-    try {
-      // Do not compare the two fields inside the PocketBase filter. Imported
-      // records can have a NULL completed id; SQL considers `request > NULL`
-      // unknown even though PocketBase getInt correctly treats it as zero.
-      // Imported collections do not always have PocketBase's optional
-      // `updated` autodate field, so intentionally use no database sort.
-      var metadataCandidates = $app.findRecordsByFilter("printer_sd_files", "printer_id = {:printer} && available = true", "", 1000, 0, { printer: printerId }) || [];
-      metadata = metadataCandidates.find(function (candidate) {
-        return candidate.getInt("metadata_request_id") > candidate.getInt("metadata_completed_request_id");
-      }) || null;
-    } catch (metadataError) {
-      metadataLookupError = String(metadataError && metadataError.message ? metadataError.message : metadataError);
-    }
+    var scanRaw = mutableJsonObject(printer.get("raw_status"));
     return e.json(200, {
-      bambu_host: connection ? connection.getString("bambu_host") : "",
-      bambu_access_code: connection ? connection.getString("bambu_access_code") : "",
-      ftps_username: connection ? (connection.getString("ftps_username") || "bblp") : "bblp",
-      ftps_port: connection ? (connection.getInt("ftps_port") || 990) : 990,
-      connection_found: !!connection,
-      scan_paths: printer.get("ftps_scan_paths") || ["/", "/cache"],
-      scan_request_id: printer.getInt("ftps_scan_request_id"), folder_scan_request_id: printer.getInt("ftps_folder_scan_request_id"),
-      scan_completed_request_id: printer.getInt("ftps_scan_completed_request_id"), folder_scan_completed_request_id: printer.getInt("ftps_folder_scan_completed_request_id"),
-      print_start_request_id: printer.getInt("print_start_request_id"), print_start_completed_request_id: printer.getInt("print_start_completed_request_id"),
       bambu_login_request_id: printer.getInt("bambu_login_request_id"), bambu_login_completed_request_id: printer.getInt("bambu_login_completed_request_id"),
-      metadata_request: cleanRecord(metadata),
-      metadata_lookup_error: metadataLookupError
+      ams_refresh_request_id: Number(scanRaw.ams_refresh_request_id || 0),
+      ams_refresh_completed_request_id: Number(scanRaw.ams_refresh_completed_request_id || 0)
     });
+  }
+  if (action === "sync_bambu_color_catalog") {
+    var catalog = Array.isArray(p.colors) ? p.colors.slice(0, 2000) : [];
+    var websiteColors = $app.findRecordsByFilter("filament_colors", "supabase_id != ''", "", 5000, 0) || [];
+    var inventoryRecords = $app.findRecordsByFilter("filament_inventory", "supabase_id != ''", "", 5000, 0) || [];
+    var inventoryByKey = {};
+    inventoryRecords.forEach(function (record) { inventoryByKey[record.getString("inventory_key")] = record; });
+    var normalizeName = function (value) { return String(value || "").trim().toLowerCase(); };
+    var normalizeMaterial = function (value) { return String(value || "").trim().toUpperCase(); };
+    var normalizeHex = function (value) {
+      var hex = String(value || "").trim().toUpperCase();
+      return /^#[0-9A-F]{6}$/.test(hex) ? hex : "";
+    };
+    var newProposals = 0;
+    var openProposals = 0;
+    var linkedExisting = 0;
+    catalog.forEach(function (candidate) {
+      var name = String(candidate.name || "").trim();
+      var material = normalizeMaterial(candidate.material);
+      var hex = normalizeHex(candidate.color_hex);
+      var catalogKey = String(candidate.catalog_key || "").trim().slice(0, 180);
+      if (!name || !material || !hex || !catalogKey) return;
+      var inventoryKey = "bambu-catalog:" + catalogKey;
+      var matchingColor = websiteColors.find(function (color) {
+        if (normalizeMaterial(color.getString("material")) !== material) return false;
+        return normalizeHex(color.getString("hex")) === hex || normalizeName(color.getString("name")) === normalizeName(name);
+      }) || null;
+      var proposal = inventoryByKey[inventoryKey] || null;
+      if (matchingColor) {
+        if (proposal && !proposal.getString("filament_color_id")) {
+          proposal.set("filament_color_id", matchingColor.getString("supabase_id") || matchingColor.id);
+          proposal.set("last_seen_at", new Date().toISOString());
+          $app.save(proposal);
+          linkedExisting += 1;
+        }
+        return;
+      }
+      var values = {
+        inventory_key: inventoryKey,
+        color_name: name,
+        material: material,
+        color_hex: hex,
+        tray_uuid: catalogKey,
+        spool_capacity_grams: 1000,
+        total_weight_grams: null,
+        remaining_percent: null,
+        last_seen_at: new Date().toISOString()
+      };
+      if (proposal) {
+        Object.keys(values).forEach(function (key) { proposal.set(key, values[key]); });
+        $app.save(proposal);
+      } else {
+        proposal = save("filament_inventory", values);
+        inventoryByKey[inventoryKey] = proposal;
+        newProposals += 1;
+      }
+      openProposals += 1;
+    });
+    return e.json(200, { success: true, received: catalog.length, new_proposals: newProposals, open_proposals: openProposals, linked_existing: linkedExisting });
+  }
+  if (action === "ack_ams_refresh") {
+    var ackAmsRaw = mutableJsonObject(printer.get("raw_status"));
+    ackAmsRaw.ams_refresh_completed_request_id = Number(p.request_id || 0);
+    ackAmsRaw.ams_refresh_completed_at = new Date().toISOString();
+    printer.set("raw_status", ackAmsRaw); $app.save(printer);
+    return e.json(200, { success: true });
   }
   if (action === "ack_bambu_login_code") {
     printer.set("bambu_login_completed_request_id", Number(p.request_id || 0));
@@ -1278,93 +1334,6 @@ function route7(e) {
     printer.set("bambu_login_last_error", p.error ? String(p.error).slice(0, 2000) : null); $app.save(printer);
     return e.json(200, { success: true });
   }
-  if (action === "ack_print_start") { printer.set("print_start_completed_request_id", Number(p.request_id || 0)); $app.save(printer); return e.json(200, { success: true }); }
-  if (action === "sync_host_pc_status") { printer.set("host_pc_status", p.status === "on" ? "on" : "off"); printer.set("host_pc_checked_at", new Date().toISOString()); printer.set("host_pc_uptime_seconds", p.status === "on" ? Number(p.uptime_seconds || 0) : null); $app.save(printer); return e.json(200, { success: true }); }
-  if (action === "sync_vm_status") {
-    var vmRaw = mutableJsonObject(printer.get("raw_status"));
-    vmRaw.vm_status = p.status === "on" ? "on" : "off";
-    vmRaw.vm_checked_at = new Date().toISOString();
-    printer.set("raw_status", vmRaw); $app.save(printer);
-    return e.json(200, { success: true });
-  }
-  if (action === "scan_error") { printer.set("ftps_last_error", String(p.error || "Onbekende FTPS-fout").slice(0, 2000)); $app.save(printer); return e.json(200, { success: true }); }
-  if (action === "sync_directories") { printer.set("ftps_directory_listing", Array.isArray(p.directory_listing) ? p.directory_listing.slice(0, 5000) : []); printer.set("ftps_folder_scan_completed_request_id", Number(p.request_id || 0)); printer.set("sd_card_last_seen_at", new Date().toISOString()); printer.set("ftps_last_error", null); $app.save(printer); return e.json(200, { success: true }); }
-  if (action === "sync_files") {
-    var files = Array.isArray(p.files) ? p.files.slice(0, 1000) : [];
-    var old = $app.findRecordsByFilter("printer_sd_files", "printer_id = {:printer}", "", 2000, 0, { printer: printerId });
-    old.forEach(function (record) { record.set("available", false); $app.save(record); });
-    files.forEach(function (file) {
-      if (!file.path || !file.display_name) return;
-      var record = null; try { record = $app.findFirstRecordByFilter("printer_sd_files", "printer_id = {:printer} && path = {:path}", { printer: printerId, path: String(file.path) }); } catch (_) {}
-      var values = { printer_id: printerId, path: String(file.path).slice(0, 1000), display_name: String(file.display_name).slice(0, 255), size_bytes: file.size_bytes || null, modified_at: file.modified_at || null, plates: file.plates || [], detected_material: file.detected_material || null, detected_color_name: file.detected_color_name || null, detected_filaments: file.detected_filaments || [], available: true, last_seen_at: new Date().toISOString() };
-      if (record) {
-        var oldSize = record.getInt("size_bytes");
-        var newSize = Number(file.size_bytes || 0);
-        var oldModified = record.getString("modified_at");
-        var newModified = String(file.modified_at || "");
-        var sourceChanged = (oldSize > 0 && newSize > 0 && oldSize !== newSize) || (oldModified && newModified && oldModified !== newModified);
-        var keepParsedMetadata = !sourceChanged && record.getInt("metadata_completed_request_id") > 0;
-        Object.keys(values).forEach(function (key) {
-          if (keepParsedMetadata && ["plates", "detected_material", "detected_color_name", "detected_filaments"].indexOf(key) >= 0) return;
-          record.set(key, values[key]);
-        });
-        if (sourceChanged) { record.set("metadata_request_id", 0); record.set("metadata_completed_request_id", 0); record.set("metadata_last_error", null); }
-        $app.save(record);
-      } else save("printer_sd_files", values);
-    });
-    printer.set("ftps_scan_completed_request_id", Number(p.request_id || 0)); printer.set("ftps_directory_listing", p.directory_listing || []); printer.set("sd_card_last_seen_at", new Date().toISOString()); printer.set("ftps_last_error", null); $app.save(printer);
-    return e.json(200, { success: true, files: files.length });
-  }
-  if (action === "sync_file_metadata") {
-    var file = byId("printer_sd_files", p.file_id); if (!file) throw new NotFoundError("Printbestand niet gevonden.");
-    var completedDownloaded = Math.max(0, Number(p.downloaded_bytes || 0)); var completedTotal = Math.max(completedDownloaded, Number(p.total_bytes || 0)); var cacheExpires = Math.max(0, Number(p.cache_expires_at || 0));
-    var completedState = !p.error ? "DOWNLOAD_COMPLETE:" + completedDownloaded + ":" + completedTotal + ":" + cacheExpires : null;
-    file.set("detected_filaments", p.detected_filaments || []); file.set("detected_material", (p.detected_filaments || [])[0]?.material || null); file.set("detected_color_name", (p.detected_filaments || [])[0]?.color_name || null); if (!p.error && Array.isArray(p.plates)) file.set("plates", p.plates); file.set("metadata_completed_request_id", Number(p.request_id || 0)); file.set("metadata_last_error", p.error || completedState); $app.save(file);
-    return e.json(200, { success: true, plate_count: Array.isArray(p.plates) ? p.plates.length : 0 });
-  }
-  if (action === "metadata_progress") {
-    var progressFile = byId("printer_sd_files", p.file_id);
-    if (!progressFile || progressFile.getString("printer_id") !== printerId) throw new NotFoundError("Printbestand niet gevonden.");
-    var progressRequest = Number(p.request_id || 0);
-    var isCancelled = progressFile.getInt("metadata_completed_request_id") >= progressRequest && /geannuleerd/i.test(progressFile.getString("metadata_last_error"));
-    if (!isCancelled && progressFile.getInt("metadata_request_id") === progressRequest) {
-      var received = Math.max(0, Number(p.downloaded_bytes || 0));
-      var total = Math.max(0, Number(p.total_bytes || 0));
-      progressFile.set("metadata_last_error", "DOWNLOAD_PROGRESS:" + received + ":" + total);
-      $app.save(progressFile);
-    }
-    return e.json(200, { success: true, cancelled: isCancelled });
-  }
-  if (action === "metadata_status") {
-    var statusFile = byId("printer_sd_files", p.file_id);
-    if (!statusFile || statusFile.getString("printer_id") !== printerId) throw new NotFoundError("Printbestand niet gevonden.");
-    var statusRequest = Number(p.request_id || 0);
-    return e.json(200, {
-      cancelled: statusFile.getInt("metadata_completed_request_id") >= statusRequest && /geannuleerd/i.test(statusFile.getString("metadata_last_error")),
-      request_id: statusFile.getInt("metadata_request_id"),
-      completed_request_id: statusFile.getInt("metadata_completed_request_id")
-    });
-  }
-  if (action === "active") {
-    var active = null; try { active = ($app.findRecordsByFilter("printer_queue_items", "printer_id = {:printer} && (status = 'starting' || status = 'printing')", "command_claimed_at", 1, 0, { printer: printerId }) || [])[0] || null; } catch (_) {}
-    return e.json(200, { item: cleanRecord(active) });
-  }
-  if (action === "next") {
-    if (p.manual_trigger !== true) return e.json(200, { command: null, reason: "manual_trigger_required" });
-    if (printer.getString("status") !== "idle") return e.json(200, { command: null, reason: "printer_not_idle" });
-    var items = $app.findRecordsByFilter("printer_queue_items", "printer_id = {:printer} && (status = 'queued' || status = 'blocked')", "position,created", 100, 0, { printer: printerId });
-    var item = items.find(function (candidate) { return !candidate.getString("blocked_reason"); }) || null;
-    if (!item) return e.json(200, { command: null, reason: "queue_empty" });
-    item.set("status", "starting"); item.set("command_claimed_at", new Date().toISOString()); $app.save(item);
-    return e.json(200, { command: cleanRecord(item) });
-  }
-  if (action === "ack") {
-    var itemToAck = byId("printer_queue_items", p.item_id); if (!itemToAck || itemToAck.getString("printer_id") !== printerId) throw new NotFoundError("Wachtrij-item niet gevonden.");
-    var allowedStatus = ["printing", "completed", "failed", "paused", "queued"]; if (allowedStatus.indexOf(String(p.status)) < 0) fail("Ongeldige bevestiging.");
-    itemToAck.set("status", p.status); itemToAck.set("bridge_error", p.error ? String(p.error).slice(0, 1000) : null); if (p.status === "printing") itemToAck.set("started_at", new Date().toISOString()); if (p.status === "completed") itemToAck.set("completed_at", new Date().toISOString()); if (p.status === "queued") itemToAck.set("command_claimed_at", null); $app.save(itemToAck);
-    return e.json(200, { success: true });
-  }
-  if (action === "notify_manual_intervention") { sendMail("gijsoverweel@gmail.com", "Handmatig ingrijpen nodig bij printer", "<p>" + escapeHtml(p.error || "Controleer de printer en de wachtrij.") + "</p>"); return e.json(200, { success: true }); }
   fail("Onbekende bridgeactie: " + action);
 }
 

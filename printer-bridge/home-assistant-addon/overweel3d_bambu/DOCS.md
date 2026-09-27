@@ -1,113 +1,35 @@
-# Installatie en printautomatisering
+# Installatie
 
-Versie **1.29.0** controleert na iedere volledige FTPS-download of het bestand werkelijk in de 48-uurscache staat. Daarna wordt het volledige bestand opnieuw geparseerd en worden het nieuwe aantal platen, de previews en filamentgegevens bevestigd door PocketBase voordat de website de download als voltooid toont. **Alles verversen** controleert ook direct de bereikbaarheid van host-pc en VM, vraagt printerstatus en AMS-rollen op en scant vervolgens mappen en bestanden. De interne MQTT-status blijft live voor printbevestiging. AMS-vakken worden door PocketBase op printer, AMS-eenheid en vaknummer ontdubbeld. Via **Volledige keten testen** worden host, VM, FTPS-download, printerkeuze, plaat, AMS-mapping en leveling echt voorbereid; verzenden en bevestigen blijven altijd geblokkeerd.
+Versie **1.34.0** is een status- en AMS-bridge. Er is geen printwachtrij en er
+worden geen pc's, VM's of prints gestart.
 
-De website voert geen periodieke productie-refresh meer uit. De knop **Alles
-verversen** vraagt in vaste volgorde een actuele printer- en AMS-status op,
-scant daarna de mappen en vernieuwt als laatste alle printbestanden in de
-geselecteerde mappen.
-De Home Assistant-add-on bestuurt de bestaande Home Assistant-entiteiten zelf en
-de Windows-VM-agent praat rechtstreeks met de add-on via poort 8766.
+1. Kopieer de map `overweel3d_bambu` naar de lokale Home Assistant-apps-map.
+2. Open **Instellingen → Apps → Appwinkel** en kies **Controleren op updates**.
+3. Installeer of update **Overweel3D Bambu Bridge**.
+4. Zet **Start bij opstarten** en **Watchdog** aan.
+5. Vul `bambu_account` en de permanente `website_pairing_code` in.
+6. Vul `email_code` alleen in wanneer Bambu een nieuwe aanmelding verlangt.
 
-Na een bevestigde print drukt de add-on eenmaal op
-`button.pc_gijs_overweel3d` om de VM netjes te stoppen. `vm_power.ps1` wacht
-tot VMware bevestigt dat de VM volledig uit staat en meldt dit rechtstreeks aan
-`http://homeassistant.local:8766/guest/vm-stopped`. Alleen wanneer de add-on de
-host-pc voor diezelfde printactie zelf met `script.pc_aanzetten` heeft gestart,
-voert zij vijf seconden later `script.pc_en_stekker_uit` uit. Een pc die vóór de
-print al aanstond blijft altijd aan. De losse Home Assistant-webhookautomatisering
-is daardoor niet meer nodig.
+De app bewaart sessie- en koppelgegevens in `/config/overweel3d`. Een herstart
+of herinstallatie maakt de website-koppelcode niet ongeldig.
 
-1. Kopieer de map `overweel3d_bambu` naar `/addons` op Home Assistant.
-2. Open **Instellingen → Apps → Appwinkel**.
-3. Kies rechtsboven **⋮ → Controleren op updates**.
-4. Installeer of update **Overweel3D Bambu Bridge**.
-5. Zet **Start bij opstarten** en **Watchdog** aan.
-6. Controleer de configuratie en start de add-on.
+## Meerdere printers
 
-## Website en printer koppelen
+Voeg iedere printer in de website apart toe en maak per printer een koppelcode.
+Draai per printer een eigen appinstantie/configuratie, zodat serienummer,
+koppeltoken, status en AMS-vakken gescheiden blijven.
 
-1. Open **Admin → Printproductie** op de website.
-2. Voeg de printer toe en vul IP-adres en lokale toegangscode in voor FTPS.
-3. Maak bij de printer een website-koppelcode.
-4. Vul in de add-on het Bambu-e-mailadres en de website-koppelcode in.
-5. Start de add-on. Vul bij de eerste cloudaanmelding de ontvangen Bambu-e-mailcode
-   in, sla op en herstart.
+## Wat wordt gesynchroniseerd
 
-De add-on bewaart sessie- en koppelgegevens in `/config/overweel3d`. Er zijn geen
-slicercertificaten nodig. Status en AMS lopen via Bambu Cloud; bestanden worden
-via FTPS van de printer gelezen.
+- online-, idle-, print-, pauze- en foutstatus;
+- bestandsnaam, plaatnummer, voortgang, lagen en resterende tijd;
+- nozzle en temperaturen;
+- elk AMS-vak, inclusief materiaal, kleur en adminvoorraad;
+- actieve prints als voorstel voor een bestaande plaatkoppeling.
 
-## Instellingen voor pc en VM
+De openbare kleurengalerij leest geen rolgewicht. Gewichten en handmatige
+voorraadcorrecties blijven uitsluitend in het admin-dashboard zichtbaar.
 
-- `host_pc_ip`: `192.168.2.20`.
-- `host_status_interval_seconds`: iedere 60 seconden een statusping voor het
-  adminscherm. Deze gecachete status beslist nooit over een printstart.
-- `host_online_delay_seconds`: 60 seconden wachten als een verse printping slaagt.
-- `host_boot_delay_seconds`: 150 seconden wachten nadat de pc is aangezet en op
-  ping reageert.
-- `pc_power_on_entity`: `script.pc_aanzetten`.
-- `pc_power_off_entity`: `script.pc_en_stekker_uit`.
-- `vm_start_entity`: `button.pc_gijs_overweel3d`; dit is de bestaande wisselknop.
-- `vm_start_wait_seconds`: maximaal 240 seconden wachten op de VM-agent.
-- `vm_ip`: het bewerkbare VM-IP dat verbinding mag maken; standaard `192.168.2.42`.
-- `guest_api_port`: `8766`.
-- `guest_api_token`: moet exact gelijk zijn aan `addon_token` in `vm-guest.json`.
+Via **Refresh AMS** vraagt de website meteen een nieuwe AMS-status op. Via
+**Nieuwe Bambu-code** kan de admin bewust een nieuwe e-mailcode aanvragen.
 
-Publiceer poort 8766 niet naar internet. Sta hem in het lokale netwerk alleen toe
-vanaf de VM (`192.168.2.30`).
-
-## VM-agent installeren
-
-De VM-agentversie is **2.5.0** en automatiseert **Bambu Connect** via Bambu Labs
-officiële `bambu-connect://import-file`-protocol. Alleen de keuzes in de geopende
-Connect-dialoog worden met Windows UI Automation bediend. Printer, AMS-slots,
-kalibratieopties en verzendknoppen worden automatisch herkend; handmatig klikken
-of vooraf selectors opzoeken is niet nodig.
-Per wachtrij-item kan de admin bed-leveling aan- of uitzetten. Deze keuze wordt
-automatisch in Connect gezet; andere kalibraties blijven uit.
-Als automatische bediening mislukt, een verkeerde print wordt waargenomen of de
-startbevestiging uitblijft, stuurt de bridge een eenmalige waarschuwing naar het
-adminadres. De pc blijft in dat geval veilig aan.
-
-1. Installeer in de VM Python, Bambu Connect en de pakketten uit
-   `requirements-vm.txt`.
-2. Kopieer de bestanden uit `overweel3d_vmware_runner.zip` naar
-   `C:\Overweel3D`.
-3. Kopieer `vm-guest.example.json` naar `vm-guest.json` en stel de zichtbare
-   UI-selectors van uw Bambu Connect-versie in.
-4. Plaats een snelkoppeling naar `start_overweel3d_vm_agent.cmd` in
-   `shell:startup` van de VM. Het venster blijft zichtbaar draaien.
-
-De standaardconfiguratie gebruikt `http://homeassistant.local:8766`. Bij een
-netwerk zonder werkende mDNS mag dit worden vervangen door het vaste Home
-Assistant-IP met poort 8766.
-
-## Exacte printstroom
-
-Een websiteklik of wijziging van `input_button.volgende_plaat_printen` wordt één
-keer verwerkt. De add-on doet altijd een verse ping naar de host-pc:
-
-- bereikbaar: 60 seconden wachten;
-- niet bereikbaar: `script.pc_aanzetten` één keer uitvoeren, iedere 5 seconden
-  blijven pingen en na het eerste antwoord 150 seconden wachten.
-
-Daarna wacht de add-on op het rechtstreekse gereedsignaal van de VM-agent. Er
-wordt niet naar `192.168.2.30` gepingd. Zonder gereedsignaal wordt
-`button.pc_gijs_overweel3d` exact één keer uitgevoerd en maximaal 240 seconden
-gewacht.
-
-De VM-agent haalt de gereserveerde wachtrijtaak en AMS-toewijzing op, downloadt
-het SD-kaartbestand tijdelijk via FTPS en laat Bambu Connect de print verzenden.
-Alleen als Bambu Cloud `RUNNING` meldt en zowel bestandsnaam als plaatnummer exact
-overeenkomen, zet de add-on de VM-wisselknop eenmaal om. Na 30 seconden wordt
-`script.pc_en_stekker_uit` eenmaal uitgevoerd. Bij een fout, mismatch of timeout
-blijft de pc aan en gaat het wachtrij-item terug naar `queued`.
-
-## Printwachtrij en scans
-
-In **Printwachtrij** kunt u meerdere startmappen kiezen. **Mappen scannen** werkt
-de maplijst bij; **Bestanden nu scannen** doorzoekt de gekozen mappen en nieuwe
-submappen. De laatst gevonden output blijft bruikbaar bij een tijdelijke
-FTPS-storing. Tijdelijk downloaden voor metadata gebeurt alleen in de add-on en
-wordt niet in PocketBase Storage gezet.

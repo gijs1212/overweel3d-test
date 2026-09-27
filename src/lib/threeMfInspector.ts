@@ -7,6 +7,7 @@ export interface ThreeMfPlate {
   name: string;
   fileName: string;
   previewUrl?: string;
+  nozzleDiameter?: number;
 }
 
 export interface ThreeMfInspection {
@@ -103,6 +104,23 @@ const bambuFilamentColors = (archive: Record<string, Uint8Array>, paths: string[
   return [...result.values()];
 };
 
+const bambuNozzleDiameter = (archive: Record<string, Uint8Array>, paths: string[]) => {
+  for (const path of paths.filter((value) => /(?:slice_info|project_settings|model_settings)\.config$/i.test(value))) {
+    const content = strFromU8(archive[path]);
+    try {
+      const settings = JSON.parse(content) as Record<string, unknown>;
+      for (const key of ["nozzle_diameter", "nozzle_diameters", "machine_nozzle_size", "printer_nozzle_diameter"]) {
+        const raw = Array.isArray(settings[key]) ? settings[key][0] : settings[key];
+        const match = String(raw ?? "").replace(",", ".").match(/(?:^|\D)(0\.\d+|1(?:\.0)?)(?:\D|$)/);
+        if (match) return Number(match[1]);
+      }
+    } catch { /* XML configuration */ }
+    const xmlMatch = content.match(/(?:nozzle_diameters?|machine_nozzle_size|printer_nozzle_diameter)[^\d]*(0[.,]\d+|1(?:[.,]0)?)/i);
+    if (xmlMatch) return Number(xmlMatch[1].replace(",", "."));
+  }
+  return undefined;
+};
+
 export function disposeThreeMfInspection(inspection: ThreeMfInspection | null) {
   inspection?.plates.forEach((plate) => { if (plate.previewUrl) URL.revokeObjectURL(plate.previewUrl); });
 }
@@ -176,6 +194,7 @@ export async function inspectThreeMf(file: File, options: InspectThreeMfOptions 
   }
 
   bambuFilamentColors(archive, archiveFiles).forEach((color) => colors.set(color.hex, color));
+  const nozzleDiameter = bambuNozzleDiameter(archive, archiveFiles);
   let plates = plateCandidatesFromArchiveFiles(archiveFiles);
   if (!plates.length) {
     const sliceConfigPath = archiveFiles.find((path) => /slice_info\.config$/i.test(path));
@@ -191,8 +210,8 @@ export async function inspectThreeMf(file: File, options: InspectThreeMfOptions 
       || entries.find((entry) => new RegExp(`(?:^|/)plate_no_light_${plate.number}\\.png$`, "i").test(entry.path));
     const printableName = /\.(?:gcode|gcode\.3mf)$/i.test(plate.fileName) ? plate.fileName : file.name;
     return previewEntry
-      ? { ...plate, fileName: printableName, previewUrl: URL.createObjectURL(new Blob([extractZipEntry(bytes, previewEntry)], { type: "image/png" })) }
-      : { ...plate, fileName: printableName };
+      ? { ...plate, fileName: printableName, nozzleDiameter, previewUrl: URL.createObjectURL(new Blob([extractZipEntry(bytes, previewEntry)], { type: "image/png" })) }
+      : { ...plate, fileName: printableName, nozzleDiameter };
   });
 
   const signature = options.lightweight

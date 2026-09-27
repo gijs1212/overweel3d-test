@@ -2126,6 +2126,10 @@ export type Database = {
         Args: { p_printer_id: string; p_scan_paths?: Json | null }
         Returns: Json
       }
+      request_printer_ams_refresh: {
+        Args: { p_printer_id: string }
+        Returns: number
+      }
       approve_and_count_print_job_run: {
         Args: { p_plate_number: number; p_suggestion_job_id: string }
         Returns: Json

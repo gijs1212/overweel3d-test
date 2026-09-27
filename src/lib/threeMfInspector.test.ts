@@ -24,7 +24,7 @@ describe("threeMfInspector", () => {
     const archive = zipSync({
       "Metadata/plate_1.gcode": new Uint8Array([1, 2, 3]),
       "Metadata/plate_2.gcode": new Uint8Array([4, 5, 6]),
-      "Metadata/project_settings.config": strToU8('<config><filament color="#FF0000" type="PLA rood"/><filament color="#FFFFFF" type="PLA wit"/></config>'),
+      "Metadata/project_settings.config": strToU8('<config><metadata key="nozzle_diameter" value="0.6"/><filament color="#FF0000" type="PLA rood"/><filament color="#FFFFFF" type="PLA wit"/></config>'),
     });
     const file = {
       name: "mobiel.3mf",
@@ -37,6 +37,7 @@ describe("threeMfInspector", () => {
     expect(result.modelDetailsAvailable).toBe(false);
     expect(result.signature).toBe("");
     expect(result.plates.map((plate) => plate.number)).toEqual([1, 2]);
+    expect(result.plates.map((plate) => plate.nozzleDiameter)).toEqual([0.6, 0.6]);
     expect(result.colors).toEqual([
       { name: "PLA rood", hex: "#FF0000" },
       { name: "PLA wit", hex: "#FFFFFF" },

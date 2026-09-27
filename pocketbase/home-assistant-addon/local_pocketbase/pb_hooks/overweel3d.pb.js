@@ -9,4 +9,4 @@ routerAdd("GET", "/api/overweel3d/functions/download-order-file", function (e) {
 routerAdd("POST", "/api/overweel3d/printer-camera-ingest", function (e) { return require(__hooks + "/overweel3d-core.js").route4(e); }, $apis.bodyLimit(6 * 1024 * 1024));
 routerAdd("POST", "/api/overweel3d/bridge/refresh", function (e) { return require(__hooks + "/overweel3d-core.js").route5(e); });
 routerAdd("POST", "/api/overweel3d/bridge/status", function (e) { return require(__hooks + "/overweel3d-core.js").route6(e); });
-routerAdd("POST", "/api/overweel3d/bridge/queue", function (e) { return require(__hooks + "/overweel3d-core.js").route7(e); });
+routerAdd("POST", "/api/overweel3d/bridge/control", function (e) { return require(__hooks + "/overweel3d-core.js").route7(e); });

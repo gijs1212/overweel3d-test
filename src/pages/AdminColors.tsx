@@ -43,6 +43,7 @@ interface FilamentColor {
 
 interface Product { id: string; name: string; materials: string[]; active: boolean; }
 interface Availability { product_id: string; color_id: string; available: boolean; }
+interface BambuColorProposal { id: string; inventory_key: string; color_name: string | null; material: string | null; color_hex: string | null; last_seen_at: string; }
 
 const emptyForm = {
   name: "",
@@ -71,6 +72,7 @@ export default function AdminColors() {
   const [colors, setColors] = useState<FilamentColor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
+  const [bambuProposals, setBambuProposals] = useState<BambuColorProposal[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [editing, setEditing] = useState<FilamentColor | null>(null);
@@ -82,19 +84,22 @@ export default function AdminColors() {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FilamentColor | null>(null);
+  const [proposalTarget, setProposalTarget] = useState<BambuColorProposal | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [cRes, pRes, aRes] = await Promise.all([
+    const [cRes, pRes, aRes, proposalRes] = await Promise.all([
       supabase.from("filament_colors").select("*").order("material").order("sort_order"),
       supabase.from("products").select("id,name,materials,active"),
       supabase.from("product_color_availability").select("*"),
+      supabase.from("filament_inventory").select("id,inventory_key,color_name,material,color_hex,last_seen_at,filament_color_id").is("filament_color_id", null).order("last_seen_at", { ascending: false }),
     ]);
-    const error = cRes.error || pRes.error || aRes.error;
+    const error = cRes.error || pRes.error || aRes.error || proposalRes.error;
     if (error) toast({ title: "Kleuren laden mislukt", description: error.message, variant: "destructive" });
     setColors((cRes.data as FilamentColor[]) || []);
     setProducts((pRes.data as Product[]) || []);
     setAvailability((aRes.data as Availability[]) || []);
+    setBambuProposals(((proposalRes.data || []) as BambuColorProposal[]).filter((item) => item.inventory_key.startsWith("bambu-catalog:")));
     setLoading(false);
   }, [toast]);
 
@@ -127,13 +132,36 @@ export default function AdminColors() {
   };
 
   useEffect(() => {
-    if (!authLoading && isAdmin) fetchAll();
+    if (authLoading || !isAdmin) return;
+    void fetchAll();
+    const channel = supabase.channel("admin-color-proposals")
+      .on("postgres_changes", { event: "*", schema: "public", table: "filament_inventory" }, () => void fetchAll())
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
   }, [authLoading, fetchAll, isAdmin]);
 
   const openNew = () => {
     setShowForm(true);
     setEditing(null);
     setForm({ ...emptyForm });
+    setExistingPhotos([]);
+    setNewPhotoFiles([]);
+    setRemovedPhotoPaths([]);
+    setProductAvail({});
+    setProposalTarget(null);
+  };
+
+  const openProposal = (proposal: BambuColorProposal) => {
+    setShowForm(true);
+    setEditing(null);
+    setProposalTarget(proposal);
+    setForm({
+      ...emptyForm,
+      name: proposal.color_name?.trim() || "Nieuwe Bambu-kleur",
+      material: proposal.material?.trim().toUpperCase() || "PLA",
+      hex: /^#[0-9a-f]{6}$/i.test(proposal.color_hex || "") ? String(proposal.color_hex).toUpperCase() : "#808080",
+      description: "Voorgesteld vanuit de officiële Bambu Lab-kleurcatalogus.",
+    });
     setExistingPhotos([]);
     setNewPhotoFiles([]);
     setRemovedPhotoPaths([]);
@@ -154,6 +182,7 @@ export default function AdminColors() {
     setExistingPhotos([...c.photos]);
     setNewPhotoFiles([]);
     setRemovedPhotoPaths([]);
+    setProposalTarget(null);
     const map: Record<string, boolean> = {};
     availability
       .filter((a) => a.color_id === c.id)
@@ -169,6 +198,7 @@ export default function AdminColors() {
     setNewPhotoFiles([]);
     setRemovedPhotoPaths([]);
     setProductAvail({});
+    setProposalTarget(null);
   };
 
   const relevantProducts = products.filter((p) => {
@@ -246,6 +276,13 @@ export default function AdminColors() {
             })),
           );
           if (availabilityError) throw availabilityError;
+        }
+        if (proposalTarget) {
+          const { error: proposalError } = await supabase.from("filament_inventory").update({
+            filament_color_id: colorId,
+            inventory_key: `palette:${colorId}`,
+          }).eq("id", proposalTarget.id);
+          if (proposalError) throw proposalError;
         }
       }
 
@@ -336,10 +373,34 @@ export default function AdminColors() {
             </div>
           </div>
 
+          {!showForm && bambuProposals.length > 0 && (
+            <section className="mb-8 rounded-2xl border border-black/10 bg-neutral-50 p-5">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-bold text-primary">Bambu Lab-kleurvoorstellen</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">De add-on vergelijkt ieder uur de officiële BambuStudio-kleurcatalogus met de kleuren op de website. Voorstellen worden nooit automatisch gepubliceerd.</p>
+                </div>
+                <span className="rounded-full bg-black px-2.5 py-1 text-xs font-semibold text-white">{bambuProposals.length} nieuw</span>
+              </div>
+              <div className="grid max-h-80 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                {bambuProposals.map((proposal) => (
+                  <article key={proposal.id} className="flex items-center gap-3 rounded-xl border border-black/10 bg-white p-3">
+                    <span className="h-9 w-9 shrink-0 rounded-full border border-black/15" style={{ backgroundColor: proposal.color_hex || "#808080" }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{proposal.color_name || "Onbekende Bambu-kleur"}</p>
+                      <p className="text-xs text-muted-foreground">{proposal.material || "Materiaal onbekend"} · {proposal.color_hex || "geen hexcode"}</p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => openProposal(proposal)}><Plus className="h-4 w-4" /> Gebruiken</Button>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Form */}
           {showForm && (
             <div className="bg-card rounded-2xl p-6 shadow-sm border border-border/50 mb-8">
-              <h3 className="font-bold text-primary mb-4">{editing ? "Kleur bewerken" : "Nieuwe kleur"}</h3>
+              <h3 className="font-bold text-primary mb-4">{editing ? "Kleur bewerken" : proposalTarget ? "Bambu-kleurvoorstel controleren" : "Nieuwe kleur"}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Naam *</Label>

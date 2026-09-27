@@ -7,40 +7,4 @@ configuration:
     description: The one-time code Bambu sends to the configured account.
   website_pairing_code:
     name: Website pairing code
-    description: The one-time code from Admin → Print production on the website.
-  next_plate_button_entity:
-    name: Next plate button
-    description: The Home Assistant input_button that starts the next queued print.
-  host_pc_ip:
-    name: Host PC IP address
-    description: IP address pinged every minute for status and freshly for every print start.
-  host_status_interval_seconds:
-    name: Status ping interval
-    description: Interval used only for the PC status on the admin website.
-  host_online_delay_seconds:
-    name: Delay when PC is online
-    description: Delay before starting the VM when the initial fresh ping succeeds.
-  host_boot_delay_seconds:
-    name: Delay after PC boot
-    description: Delay after a previously unreachable PC first responds.
-  pc_power_on_entity:
-    name: PC power-on script
-    description: Script that runs when the Windows PC is unavailable.
-  pc_power_off_entity:
-    name: PC power-off script
-    description: Script executed after the selected print is confirmed.
-  vm_start_entity:
-    name: VM start button
-    description: Button entity that starts the Overweel3D VMware VM.
-  vm_start_wait_seconds:
-    name: VM startup timeout
-    description: Maximum time to wait for the VM agent's direct ready signal.
-  vm_ip:
-    name: VM IP address
-    description: IP address allowed to connect to the add-on's local VM agent API.
-  guest_api_port:
-    name: VM agent API port
-    description: Local port on which the VM agent reports directly to the add-on.
-  guest_api_token:
-    name: VM agent token
-    description: Shared token for the direct VM-to-add-on connection.
+    description: The reusable code from Admin → Print production on the website.

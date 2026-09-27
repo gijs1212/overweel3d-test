@@ -14,8 +14,6 @@ import base64
 import getpass
 import ftplib
 import hashlib
-import ipaddress
-import io
 import json
 import os
 import re
@@ -24,17 +22,12 @@ import shutil
 import socket
 import ssl
 import struct
-import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
-import zipfile
-import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -44,8 +37,6 @@ TOKEN_FILE = CONFIG_DIR / "bambu-session.json"
 BRIDGE_TOKEN_FILE = CONFIG_DIR / "overweel-bridge-token.json"
 PAIRING_FILE = CONFIG_DIR / "website-pairing.json"
 PERSISTED_OPTIONS_FILE = CONFIG_DIR / "settings.json"
-DOWNLOAD_CACHE_DIR = CONFIG_DIR / "download-cache"
-DOWNLOAD_CACHE_TTL_SECONDS = 2 * 24 * 60 * 60
 ADDON_OPTIONS_FILE = Path("/data/options.json")
 
 
@@ -82,91 +73,31 @@ def setting(name: str, default: str = "") -> str:
 API = "https://api.bambulab.com"
 BAMBU_ACCOUNT = setting("BAMBU_ACCOUNT", "gijsoverweel@gmail.com")
 WEBSITE_PAIRING_CODE = setting("WEBSITE_PAIRING_CODE")
-NEXT_PLATE_BUTTON_ENTITY = setting("NEXT_PLATE_BUTTON_ENTITY", "input_button.volgende_plaat_printen")
-HOST_PC_IP = setting("HOST_PC_IP", "192.168.2.20")
-HOST_STATUS_INTERVAL_SECONDS = int(setting("HOST_STATUS_INTERVAL_SECONDS", "60") or 60)
-HOST_ONLINE_DELAY_SECONDS = int(setting("HOST_ONLINE_DELAY_SECONDS", "60") or 60)
-HOST_BOOT_DELAY_SECONDS = int(setting("HOST_BOOT_DELAY_SECONDS", "150") or 150)
-PC_POWER_ON_ENTITY = setting("PC_POWER_ON_ENTITY", "script.pc_aanzetten")
-PC_POWER_OFF_ENTITY = setting("PC_POWER_OFF_ENTITY", "script.pc_en_stekker_uit")
-VM_START_ENTITY = setting("VM_START_ENTITY", "button.pc_gijs_overweel3d")
-VM_START_WAIT_SECONDS = int(setting("VM_START_WAIT_SECONDS", "240") or 240)
-VM_IP = setting("VM_IP", "192.168.2.42")
-GUEST_API_PORT = int(setting("GUEST_API_PORT", "8766") or 8766)
-GUEST_API_TOKEN = setting("GUEST_API_TOKEN", "Gijs1212!")
 CLOUD_PRESENCE_INTERVAL_SECONDS = 120
-SUPERVISOR_TOKEN = setting("SUPERVISOR_TOKEN")
+FAN_STATUS_CHECK_SECONDS = 30
+FAN_VENTILATION_INTERVAL_SECONDS = 5 * 60
+FAN_VENTILATION_DURATION_SECONDS = 60
+BAMBU_COLOR_CATALOG_INTERVAL_SECONDS = 60 * 60
+BAMBU_COLOR_CATALOG_URL = "https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/profiles/BBL/filament/filaments_color_codes.json"
 MQTT_HOST = "us.mqtt.bambulab.com"
 WEBSITE_API_URL = setting("WEBSITE_API_URL", "https://api.gijsoverweel.nl/api/overweel3d")
 BAMBU_SERIAL = ""
 PRINTER_ID = ""
 BRIDGE_TOKEN = ""
 BRIDGE_REFRESH_TOKEN = ""
-BAMBU_HOST = ""
-BAMBU_ACCESS_CODE = ""
-FTPS_USERNAME = "bblp"
-FTPS_PORT = 990
+INSTALLED_NOZZLE_DIAMETER: float | None = None
 
 BRIDGE_TOKEN_LOCK = threading.Lock()
 PRINT_SEQUENCE_LOCK = threading.Lock()
 PRINT_SEQUENCE_ID = secrets.randbelow(9000) + 1000
-GUEST_LOCK = threading.Condition()
-GUEST_LAST_SEEN = 0.0
-GUEST_PENDING_JOB: dict | None = None
-GUEST_LAST_EVENT: dict | None = None
-POWER_OFF_REQUESTED_FOR: set[str] = set()
-HOST_STARTED_BY_ADDON_FOR: set[str] = set()
-HOST_SHUTDOWN_PENDING_FOR: set[str] = set()
-HOST_POWER_OFF_COMPLETED_FOR: set[str] = set()
-PREPARATION_LOCK = threading.Lock()
-PREPARATION_ACTIVE = False
-PREPARATION_RESULT: dict | None = None
-METADATA_LOCK = threading.Lock()
-METADATA_ACTIVE: set[str] = set()
 LATEST_REPORT_LOCK = threading.Lock()
 LATEST_PRINTER_REPORT: dict = {}
-MANUAL_STATUS_REFRESH_REQUESTED = threading.Event()
-MANUAL_STATUS_REFRESH_COMPLETED = threading.Event()
+AMS_REFRESH_REQUESTED = threading.Event()
+AMS_REFRESH_COMPLETED = threading.Event()
 
 
 class BridgeAuthorizationError(RuntimeError):
     """The local bridge token no longer matches the selected website printer."""
-
-
-class MetadataDownloadCancelled(RuntimeError):
-    """Raised when the admin cancels a temporary FTPS metadata download."""
-
-
-def cleanup_download_cache(now: float | None = None) -> int:
-    """Remove completed and partial cached downloads after 48 hours."""
-    current = time.time() if now is None else now
-    DOWNLOAD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    removed = 0
-    for cached in DOWNLOAD_CACHE_DIR.iterdir():
-        try:
-            if cached.is_file() and current - cached.stat().st_mtime >= DOWNLOAD_CACHE_TTL_SECONDS:
-                cached.unlink(missing_ok=True)
-                removed += 1
-        except OSError as exc:
-            print(f"Downloadcachebestand kon niet worden gecontroleerd: {cached}: {exc}", flush=True)
-    if removed:
-        print(f"Downloadcache opgeschoond: {removed} bestand(en) ouder dan 48 uur verwijderd.", flush=True)
-    return removed
-
-
-def download_cache_path(remote_path: str, expected_size: int | None) -> Path:
-    suffix = ".gcode" if remote_path.lower().endswith(".gcode") else ".3mf"
-    identity = f"{remote_path.lstrip('/')}\0{expected_size if expected_size is not None else 'unknown'}"
-    return DOWNLOAD_CACHE_DIR / f"{hashlib.sha256(identity.encode('utf-8')).hexdigest()}{suffix}"
-
-
-def download_cache_cleanup_loop() -> None:
-    while True:
-        try:
-            cleanup_download_cache()
-        except Exception as exc:
-            print(f"Downloadcache opschonen mislukt: {exc}", flush=True)
-        time.sleep(60 * 60)
 
 
 def migrate_persistent_file(source: Path, destination: Path) -> bool:
@@ -184,9 +115,8 @@ def migrate_persistent_file(source: Path, destination: Path) -> bool:
 
 def initialize_persistent_storage() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    DOWNLOAD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
-        for directory in (CONFIG_DIR, DOWNLOAD_CACHE_DIR):
+        for directory in (CONFIG_DIR,):
             try:
                 directory.chmod(0o700)
             except OSError:
@@ -210,18 +140,6 @@ def save_persistent_settings() -> None:
         "bambu_account": latest("bambu_account", BAMBU_ACCOUNT),
         "email_code": latest("email_code"),
         "website_pairing_code": latest("website_pairing_code", WEBSITE_PAIRING_CODE),
-        "next_plate_button_entity": latest("next_plate_button_entity", NEXT_PLATE_BUTTON_ENTITY),
-        "host_pc_ip": latest("host_pc_ip", HOST_PC_IP),
-        "host_status_interval_seconds": latest("host_status_interval_seconds", str(HOST_STATUS_INTERVAL_SECONDS)),
-        "host_online_delay_seconds": latest("host_online_delay_seconds", str(HOST_ONLINE_DELAY_SECONDS)),
-        "host_boot_delay_seconds": latest("host_boot_delay_seconds", str(HOST_BOOT_DELAY_SECONDS)),
-        "pc_power_on_entity": latest("pc_power_on_entity", PC_POWER_ON_ENTITY),
-        "pc_power_off_entity": latest("pc_power_off_entity", PC_POWER_OFF_ENTITY),
-        "vm_start_entity": latest("vm_start_entity", VM_START_ENTITY),
-        "vm_start_wait_seconds": latest("vm_start_wait_seconds", str(VM_START_WAIT_SECONDS)),
-        "vm_ip": latest("vm_ip", VM_IP),
-        "guest_api_port": latest("guest_api_port", str(GUEST_API_PORT)),
-        "guest_api_token": latest("guest_api_token", GUEST_API_TOKEN),
     }
     temporary = PERSISTED_OPTIONS_FILE.with_suffix(".tmp")
     temporary.write_text(json.dumps(values), encoding="utf-8")
@@ -239,18 +157,11 @@ def pairing_code_hash(code: str) -> str:
 
 
 def apply_website_pairing(config: dict) -> None:
-    global BAMBU_SERIAL, PRINTER_ID, BRIDGE_TOKEN, BRIDGE_REFRESH_TOKEN, BAMBU_HOST, BAMBU_ACCESS_CODE, FTPS_USERNAME, FTPS_PORT
+    global BAMBU_SERIAL, PRINTER_ID, BRIDGE_TOKEN, BRIDGE_REFRESH_TOKEN
     BAMBU_SERIAL = str(config.get("bambu_serial") or "").strip()
     PRINTER_ID = str(config.get("printer_id") or "").strip()
     BRIDGE_TOKEN = str(config.get("bridge_token") or "").strip()
     BRIDGE_REFRESH_TOKEN = str(config.get("bridge_refresh_token") or "").strip()
-    BAMBU_HOST = str(config.get("bambu_host") or "").strip()
-    BAMBU_ACCESS_CODE = str(config.get("bambu_access_code") or "").strip()
-    FTPS_USERNAME = str(config.get("ftps_username") or "bblp").strip()
-    try:
-        FTPS_PORT = int(config.get("ftps_port") or 990)
-    except (TypeError, ValueError):
-        FTPS_PORT = 990
 
 
 def local_sd_access_available() -> bool:
@@ -465,6 +376,44 @@ def choose_serial(token: str) -> str:
     return BAMBU_SERIAL
 
 
+def normalize_nozzle_diameter(value) -> float | None:
+    """Return a plausible nozzle diameter in millimetres from Bambu/slicer data."""
+    if isinstance(value, dict):
+        for key in ("installed_nozzle_diameter", "nozzle_diameter", "diameter", "value"):
+            normalized = normalize_nozzle_diameter(value.get(key))
+            if normalized is not None:
+                return normalized
+        return None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            normalized = normalize_nozzle_diameter(item)
+            if normalized is not None:
+                return normalized
+        return None
+    if value in (None, ""):
+        return None
+    match = re.search(r"(?<!\d)(0(?:[.,]\d+)|1(?:[.,]0)?)(?!\d)", str(value))
+    if not match:
+        return None
+    try:
+        diameter = float(match.group(1).replace(",", "."))
+    except ValueError:
+        return None
+    return round(diameter, 3) if 0.1 <= diameter <= 1.2 else None
+
+
+def report_nozzle_diameter(report: dict | None) -> float | None:
+    if isinstance(report, dict):
+        for key in ("installed_nozzle_diameter", "nozzle_diameter", "nozzle_diameter_mm", "machine_nozzle_size"):
+            normalized = normalize_nozzle_diameter(report.get(key))
+            if normalized is not None:
+                return normalized
+        normalized = normalize_nozzle_diameter(report.get("nozzle"))
+        if normalized is not None:
+            return normalized
+    return INSTALLED_NOZZLE_DIAMETER
+
+
 def cloud_presence_status(device: dict) -> str:
     if device.get("online") is False:
         return "offline"
@@ -481,15 +430,24 @@ def cloud_presence_status(device: dict) -> str:
 
 def cloud_presence_loop(token: str, serial: str) -> None:
     """Keep website presence fresh even while Cloud MQTT reconnects."""
+    global INSTALLED_NOZZLE_DIAMETER
     while True:
         try:
             devices = bound_printers(token)
             device = next((item for item in devices if str(item.get("dev_id") or "") == serial), None)
             if not device:
                 raise RuntimeError(f"Printer {serial} ontbreekt in het gekoppelde Bambu-account")
+            reported_nozzle = report_nozzle_diameter(device)
+            if reported_nozzle is not None:
+                INSTALLED_NOZZLE_DIAMETER = reported_nozzle
             status = cloud_presence_status(device)
-            forward({"status": status, "heartbeat_only": True})
-            print(f"Bambu Cloud-aanwezigheid bevestigd: {status}.", flush=True)
+            forward({
+                "status": status,
+                "heartbeat_only": True,
+                "installed_nozzle_diameter": INSTALLED_NOZZLE_DIAMETER,
+            })
+            nozzle_text = f"; nozzle {INSTALLED_NOZZLE_DIAMETER:g} mm" if INSTALLED_NOZZLE_DIAMETER is not None else ""
+            print(f"Bambu Cloud-aanwezigheid bevestigd: {status}{nozzle_text}.", flush=True)
         except Exception as exc:
             print(f"Bambu Cloud-aanwezigheidscontrole tijdelijk mislukt: {exc}", flush=True)
         time.sleep(CLOUD_PRESENCE_INTERVAL_SECONDS)
@@ -535,6 +493,121 @@ def next_print_sequence_id() -> str:
     with PRINT_SEQUENCE_LOCK:
         PRINT_SEQUENCE_ID = 1000 if PRINT_SEQUENCE_ID >= 9999 else PRINT_SEQUENCE_ID + 1
         return str(PRINT_SEQUENCE_ID)
+
+
+def fan_gcode_command(*, part_percent: int | None = None, auxiliary_percent: int | None = None, chamber_percent: int | None = None) -> dict:
+    """Build a safe Bambu command: unnumbered part fan, P2 auxiliary, P3 chamber."""
+    lines: list[str] = []
+    for command, percent, maximum in (("M106", part_percent, 100), ("M106 P2", auxiliary_percent, 30), ("M106 P3", chamber_percent, 30)):
+        if percent is None:
+            continue
+        bounded = max(0, min(maximum, int(percent)))
+        pwm = (255 * bounded + 50) // 100
+        lines.append(f"{command} S{pwm}")
+    if not lines:
+        raise ValueError("Minimaal één ventilatorsnelheid is vereist")
+    return {"print": {
+        "sequence_id": next_print_sequence_id(),
+        "command": "gcode_line",
+        "param": "\n".join(lines) + "\n",
+    }}
+
+
+def reported_fan_percent(report: dict | None, field: str) -> float | None:
+    """Normalize Bambu's reported 0-15 fan steps (or a percentage) to 0-100%."""
+    if not isinstance(report, dict) or report.get(field) in (None, ""):
+        return None
+    try:
+        value = max(0.0, float(report[field]))
+    except (TypeError, ValueError):
+        return None
+    if value <= 15:
+        return value * 100 / 15
+    if value <= 100:
+        return value
+    return min(100.0, value * 100 / 255)
+
+
+def fan_has_manual_override(report: dict | None, field: str) -> bool:
+    """Treat any observed auxiliary/chamber speed except 0% or 30% as manual."""
+    percent = reported_fan_percent(report, field)
+    if percent is None:
+        return False
+    return not (percent <= 2 or abs(percent - 30) <= 5)
+
+
+class PrintFanAutomation:
+    """Thirty-second print check with a one-minute enclosure ventilation pulse."""
+
+    def __init__(self) -> None:
+        self.last_check_at: float | None = None
+        self.was_printing = False
+        self.next_ventilation_at: float | None = None
+        self.ventilation_until: float | None = None
+        self.auxiliary_expected: int | None = None
+        self.chamber_expected: int | None = None
+        self.auxiliary_manual_detection_armed = False
+        self.chamber_manual_detection_armed = False
+        self.auxiliary_override = False
+        self.chamber_override = False
+
+    def _update_manual_overrides(self, report: dict | None) -> None:
+        for prefix, field in (("auxiliary", "big_fan1_speed"), ("chamber", "big_fan2_speed")):
+            observed = reported_fan_percent(report, field)
+            if observed is None:
+                continue
+            allowed = observed <= 2 or abs(observed - 30) <= 5
+            armed_name = f"{prefix}_manual_detection_armed"
+            override_name = f"{prefix}_override"
+            expected = getattr(self, f"{prefix}_expected")
+            if allowed and expected is not None:
+                setattr(self, armed_name, True)
+                setattr(self, override_name, False)
+            elif getattr(self, armed_name):
+                setattr(self, override_name, True)
+
+    def _command(self, *, part: int | None = None, auxiliary: int | None = None, chamber: int | None = None) -> dict:
+        if auxiliary is not None:
+            self.auxiliary_expected = auxiliary
+        if chamber is not None:
+            self.chamber_expected = chamber
+        return fan_gcode_command(part_percent=part, auxiliary_percent=auxiliary, chamber_percent=chamber)
+
+    def tick(self, now: float, state: str, report: dict | None = None) -> tuple[bool, dict | None]:
+        if self.last_check_at is not None and now - self.last_check_at < FAN_STATUS_CHECK_SECONDS:
+            return False, None
+        self.last_check_at = now
+        self._update_manual_overrides(report)
+        auxiliary_off = None if self.auxiliary_override else 0
+        chamber_off = None if self.chamber_override else 0
+        auxiliary_pulse = None if self.auxiliary_override else 30
+        chamber_pulse = None if self.chamber_override else 30
+        printing = str(state or "").upper() == "RUNNING"
+        if not printing:
+            if not self.was_printing:
+                return True, None
+            self.was_printing = False
+            self.next_ventilation_at = None
+            self.ventilation_until = None
+            return True, self._command(part=0, auxiliary=auxiliary_off, chamber=chamber_off)
+
+        if not self.was_printing:
+            self.was_printing = True
+            self.next_ventilation_at = now + FAN_VENTILATION_INTERVAL_SECONDS
+            self.ventilation_until = None
+            # Reset P2/P3 after a reconnect, then keep P1 at 100%.
+            return True, self._command(part=100, auxiliary=auxiliary_off, chamber=chamber_off)
+
+        if self.ventilation_until is not None and now >= self.ventilation_until:
+            self.ventilation_until = None
+            return True, self._command(part=100, auxiliary=auxiliary_off, chamber=chamber_off)
+
+        if self.ventilation_until is None and self.next_ventilation_at is not None and now >= self.next_ventilation_at:
+            self.ventilation_until = now + FAN_VENTILATION_DURATION_SECONDS
+            self.next_ventilation_at = now + FAN_VENTILATION_INTERVAL_SECONDS
+            return True, self._command(part=100, auxiliary=auxiliary_pulse, chamber=chamber_pulse)
+
+        return True, self._command(part=100)
 
 
 def read_packet(sock: ssl.SSLSocket) -> tuple[int, bytes]:
@@ -600,6 +673,10 @@ def status_payload(report: dict) -> dict:
                 "spool_capacity_grams": spool_capacity_grams(tray),
                 "raw_status": tray,
             })
+    raw_status = json.loads(json.dumps(report))
+    installed_nozzle = report_nozzle_diameter(report)
+    if installed_nozzle is not None:
+        raw_status["installed_nozzle_diameter"] = installed_nozzle
     return {
         "status": status,
         "print_state": state,
@@ -613,7 +690,8 @@ def status_payload(report: dict) -> dict:
         "bed_temperature": report.get("bed_temper"),
         "chamber_temperature": report.get("chamber_temper"),
         "ams_slots": slots,
-        "raw_status": report,
+        "installed_nozzle_diameter": installed_nozzle,
+        "raw_status": raw_status,
     }
 
 
@@ -621,6 +699,31 @@ def remember_latest_report(report: dict) -> None:
     with LATEST_REPORT_LOCK:
         LATEST_PRINTER_REPORT.clear()
         LATEST_PRINTER_REPORT.update(json.loads(json.dumps(report)))
+
+
+def ams_only_payload(report: dict) -> dict:
+    """Build an AMS-only status update without changing general printer state."""
+    payload = status_payload(report)
+    return {
+        "ams_only": True,
+        "ams_slots": payload.get("ams_slots") or [],
+    }
+
+
+def request_ams_refresh(timeout_seconds: int = 20) -> bool:
+    """Ask Bambu Cloud for fresh AMS data without refreshing other systems."""
+    AMS_REFRESH_COMPLETED.clear()
+    AMS_REFRESH_REQUESTED.set()
+    if AMS_REFRESH_COMPLETED.wait(timeout=max(1, timeout_seconds)):
+        return True
+    with LATEST_REPORT_LOCK:
+        snapshot = json.loads(json.dumps(LATEST_PRINTER_REPORT)) if LATEST_PRINTER_REPORT else {}
+    if snapshot:
+        forward(ams_only_payload(snapshot))
+        print("AMS-refresh gebruikte de laatste live MQTT-status na een printertimeout.", flush=True)
+        return True
+    print("AMS-refresh kreeg nog geen MQTT-data en blijft openstaan voor een nieuwe poging.", flush=True)
+    return False
 
 
 def request_manual_status_refresh(timeout_seconds: int = 20) -> bool:
@@ -719,10 +822,11 @@ def publish_scan_state(state: str, kind: str, request_id: int, detail: str = "")
         print(f"HA-scanstatus kon niet worden bijgewerkt: {exc}", flush=True)
 
 
-def queue_request(payload: dict, retry_after_refresh: bool = False) -> dict:
+def bridge_control_request(payload: dict) -> dict:
+    action = str(payload.get("action") or "onbekend")
     token_used = BRIDGE_TOKEN
     request = urllib.request.Request(
-        WEBSITE_API_URL + "/bridge/queue",
+        WEBSITE_API_URL + "/bridge/control",
         data=json.dumps(payload).encode(),
         method="POST",
         headers={"content-type": "application/json", "x-printer-id": PRINTER_ID, "x-bridge-token": token_used},
@@ -736,21 +840,72 @@ def queue_request(payload: dict, retry_after_refresh: bool = False) -> dict:
             raise BridgeAuthorizationError(
                 "PocketBase weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
             ) from exc
-        raise RuntimeError(f"Printerwachtrij synchroniseren mislukt ({exc.code}): {detail[:300]}") from exc
+        raise RuntimeError(f"Bridgeactie '{action}' mislukt ({exc.code}): {detail[:300]}") from exc
 
 
-def notify_admin_manual_intervention(item: dict, error: str, alert_id: str = "") -> None:
-    """Send one best-effort admin alert through the authenticated bridge endpoint."""
-    try:
-        queue_request({
-            "action": "notify_manual_intervention",
-            "item_id": str(item.get("id") or ""),
-            "error": str(error or "Handmatige controle is nodig")[:2000],
-            "alert_id": str(alert_id or uuid.uuid4()),
-        })
-        print("Adminmail voor handmatig ingrijpen is verzonden.", flush=True)
-    except Exception as exc:
-        print(f"Adminmail voor handmatig ingrijpen kon niet worden verzonden: {exc}", flush=True)
+def normalize_bambu_catalog_material(value: object) -> str:
+    material = str(value or "").strip().upper().replace("_", " ")
+    for prefix in ("PETG", "PLA", "TPU", "ABS", "ASA", "PC", "PA", "PVA", "PPS", "PET"):
+        if material.startswith(prefix):
+            return prefix
+    return material.split(" ", 1)[0]
+
+
+def parse_bambu_color_catalog(payload: dict) -> list[dict]:
+    """Reduce BambuStudio's official colour catalog to unique website proposals."""
+    unique: dict[str, dict] = {}
+    for item in payload.get("data") or []:
+        if not isinstance(item, dict):
+            continue
+        colors = item.get("fila_color") or []
+        raw_hex = str(colors[0] if colors else "").strip().lstrip("#")
+        if len(raw_hex) < 6 or not re.fullmatch(r"[0-9a-fA-F]{6,8}", raw_hex):
+            continue
+        material = normalize_bambu_catalog_material(item.get("fila_type"))
+        names = item.get("fila_color_name") if isinstance(item.get("fila_color_name"), dict) else {}
+        name = str(names.get("nl") or names.get("en") or "").strip()
+        if not material or not name:
+            continue
+        color_hex = "#" + raw_hex[:6].upper()
+        source_id = str(item.get("fila_id") or "unknown").strip()
+        color_code = str(item.get("fila_color_code") or item.get("color_code") or color_hex[1:]).strip()
+        key = f"{material}|{name.casefold()}|{color_hex}"
+        unique[key] = {
+            "catalog_key": f"{source_id}:{color_code}",
+            "name": name,
+            "material": material,
+            "color_hex": color_hex,
+            "filament_type": str(item.get("fila_type") or material).strip(),
+        }
+    return list(unique.values())
+
+
+def fetch_bambu_color_catalog() -> list[dict]:
+    request = urllib.request.Request(
+        BAMBU_COLOR_CATALOG_URL,
+        headers={"user-agent": "Overweel3D-Bambu-Bridge/1.32"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return parse_bambu_color_catalog(json.loads(response.read().decode("utf-8")))
+
+
+def bambu_color_catalog_loop() -> None:
+    """Synchronize official Bambu colour proposals immediately and hourly."""
+    while True:
+        retry_seconds = BAMBU_COLOR_CATALOG_INTERVAL_SECONDS
+        try:
+            colors = fetch_bambu_color_catalog()
+            result = bridge_control_request({"action": "sync_bambu_color_catalog", "colors": colors})
+            print(
+                f"Bambu-kleurcatalogus vergeleken: {len(colors)} unieke kleuren; "
+                f"{int(result.get('new_proposals') or 0)} nieuw voorgesteld, "
+                f"{int(result.get('open_proposals') or 0)} voorstel(len) open.",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"Bambu-kleurcatalogus tijdelijk niet beschikbaar: {exc}", flush=True)
+            retry_seconds = 5 * 60
+        time.sleep(retry_seconds)
 
 
 class ImplicitFTP_TLS(ftplib.FTP_TLS):
@@ -774,6 +929,7 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
     plates: dict[int, dict] = {}
     configured_filaments: list[dict] = []
     used_filaments: list[dict] = []
+    project_nozzle: float | None = None
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             names = archive.namelist()
@@ -789,6 +945,11 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
                     settings = json.loads(archive.read(name))
                 except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
                     continue
+                for key in ("nozzle_diameter", "nozzle_diameters", "machine_nozzle_size", "printer_nozzle_diameter"):
+                    normalized_nozzle = normalize_nozzle_diameter(settings.get(key))
+                    if normalized_nozzle is not None:
+                        project_nozzle = normalized_nozzle
+                        break
                 colors = settings.get("filament_colour") or settings.get("filament_color") or []
                 materials = settings.get("filament_type") or []
                 for index, color in enumerate(colors):
@@ -887,6 +1048,11 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
                             entry["name"] = plate_name
                         if plate_filaments:
                             entry["detected_filaments"] = plate_filaments
+                        for key in ("nozzle_diameter", "nozzle_diameters", "machine_nozzle_size", "printer_nozzle_diameter"):
+                            normalized_nozzle = normalize_nozzle_diameter(metadata.get(key) or plate_element.attrib.get(key))
+                            if normalized_nozzle is not None:
+                                entry["nozzle_diameter"] = normalized_nozzle
+                                break
                         thumbnail_path = metadata.get("thumbnail_file")
                         resolved_thumbnail = name_lookup.get(str(thumbnail_path or "").lower())
                         if resolved_thumbnail and archive.getinfo(resolved_thumbnail).file_size <= 2 * 1024 * 1024:
@@ -896,6 +1062,17 @@ def parse_3mf_metadata(content: bytes) -> tuple[list[dict], list[dict]]:
             # thumbnail reference in model_settings. Attach the conventional
             # plate_N.png preview after all plate sources have been merged.
             for number, entry in plates.items():
+                if entry.get("nozzle_diameter") is None:
+                    embedded_gcode = name_lookup.get(f"metadata/plate_{number}.gcode")
+                    if embedded_gcode:
+                        try:
+                            parsed_plates, _ = parse_gcode_metadata(archive.read(embedded_gcode), number, entry.get("name") or "")
+                            if parsed_plates and parsed_plates[0].get("nozzle_diameter") is not None:
+                                entry["nozzle_diameter"] = parsed_plates[0]["nozzle_diameter"]
+                        except (KeyError, OSError):
+                            pass
+                if entry.get("nozzle_diameter") is None and project_nozzle is not None:
+                    entry["nozzle_diameter"] = project_nozzle
                 if entry.get("preview_data_url"):
                     continue
                 preview = name_lookup.get(f"metadata/plate_{number}.png")
@@ -944,7 +1121,8 @@ def parse_gcode_metadata(content: bytes, plate_number: int = 1, plate_name: str 
             "used_grams": weights[used_position] if used_position < len(weights) else None,
         })
     name = plate_name or setting(r"^;\s*(?:plate_name|plater_name)\s*=\s*(.+)$") or f"Plaat {plate_number}"
-    return ([{"number": plate_number, "name": name, "detected_filaments": filaments}], filaments)
+    nozzle = normalize_nozzle_diameter(setting(r"^;\s*(?:nozzle_diameters?|machine_nozzle_size|printer_nozzle_diameter)\s*[:=]\s*(.+)$"))
+    return ([{"number": plate_number, "name": name, "detected_filaments": filaments, "nozzle_diameter": nozzle}], filaments)
 
 
 def read_remote_print_metadata(ftp: ImplicitFTP_TLS, path: str, size: int | None, plate_number: int = 1, plate_name: str = "", cancellation_check=None, progress_callback=None) -> tuple[list[dict], list[dict]]:
@@ -1421,69 +1599,26 @@ def start_requested_file_metadata(request: dict) -> bool:
     return True
 
 
-def sd_sync_loop() -> None:
-    if local_sd_access_available():
-        access_state = f"FTPS gereed op {BAMBU_HOST}:{FTPS_PORT} als {FTPS_USERNAME}"
-    else:
-        access_state = "FTPS-configuratie ontbreekt; verzoeken worden wel ontvangen en met een duidelijke fout gemeld"
-    print(
-        f"Handmatige SD-scanlistener gestart voor websiteprinter {PRINTER_ID}; {access_state}.",
-        flush=True,
-    )
-    last_status_refresh_marker: tuple[int, int] | None = None
+def bridge_control_loop() -> None:
+    """Handle only AMS refresh requests; print queue and SD scanning are removed."""
+    print(f"AMS-ververslistener gestart voor websiteprinter {PRINTER_ID}.", flush=True)
     while True:
         try:
-            config = queue_request({"action": "scan_config"})
-            if apply_runtime_ftps_config(config):
-                persist_runtime_ftps_config()
-                print(f"Bijgewerkte FTPS-instellingen ontvangen: {BAMBU_HOST or 'geen IP'}:{FTPS_PORT} als {FTPS_USERNAME}.", flush=True)
-            paths = [str(path) for path in (config.get("scan_paths") or ["/", "/cache"])][:25]
-            request_marker = int(config.get("scan_request_id") or 0)
-            folder_request_marker = int(config.get("folder_scan_request_id") or 0)
-            completed_request = int(config.get("scan_completed_request_id") or 0)
-            completed_folder_request = int(config.get("folder_scan_completed_request_id") or 0)
-            metadata_request = config.get("metadata_request")
-            if config.get("metadata_lookup_error"):
-                raise RuntimeError(f"PocketBase kon open downloadverzoeken niet lezen: {config['metadata_lookup_error']}")
-            refresh_marker = (folder_request_marker, request_marker)
-            refresh_pending = folder_request_marker > completed_folder_request or request_marker > completed_request
-            if refresh_pending and refresh_marker != last_status_refresh_marker:
-                print("Handmatige volledige refresh: eerst printerstatus en AMS opvragen.", flush=True)
-                request_manual_status_refresh()
-                last_status_refresh_marker = refresh_marker
-            # PocketBase is de bron van waarheid. Een verzoek blijft openstaan totdat
-            # sync_directories/sync_files de bijbehorende completed-id opslaat. Gebruik
-            # hier bewust geen lokale last_request-filter: na een tijdelijke FTPS- of
-            # API-fout moet exact hetzelfde verzoek opnieuw worden uitgevoerd.
-            if folder_request_marker > completed_folder_request:
+            config = bridge_control_request({"action": "scan_config"})
+            ams_request_marker = int(config.get("ams_refresh_request_id") or 0)
+            completed_ams_request = int(config.get("ams_refresh_completed_request_id") or 0)
+            if ams_request_marker > completed_ams_request:
                 print(
-                    f"Mappenscanverzoek #{folder_request_marker} ontvangen "
-                    f"(laatst bevestigd: #{completed_folder_request}).",
+                    f"AMS-refreshverzoek #{ams_request_marker} ontvangen "
+                    f"(laatst bevestigd: #{completed_ams_request}).",
                     flush=True,
                 )
-                publish_scan_state("bezig", "mappen", folder_request_marker)
-                sync_sd_directories(folder_request_marker)
-                publish_scan_state("voltooid", "mappen", folder_request_marker)
-            if request_marker > completed_request:
-                print(
-                    f"Bestandsscanverzoek #{request_marker} ontvangen "
-                    f"(laatst bevestigd: #{completed_request}; mappen: {paths}).",
-                    flush=True,
-                )
-                publish_scan_state("bezig", "bestanden", request_marker)
-                sync_sd_files(paths, request_marker)
-                publish_scan_state("voltooid", "bestanden", request_marker)
-            if isinstance(metadata_request, dict):
-                if start_requested_file_metadata(metadata_request):
-                    print(f"Metadata-downloadworker gestart voor aanvraag #{metadata_request.get('metadata_request_id')}.", flush=True)
+                if request_ams_refresh():
+                    bridge_control_request({"action": "ack_ams_refresh", "request_id": ams_request_marker})
+                    print(f"AMS-refreshverzoek #{ams_request_marker} voltooid.", flush=True)
         except Exception as exc:
-            print(f"Handmatige SD-scan tijdelijk niet beschikbaar: {exc}", flush=True)
-            try:
-                publish_scan_state("mislukt", "onbekend", 0, str(exc))
-                queue_request({"action": "scan_error", "error": str(exc)})
-            except Exception:
-                pass
-        time.sleep(3)
+            print(f"AMS-verversverzoeken tijdelijk niet leesbaar: {exc}", flush=True)
+        time.sleep(5)
 
 
 def bambu_login_request_loop() -> None:
@@ -1491,7 +1626,7 @@ def bambu_login_request_loop() -> None:
     last_handled = 0
     while True:
         try:
-            config = queue_request({"action": "scan_config"})
+            config = bridge_control_request({"action": "scan_config"})
             requested = int(config.get("bambu_login_request_id") or 0)
             completed = int(config.get("bambu_login_completed_request_id") or 0)
             if requested > completed and requested != last_handled:
@@ -1500,14 +1635,14 @@ def bambu_login_request_loop() -> None:
                     api("/v1/user-service/user/sendemail/code", "POST", {"email": BAMBU_ACCOUNT, "type": "codeLogin"})
                     if TOKEN_FILE.exists():
                         TOKEN_FILE.unlink()
-                    queue_request({"action": "ack_bambu_login_code", "request_id": requested, "success": True})
+                    bridge_control_request({"action": "ack_bambu_login_code", "request_id": requested, "success": True})
                     print(
                         f"Handmatig Bambu-inlogcodeverzoek #{requested} uitgevoerd. "
                         f"De code is naar {BAMBU_ACCOUNT} gestuurd; vul hem in bij E-mailcode en herstart de add-on.",
                         flush=True,
                     )
                 except Exception as exc:
-                    queue_request({"action": "ack_bambu_login_code", "request_id": requested, "success": False, "error": str(exc)})
+                    bridge_control_request({"action": "ack_bambu_login_code", "request_id": requested, "success": False, "error": str(exc)})
                     print(f"Bambu-inlogcode aanvragen mislukt: {exc}", flush=True)
         except Exception as exc:
             print(f"Loginverzoeken tijdelijk niet leesbaar: {exc}", flush=True)
@@ -1604,7 +1739,7 @@ class GuestThreadingHTTPServer(ThreadingHTTPServer):
 
 
 class GuestApiHandler(BaseHTTPRequestHandler):
-    server_version = "Overweel3DGuestAPI/1.29.0"
+    server_version = "Overweel3DGuestAPI/1.34.0"
 
     def log_message(self, pattern: str, *args: object) -> None:
         print("VM-API " + (pattern % args), flush=True)
@@ -1642,7 +1777,7 @@ class GuestApiHandler(BaseHTTPRequestHandler):
             if not guest_client_allowed(client_ip):
                 self.answer(403, {"error": "private network required"})
                 return
-            self.answer(200, {"ok": True, "service": "overweel3d-vm-api", "version": "1.29.0", "client_ip": client_ip})
+            self.answer(200, {"ok": True, "service": "overweel3d-vm-api", "version": "1.34.0", "client_ip": client_ip})
             return
         if not self.authorized():
             self.answer(401, {"error": "unauthorized"})
@@ -2009,7 +2144,9 @@ def run(session: dict, serial: str) -> None:
         print(f"Verbonden met Bambu-printer {serial}; live status wordt doorgestuurd.", flush=True)
         complete, last_ping = {}, time.monotonic()
         manual_status_pending = False
+        ams_refresh_pending = False
         next_plate_button = InputButtonPress()
+        fan_automation = PrintFanAutomation()
         active_item = None
         active_sequence_id = None
         active_ack_received = False
@@ -2066,6 +2203,11 @@ def run(session: dict, serial: str) -> None:
                         manual_status_pending = False
                         MANUAL_STATUS_REFRESH_COMPLETED.set()
                         print("Handmatige printer- en AMS-statusrefresh voltooid.", flush=True)
+                    if ams_refresh_pending:
+                        forward(ams_only_payload(complete))
+                        ams_refresh_pending = False
+                        AMS_REFRESH_COMPLETED.set()
+                        print("Aparte AMS-refresh voltooid; overige printerdata is niet gewijzigd.", flush=True)
             # PINGRESP (type 13) is only an acknowledgement; a client must not answer it.
 
             now = time.monotonic()
@@ -2074,6 +2216,11 @@ def run(session: dict, serial: str) -> None:
                 MANUAL_STATUS_REFRESH_REQUESTED.clear()
                 manual_status_pending = True
                 print("Handmatige pushall-statusaanvraag naar de Bambu-printer verzonden.", flush=True)
+            if AMS_REFRESH_REQUESTED.is_set() and not ams_refresh_pending:
+                sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": next_print_sequence_id(), "command": "pushall"}}))
+                AMS_REFRESH_REQUESTED.clear()
+                ams_refresh_pending = True
+                print("Aparte AMS pushall-aanvraag naar de Bambu-printer verzonden.", flush=True)
             if now - last_ping >= 30:
                 sock.sendall(bytes([0xC0, 0x00]))
                 last_ping = now
@@ -2097,6 +2244,14 @@ def run(session: dict, serial: str) -> None:
                 last_website_trigger_check = now
 
             state = str(complete.get("gcode_state") or "IDLE").upper()
+            fan_status_due, fan_command = fan_automation.tick(now, state, complete)
+            if fan_status_due:
+                sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": next_print_sequence_id(), "command": "pushall"}}))
+                print(f"30-seconden printcontrole aangevraagd; laatst bekende status: {state}.", flush=True)
+                if fan_command:
+                    send_print_command(sock, request_topic, report_topic, fan_command)
+                    fan_gcode = str(fan_command.get("print", {}).get("param") or "").strip().replace("\n", "; ")
+                    print(f"Automatische ventilatorinstelling verzonden: {fan_gcode}.", flush=True)
             prepared = take_preparation_result()
             if prepared:
                 if prepared.get("error"):
@@ -2249,8 +2404,75 @@ def run(session: dict, serial: str) -> None:
                     reason = result.get("reason", "geen beschikbaar wachtrij-item") if isinstance(result, dict) else "onbekende reactie"
                     print(f"Knop volgende plaat ontvangen, maar er is niets gestart: {reason}.", flush=True)
 
-            # MQTT blijft live voor veilige printbevestiging. Printer- en
-            # AMS-status worden alleen na de websiteknop naar PocketBase geschreven.
+            # Legacy queue code below this point is no longer called. The active
+            # bridge entry point is run_status_only().
+
+
+def run_status_only(session: dict, serial: str) -> None:
+    """Forward printer/AMS status without any print queue, PC or VM control."""
+    context = ssl.create_default_context()
+    with socket.create_connection((MQTT_HOST, 8883), timeout=20) as raw, context.wrap_socket(raw, server_hostname=MQTT_HOST) as sock:
+        sock.settimeout(10)
+        sock.sendall(connect_packet(f"u_{session['uid']}", session["access_token"]))
+        kind, response = read_packet(sock)
+        if kind >> 4 != 2 or len(response) < 2 or response[1] != 0:
+            raise RuntimeError(f"Bambu Cloud MQTT-login geweigerd: {response.hex()}")
+        report_topic, request_topic = f"device/{serial}/report", f"device/{serial}/request"
+        sock.sendall(subscribe_packet(report_topic))
+        read_packet(sock)
+        sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": "0", "command": "pushall"}}))
+        print(f"Verbonden met Bambu-printer {serial}; printerstatus en AMS worden doorgestuurd.", flush=True)
+        complete: dict = {}
+        last_ping = time.monotonic()
+        last_forwarded = 0.0
+        last_state = ""
+        ams_refresh_pending = False
+        fan_automation = PrintFanAutomation()
+        while True:
+            try:
+                kind, payload = read_packet(sock)
+            except (socket.timeout, TimeoutError, ssl.SSLWantReadError):
+                kind, payload = 0, b""
+            except ssl.SSLError as exc:
+                if "timed out" in str(exc).lower():
+                    kind, payload = 0, b""
+                else:
+                    raise
+            now = time.monotonic()
+            if kind >> 4 == 3:
+                topic_length = struct.unpack("!H", payload[:2])[0]
+                data = json.loads(payload[2 + topic_length:].decode(errors="replace"))
+                update = data.get("print") or {}
+                if "result" not in update:
+                    merge(complete, update)
+                    remember_latest_report(complete)
+                    state = str(complete.get("gcode_state") or "IDLE").upper()
+                    if state != last_state or now - last_forwarded >= 30:
+                        forward(status_payload(complete))
+                        last_forwarded = now
+                        if state != last_state:
+                            print(f"PRINTERSTATUS: {last_state or 'ONBEKEND'} -> {state}.", flush=True)
+                            last_state = state
+                    if ams_refresh_pending:
+                        forward(ams_only_payload(complete))
+                        ams_refresh_pending = False
+                        AMS_REFRESH_COMPLETED.set()
+                        print("AMS-refresh voltooid.", flush=True)
+
+            if AMS_REFRESH_REQUESTED.is_set() and not ams_refresh_pending:
+                sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": next_print_sequence_id(), "command": "pushall"}}))
+                AMS_REFRESH_REQUESTED.clear()
+                ams_refresh_pending = True
+                print("AMS-status bij de printer opgevraagd.", flush=True)
+            if now - last_ping >= 30:
+                sock.sendall(bytes([0xC0, 0x00]))
+                sock.sendall(publish_packet(request_topic, {"pushing": {"sequence_id": next_print_sequence_id(), "command": "pushall"}}))
+                last_ping = now
+
+            state = str(complete.get("gcode_state") or "IDLE").upper()
+            fan_status_due, fan_command = fan_automation.tick(now, state, complete)
+            if fan_status_due and fan_command:
+                sock.sendall(publish_packet(request_topic, fan_command))
 
 
 def main() -> None:
@@ -2261,15 +2483,11 @@ def main() -> None:
     save_persistent_settings()
     exchange_website_pairing()
     load_saved_bridge_token()
-    # Start all website controls before cloud login. SD/FTPS requests are local
-    # printer operations and must blijven werken wanneer Bambu Cloud offline is
-    # of om een nieuwe e-mailcode vraagt.
+    # Only login, AMS refresh and colour-catalog controls remain. Print queue,
+    # SD/FTPS scanning, host-PC control and VM control have been removed.
     threading.Thread(target=bambu_login_request_loop, name="bambu-login-requests", daemon=True).start()
-    threading.Thread(target=sd_sync_loop, name="printer-sd-sync", daemon=True).start()
-    threading.Thread(target=host_status_loop, name="host-pc-status", daemon=True).start()
-    threading.Thread(target=download_cache_cleanup_loop, name="download-cache-cleanup", daemon=True).start()
-    threading.Thread(target=start_guest_api, name="vm-guest-api", daemon=True).start()
-    threading.Thread(target=vm_status_loop, name="vm-display-status", daemon=True).start()
+    threading.Thread(target=bridge_control_loop, name="ams-refresh-requests", daemon=True).start()
+    threading.Thread(target=bambu_color_catalog_loop, name="bambu-color-catalog", daemon=True).start()
     while True:
         try:
             session = login()
@@ -2277,7 +2495,7 @@ def main() -> None:
         except Exception as exc:
             print(
                 f"Bambu Cloud-login tijdelijk niet beschikbaar: {exc}. "
-                "Website-, FTPS- en loginverzoeken blijven actief; nieuwe poging over 30 seconden.",
+                "Website- en loginverzoeken blijven actief; nieuwe poging over 30 seconden.",
                 flush=True,
             )
             time.sleep(30)
@@ -2286,9 +2504,10 @@ def main() -> None:
         print(f"Bambu-sessie voor {session['account']} is veilig in het Docker-volume opgeslagen.", flush=True)
         return
     serial = choose_serial(session["access_token"])
+    threading.Thread(target=cloud_presence_loop, args=(session["access_token"], serial), name="bambu-cloud-presence", daemon=True).start()
     while True:
         try:
-            run(session, serial)
+            run_status_only(session, serial)
         except BridgeAuthorizationError as exc:
             print(f"Cloudbridge-koppeling geweigerd: {exc}", flush=True)
             time.sleep(30)
