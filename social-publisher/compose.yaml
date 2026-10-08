@@ -1,0 +1,32 @@
+services:
+  social-publisher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: overweel3d-social-publisher:2.2.0
+    restart: unless-stopped
+    environment:
+      POCKETBASE_URL: ${POCKETBASE_URL:-https://api.gijsoverweel.nl}
+      NOVNC_PASSWORD: ${NOVNC_PASSWORD:?Vul een sterk noVNC-wachtwoord in}
+      CONTROL_PASSWORD: ${CONTROL_PASSWORD:?Vul een sterk beheerwachtwoord in}
+      POLL_SECONDS: ${POLL_SECONDS:-30}
+      FACEBOOK_PAGE_NAME: ${FACEBOOK_PAGE_NAME:-Overweel3D}
+      FACEBOOK_PAGE_URL: ${FACEBOOK_PAGE_URL:-https://www.facebook.com/Overweel3D}
+      INSTAGRAM_ACCOUNT_URL: ${INSTAGRAM_ACCOUNT_URL:-https://www.instagram.com/overweel3d/}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN:-}
+      META_PAGE_ID: ${META_PAGE_ID:-}
+      META_INSTAGRAM_USER_ID: ${META_INSTAGRAM_USER_ID:-}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v26.0}
+      TZ: Europe/Amsterdam
+    ports:
+      - "8787:8787"
+      - "6080:6080"
+    volumes:
+      - social_publisher_data:/data
+    shm_size: 1gb
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  social_publisher_data:
+    name: overweel3d_social_publisher_data

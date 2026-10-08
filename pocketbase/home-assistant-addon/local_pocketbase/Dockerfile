@@ -17,6 +17,7 @@ RUN apk add --no-cache ca-certificates tzdata unzip wget \
     && rm /tmp/pocketbase.zip
 
 COPY pb_hooks /opt/overweel3d-default-hooks
+COPY pb_migrations /opt/overweel3d-default-migrations
 COPY run.sh /run.sh
 RUN chmod +x /run.sh
 

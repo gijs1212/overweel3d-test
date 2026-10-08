@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, Video, X } from "lucide-react";
 
@@ -192,7 +193,7 @@ export default function AdminProducts() {
         converted.push(file);
       }
       const additions = converted.map((file) => ({
-        key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file),
+        key: createClientId(), file, previewUrl: URL.createObjectURL(file),
         media_type: file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name) ? "video" as const : "image" as const,
       }));
       setPendingImages((current) => [...current, ...additions]);
@@ -222,17 +223,17 @@ export default function AdminProducts() {
   };
 
   const addOption = () => setOptions((current) => [...current, {
-    id: crypto.randomUUID(), product_id: editingId || "", type: "text", label: "", description: "", required: false,
+    id: createClientId(), product_id: editingId || "", type: "text", label: "", description: "", required: false,
     choices: [], max_length: 100, sort_order: current.length, active: true,
     is_addon: false, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
   }]);
   const addAddon = () => setOptions((current) => [...current, {
-    id: crypto.randomUUID(), product_id: editingId || "", type: "text", label: "Nieuwe add-on", description: "", required: false,
+    id: createClientId(), product_id: editingId || "", type: "text", label: "Nieuwe add-on", description: "", required: false,
     choices: [], max_length: 100, sort_order: current.length, active: true, is_addon: true, price_adjustment: 0, color_slots: 1, color_slot_labels: ["Kleur add-on"],
   }]);
   const updateOption = (id: string, patch: Partial<ProductOption>) => setOptions((current) => current.map((option) => option.id === id ? { ...option, ...patch } : option));
   const addVariant = () => setVariants((current) => [...current, {
-    id: crypto.randomUUID(), product_id: editingId || "", name: "", sku: null, size_label: null,
+    id: createClientId(), product_id: editingId || "", name: "", sku: null, size_label: null,
     material_id: null, price_adjustment: 0, active: true, sort_order: current.length,
   }]);
   const updateVariant = (id: string, patch: Partial<ProductVariant>) => setVariants((current) => current.map((variant) => variant.id === id ? { ...variant, ...patch } : variant));
@@ -288,7 +289,7 @@ export default function AdminProducts() {
       for (let mediaIndex = 0; mediaIndex < pendingImages.length; mediaIndex += 1) {
         const pending = pendingImages[mediaIndex];
         setSaveStatus(`${pending.file.name} uploaden (${mediaIndex + 1}/${pendingImages.length})…`);
-        const path = `products/${productId}/${crypto.randomUUID()}-${sanitizeFilename(pending.file.name)}`;
+        const path = `products/${productId}/${createClientId()}-${sanitizeFilename(pending.file.name)}`;
         const uploadedFile = await uploadFileWithHeicConversion("orders", path, pending.file, { cacheControl: "3600", upsert: false });
         const { error } = uploadedFile;
         if (error) throw new Error(`Upload van ${pending.file.name} mislukt: ${error.message}`);

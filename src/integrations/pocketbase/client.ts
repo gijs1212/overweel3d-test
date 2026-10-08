@@ -1,4 +1,5 @@
 import PocketBase, { ClientResponseError, type RecordModel } from "pocketbase";
+import { createClientId } from "@/lib/clientId";
 
 export const POCKETBASE_URL = "https://api.gijsoverweel.nl";
 export const pocketbase = new PocketBase(POCKETBASE_URL);
@@ -91,6 +92,25 @@ function sessionShape() {
   return user ? { access_token: pocketbase.authStore.token, token_type: "bearer", user } as any : null;
 }
 
+let sessionRefreshPromise: Promise<ReturnType<typeof sessionShape>> | null = null;
+
+async function refreshStoredSession() {
+  if (!pocketbase.authStore.token || !pocketbase.authStore.record) return null;
+  if (!sessionRefreshPromise) {
+    sessionRefreshPromise = pocketbase.collection("users")
+      .authRefresh({ requestKey: null })
+      .then(() => sessionShape())
+      .catch(() => {
+        pocketbase.authStore.clear();
+        return null;
+      })
+      .finally(() => {
+        sessionRefreshPromise = null;
+      });
+  }
+  return sessionRefreshPromise;
+}
+
 async function findStoredFile(bucket: string, path: string) {
   return pocketbase.collection("storage_files").getFirstListItem(
     pocketbase.filter("bucket = {:bucket} && path = {:path}", { bucket, path }),
@@ -179,7 +199,7 @@ class PocketQuery implements PromiseLike<Result<any>> {
   private async matching() { return (await allRecords(this.table)).filter((row) => this.filters.every((filter) => compare(row, filter))); }
   private body(row: Record<string, any>) {
     const result = { ...row }; delete result.id; delete result._pocketbase_id; delete result.created; delete result.updated;
-    result.supabase_id = row.id || row.supabase_id || crypto.randomUUID();
+    result.supabase_id = row.id || row.supabase_id || createClientId();
     return result;
   }
   private async relations(rows: Record<string, any>[]) {
@@ -227,14 +247,17 @@ class PocketQuery implements PromiseLike<Result<any>> {
 export const supabase = {
   from: (table: string) => new PocketQuery(table),
   auth: {
-    getSession: async () => ({ data: { session: sessionShape() }, error: null }),
-    getUser: async () => ({ data: { user: userShape(pocketbase.authStore.record) }, error: null }),
+    getSession: async () => ({ data: { session: await refreshStoredSession() }, error: null }),
+    getUser: async () => {
+      const session = await refreshStoredSession();
+      return { data: { user: session?.user ?? null }, error: null };
+    },
     signInWithPassword: async ({ email, password }: any) => { try { const auth=await pocketbase.collection("users").authWithPassword(email,password); return { data:{user:userShape(auth.record),session:sessionShape()},error:null }; } catch(e){ return {data:{user:null,session:null},error:asError(e)}; } },
-    signUp: async ({ email, password, options }: any) => { try { const names=String(options?.data?.full_name||"").trim().split(/\s+/); const record=await pocketbase.collection("users").create({email,password,passwordConfirm:password,first_name:names.shift()||"",last_name:names.join(" "),role:"customer",supabase_id:crypto.randomUUID()}); return {data:{user:userShape(record),session:null},error:null}; } catch(e){return {data:{user:null,session:null},error:asError(e)}} },
+    signUp: async ({ email, password, options }: any) => { try { const names=String(options?.data?.full_name||"").trim().split(/\s+/); const record=await pocketbase.collection("users").create({email,password,passwordConfirm:password,first_name:names.shift()||"",last_name:names.join(" "),role:"customer",supabase_id:createClientId()}); return {data:{user:userShape(record),session:null},error:null}; } catch(e){return {data:{user:null,session:null},error:asError(e)}} },
     signOut: async () => { pocketbase.authStore.clear(); return { error: null }; },
     resetPasswordForEmail: async (email: string, _options?: any) => { try { await pocketbase.collection("users").requestPasswordReset(email); return {error:null}; } catch(e){return {error:asError(e)}} },
     updateUser: async ({ password }: any) => { try { const id=pocketbase.authStore.record?.id; if(!id) throw new Error("Niet ingelogd"); const record=await pocketbase.collection("users").update(id,{password,passwordConfirm:password}); return {data:{user:userShape(record)},error:null}; } catch(e){return {data:{user:null},error:asError(e)}} },
-    onAuthStateChange: (callback: any) => { const unsub=pocketbase.authStore.onChange(()=>callback(pocketbase.authStore.isValid?"SIGNED_IN":"SIGNED_OUT",sessionShape()),true); return {data:{subscription:{unsubscribe:unsub}}}; },
+    onAuthStateChange: (callback: any) => { const unsub=pocketbase.authStore.onChange(()=>callback(pocketbase.authStore.isValid?"SIGNED_IN":"SIGNED_OUT",sessionShape()),false); return {data:{subscription:{unsubscribe:unsub}}}; },
   },
   rpc: async (name: string, body: any = {}): Promise<any> => { try { const response=await fetch(`${POCKETBASE_URL}/api/overweel3d/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json",...(pocketbase.authStore.token?{Authorization:pocketbase.authStore.token}: {})},body:JSON.stringify(body)}); const data=await response.json(); if(!response.ok) throw new Error(data?.message||data?.error||`RPC ${name} mislukt`); return {data:data?.data ?? data,error:null}; } catch(e){return {data:null,error:asError(e)}} },
   functions: { invoke: async (name: string,{body}:any={}) => { try { const response=await fetch(`${POCKETBASE_URL}/api/overweel3d/functions/${name}`,{method:"POST",headers:{"Content-Type":"application/json",...(pocketbase.authStore.token?{Authorization:pocketbase.authStore.token}:{})},body:JSON.stringify(body||{})}); const data=await response.json(); if(response.status===404) throw new Error("De Overweel3D-serverfunctie ontbreekt op PocketBase. Installeer of herlaad de PocketBase-hook."); if(!response.ok) throw new Error(data?.message||data?.error||`${name} mislukt`); return {data,error:null}; }catch(e){return {data:null,error:asError(e)}} } },

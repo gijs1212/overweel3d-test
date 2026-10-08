@@ -10,3 +10,6 @@ routerAdd("POST", "/api/overweel3d/printer-camera-ingest", function (e) { return
 routerAdd("POST", "/api/overweel3d/bridge/refresh", function (e) { return require(__hooks + "/overweel3d-core.js").route5(e); });
 routerAdd("POST", "/api/overweel3d/bridge/status", function (e) { return require(__hooks + "/overweel3d-core.js").route6(e); });
 routerAdd("POST", "/api/overweel3d/bridge/control", function (e) { return require(__hooks + "/overweel3d-core.js").route7(e); });
+routerAdd("POST", "/api/overweel3d/social/{action}", function (e) { return require(__hooks + "/overweel3d-core.js").route8(e); });
+routerAdd("GET", "/api/overweel3d/social/media", function (e) { return require(__hooks + "/overweel3d-core.js").route9(e); }, $apis.bodyLimit(32 * 1024 * 1024));
+routerAdd("GET", "/api/overweel3d/social/public-media", function (e) { return require(__hooks + "/overweel3d-core.js").route10(e); }, $apis.bodyLimit(32 * 1024 * 1024));

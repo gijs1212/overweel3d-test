@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, FileArchive, KeyRound, Loader2, Plus, Printer, RefreshCw, ShieldCheck, TriangleAlert, Trash2, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -213,7 +214,7 @@ export default function AdminProduction() {
     try {
       let storagePath: string | null = null;
       if (threeMf) {
-        storagePath = `production/${selectedOrder.order_number}/${crypto.randomUUID()}-${threeMf.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+        storagePath = `production/${selectedOrder.order_number}/${createClientId()}-${threeMf.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
         const { error } = await supabase.storage.from("orders").upload(storagePath, threeMf, { upsert: false }); if (error) throw error;
       }
       const { error } = await supabase.from("print_jobs").insert({

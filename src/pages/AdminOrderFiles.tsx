@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, File, Loader2, Package, Search, Upload, X } from "lucide-react";
 import { Footer } from "@/components/Footer";
@@ -107,7 +108,7 @@ export default function AdminOrderFiles() {
       for (let index = 0; index < selectedFiles.length; index += 1) {
         const sourceFile = selectedFiles[index];
         setUploadProgress(`${index + 1} van ${selectedFiles.length}: ${sourceFile.name}`);
-        const path = `${selectedOrder.order_number}/files/admin-${crypto.randomUUID()}-${safeFilename(sourceFile.name)}`;
+        const path = `${selectedOrder.order_number}/files/admin-${createClientId()}-${safeFilename(sourceFile.name)}`;
         const uploaded = await uploadFileWithHeicConversion("orders", path, sourceFile, { upsert: false });
         if (uploaded.error) throw uploaded.error;
 

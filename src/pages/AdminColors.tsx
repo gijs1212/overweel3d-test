@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -224,7 +225,7 @@ export default function AdminColors() {
     const paths: string[] = [...existingPhotos];
     for (const file of newPhotoFiles) {
       const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-      const path = `colors/${crypto.randomUUID()}-${safeName}`;
+      const path = `colors/${createClientId()}-${safeName}`;
       const uploaded = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
       if (uploaded.error) throw new Error(`Upload van ${file.name} mislukt: ${uploaded.error.message}`);
       uploadedPaths.push(uploaded.path);

@@ -29,3 +29,4 @@ printer-bridge/vmware-runner/*.log
 *.sw?
 .dyad/
 private-backups/
+pocketbase/mcp-server/

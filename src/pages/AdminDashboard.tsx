@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator, Upload, ImagePlus } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator, Upload, ImagePlus, Share2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
               ["Printer", [["Printers & plaatkoppeling", "/admin/production", Printer], ["Filamentvoorraad", "/admin/filament-inventory", Boxes], ["Automatische prijsberekening", "/admin/price-calculator", Calculator], ["Kostenrapportage", "/admin/reports", BarChart3]]],
               ["Producten & kleuren", [["Opdrachten", "/admin/assignments", ImagePlus], ["Producten & varianten", "/admin/products", ShoppingBag], ["Materialen", "/admin/materials", Layers3], ["Kleuren", "/admin/colors", Palette], ["Reviews", "/admin/reviews", Star]]],
               ["Klanten", [["Klantenoverzicht", "/admin/customers", Users], ["Nieuwe bestelling", "/admin/new-order", Plus], ["Bestanden uploaden", "/admin/order-files", Upload]]],
-              ["Marketing", [["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Loyaliteitsprogramma", "/admin#loyaliteitsprogramma", Gift], ["Blog & content", "/admin/blog", FileText], ["Websitecontent", "/admin/content", Megaphone]]],
+              ["Marketing", [["Social Publisher", "/admin/social", Share2], ["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Loyaliteitsprogramma", "/admin#loyaliteitsprogramma", Gift], ["Blog & content", "/admin/blog", FileText], ["Websitecontent", "/admin/content", Megaphone]]],
             ].map(([title, items]) => <section key={title as string} className="rounded-xl border border-black/10 bg-neutral-50 p-4"><h3 className="mb-2 text-sm font-bold">{title as string}</h3><div className="space-y-1">{(items as [string,string,typeof Package][]).map(([label,to,Icon]) => <Link key={to} to={to} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-black/65 transition-colors hover:bg-black hover:text-white"><Icon className="w-4 h-4"/><span className="flex-1">{label}</span><ChevronRight className="w-4 h-4 opacity-40"/></Link>)}</div></section>)}
             </div>
           </section>

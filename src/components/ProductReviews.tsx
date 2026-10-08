@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { Camera, Loader2, Star, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export function ProductReviews({ productId }: { productId: string }) {
     try {
       const paths: string[] = [];
       for (const file of photos) {
-        const path = `reviews/${user.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+        const path = `reviews/${user.id}/${createClientId()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
         const uploaded = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
         if (uploaded.error) throw uploaded.error;
         paths.push(uploaded.path);

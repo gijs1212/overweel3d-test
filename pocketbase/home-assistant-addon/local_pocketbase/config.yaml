@@ -1,5 +1,5 @@
 name: PocketBase
-version: "1.4.0"
+version: "1.13.0"
 slug: local_pocketbase
 description: PocketBase voor Overweel3D met bewerkbare serverhooks uit /share/pocketbase/pb_hooks.
 url: https://pocketbase.io

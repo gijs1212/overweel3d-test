@@ -7,6 +7,14 @@ DATA_DIR_MARKER="/data/overweel3d-active-data-dir"
 
 mkdir -p "${HOOK_DIR}" "${MIGRATIONS_DIR}"
 
+for MIGRATION_FILE in /opt/overweel3d-default-migrations/*.js; do
+  [ -f "${MIGRATION_FILE}" ] || continue
+  TARGET_MIGRATION="${MIGRATIONS_DIR}/$(basename "${MIGRATION_FILE}")"
+  if [ ! -f "${TARGET_MIGRATION}" ]; then
+    cp "${MIGRATION_FILE}" "${TARGET_MIGRATION}"
+  fi
+done
+
 # Installeer zowel de route-registratie als de CommonJS-kernmodule. Een
 # nieuwere appversie werkt beide bestanden als één set bij.
 for HOOK_FILE in overweel3d.pb.js overweel3d-core.js; do

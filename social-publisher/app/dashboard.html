@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overweel3D Social Publisher</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #090909; color: #f5f5f5; }
+    body { max-width: 1100px; margin: 0 auto; padding: 36px 20px 64px; }
+    h1 { font-size: clamp(1.8rem, 5vw, 2.7rem); margin: 0 0 5px; }
+    h2 { margin: 0 0 14px; font-size: 1.1rem; }
+    p { line-height: 1.5; }
+    .muted { color: #aaa; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .card { background: #171717; border: 1px solid #363636; border-radius: 18px; padding: 22px; margin-top: 18px; }
+    .status { display: inline-flex; align-items: center; gap: 10px; border: 1px solid #555; padding: 8px 12px; border-radius: 999px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; }
+    .dot.ok { background: #22c55e; }
+    .code { font-size: 1.5rem; letter-spacing: .18em; font-weight: 700; }
+    button, .button { background: white; color: black; border: 0; border-radius: 999px; padding: 11px 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px; }
+    button.danger { background: #7f1d1d; color: white; }
+    .error { color: #fca5a5; overflow-wrap: anywhere; }
+    pre { background: #050505; border: 1px solid #292929; border-radius: 14px; padding: 16px; height: 390px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #d4d4d4; }
+  </style>
+</head>
+<body>
+  <h1>Overweel3D Social Publisher</h1>
+  <p class="muted">Versie <span id="version">laden…</span> · Facebookpagina <strong id="facebook-page">laden…</strong></p>
+  <div class="grid">
+    <section class="card">
+      <h2>Websitekoppeling</h2>
+      <p class="status"><span id="pair-dot" class="dot"></span><strong id="pair-state">Controleren…</strong></p>
+      <p>Koppelcode voor Admin → Marketing → Social Publisher:</p>
+      <p class="code" id="pair-code">········</p>
+      <p class="muted">Na het invoeren op de website wordt meteen een heartbeat bevestigd.</p>
+    </section>
+    <section class="card">
+      <h2>PocketBase-verbinding</h2>
+      <p class="status"><span id="connection-dot" class="dot"></span><strong id="connection-state">Controleren…</strong></p>
+      <p class="muted" id="heartbeat">Nog geen heartbeat bevestigd.</p>
+      <p class="error" id="connection-error"></p>
+    </section>
+  </div>
+  <section class="card">
+    <h2>Meta Graph API</h2>
+    <p class="status"><span id="meta-dot" class="dot"></span><strong id="meta-state">Controleren…</strong></p>
+    <p class="muted">De token blijft uitsluitend in de blijvende Docker-volume. Vul de gegevens hier in; herstart daarna de container en test de verbinding op de website onder Admin → Marketing → Social Publisher.</p>
+    <p class="muted">Deze lokale beheerpagina gebruikt standaard HTTP zonder versleuteling. Gebruik haar alleen op een vertrouwd netwerk of achter HTTPS.</p>
+    <form id="meta-form">
+      <p><label>Page Access Token<br><input id="meta-token" type="password" autocomplete="off" required style="width:100%;max-width:680px;padding:10px"></label></p>
+      <p><label>Facebookpagina-ID<br><input id="meta-page-id" inputmode="numeric" required style="width:100%;max-width:300px;padding:10px"></label></p>
+      <p><label>Instagram-account-ID<br><input id="meta-instagram-id" inputmode="numeric" required style="width:100%;max-width:300px;padding:10px"></label></p>
+      <button type="submit">API-gegevens lokaal opslaan</button>
+      <p id="meta-save-result" role="status"></p>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Containerlogs</h2>
+    <p class="muted">Recente logregels van deze container. Iedere drie seconden bijgewerkt.</p>
+    <pre id="logs">Logs laden…</pre>
+  </section>
+  <script src="/dashboard.js" defer></script>
+</body>
+</html>

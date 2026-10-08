@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
+import { createClientId } from "@/lib/clientId";
 import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -507,7 +508,7 @@ export default function AdminOrderEdit() {
                         try {
                           for (const f of filesIn) {
                             const safeName = f.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-                            const path = `${order.order_number}/files/admin-${crypto.randomUUID()}-${safeName}`;
+                            const path = `${order.order_number}/files/admin-${createClientId()}-${safeName}`;
                             const uploaded = await uploadFileWithHeicConversion("orders", path, f, { upsert: false });
                             const { error: upErr } = uploaded;
                             if (upErr) throw upErr;

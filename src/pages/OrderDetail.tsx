@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from "react";
+import { createClientId } from "@/lib/clientId";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -565,7 +566,7 @@ export default function OrderDetail() {
                             try {
                               for (const f of fs) {
                                 const safeName = f.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-                                const path = `${order.order_number}/files/customer-${crypto.randomUUID()}-${safeName}`;
+                                const path = `${order.order_number}/files/customer-${createClientId()}-${safeName}`;
                                 const uploaded = await uploadFileWithHeicConversion("orders", path, f, { upsert: false });
                                 const { error: upErr } = uploaded;
                                 if (upErr) throw upErr;

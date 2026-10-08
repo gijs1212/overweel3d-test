@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getFunctionErrorMessage } from "@/lib/functionErrors";
@@ -46,61 +46,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
       .select("*")
       .eq("user_id", userId)
       .single();
-    if (data) setProfile(data as Profile);
-  };
+    setProfile(data ? data as Profile : null);
+  }, []);
 
-  const checkAdmin = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    setIsAdmin(!!data);
-  };
+  const applySession = useCallback(async (nextSession: Session | null) => {
+    const nextUser = nextSession?.user ?? null;
+    setSession(nextSession);
+    setUser(nextUser);
+    if (!nextUser) {
+      setProfile(null);
+      setIsAdmin(false);
+      return;
+    }
+
+    // PocketBase returns the authoritative role on the refreshed user record.
+    // This avoids relying on an admin-only list query during a fresh page load.
+    setIsAdmin(nextUser.app_metadata?.role === "admin");
+    await fetchProfile(nextUser.id);
+  }, [fetchProfile]);
 
   useEffect(() => {
+    let active = true;
+    let validationId = 0;
+
+    const validateStoredSession = async (showLoader: boolean) => {
+      const currentValidation = ++validationId;
+      if (showLoader) setLoading(true);
+      const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+      if (!active || currentValidation !== validationId) return;
+      await applySession(verifiedSession);
+      if (active && currentValidation === validationId) setLoading(false);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setLoading(true);
-          setTimeout(async () => {
-            await Promise.all([
-              fetchProfile(session.user.id),
-              checkAdmin(session.user.id),
-            ]);
-            setLoading(false);
-          }, 0);
-        } else {
-          setProfile(null);
-          setIsAdmin(false);
-          setLoading(false);
-        }
+      async (_event, nextSession) => {
+        const currentValidation = ++validationId;
+        setLoading(true);
+        await applySession(nextSession);
+        if (active && currentValidation === validationId) setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await Promise.all([
-          fetchProfile(session.user.id),
-          checkAdmin(session.user.id),
-        ]);
-      }
-      setLoading(false);
-    });
+    // Validate immediately when the website opens, not only after signing in.
+    void validateStoredSession(true);
 
-    return () => subscription.unsubscribe();
-  }, []);
+    const revalidateWhenVisible = () => {
+      if (document.visibilityState === "visible") void validateStoredSession(false);
+    };
+    window.addEventListener("focus", revalidateWhenVisible);
+    document.addEventListener("visibilitychange", revalidateWhenVisible);
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+      window.removeEventListener("focus", revalidateWhenVisible);
+      document.removeEventListener("visibilitychange", revalidateWhenVisible);
+    };
+  }, [applySession]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({
@@ -129,13 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     if (!signInData.user) return false;
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", signInData.user.id)
-      .eq("role", "admin")
-      .maybeSingle();
-    return Boolean(data);
+    return signInData.user.app_metadata?.role === "admin";
   };
 
   const signOut = async () => {

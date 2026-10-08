@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
 import { Loader2, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 interface FilamentColor {
@@ -20,6 +20,7 @@ interface FilamentColor {
 }
 
 export default function Kleuren() {
+  const [searchParams] = useSearchParams();
   const [colors, setColors] = useState<FilamentColor[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,13 @@ export default function Kleuren() {
       setLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    const selected = searchParams.get("color");
+    if (!selected || loading) return;
+    const timer = window.setTimeout(() => document.getElementById(`kleur-${selected}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+    return () => window.clearTimeout(timer);
+  }, [loading, searchParams]);
 
   const byMaterial = colors.reduce<Record<string, FilamentColor[]>>((acc, c) => {
     (acc[c.material] ||= []).push(c);
@@ -109,11 +117,12 @@ export default function Kleuren() {
                       return (
                         <motion.div
                           key={c.id}
+                          id={`kleur-${c.id}`}
                           initial={{ opacity: 0, y: 10 }}
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: true }}
                           transition={{ duration: 0.4 }}
-                          className={`rounded-3xl border border-border/60 bg-card overflow-hidden group ${!c.active ? "opacity-70" : ""}`}
+                          className={`scroll-mt-28 rounded-3xl border bg-card overflow-hidden group ${searchParams.get("color") === c.id ? "border-black ring-4 ring-black/10" : "border-border/60"} ${!c.active ? "opacity-70" : ""}`}
                         >
                           <div className="aspect-square bg-muted relative overflow-hidden">
                             {first ? (

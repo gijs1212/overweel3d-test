@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { AlertCircle, ArrowDown, ArrowUp, Check, Eye, FileArchive, GripVertical, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -413,7 +414,7 @@ export function PlateTracker({
     try {
       if (!orderFile) {
         const safeName = pendingFile.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-        uploadedOriginalPath = `${orderNumber}/production/${crypto.randomUUID()}-${safeName}`;
+        uploadedOriginalPath = `${orderNumber}/production/${createClientId()}-${safeName}`;
         const { error: uploadError } = await supabase.storage.from("orders").upload(uploadedOriginalPath, pendingFile, { upsert: false });
         if (uploadError) throw uploadError;
         const { data, error } = await supabase.from("order_files").insert({
@@ -439,7 +440,7 @@ export function PlateTracker({
           const previewResponse = await fetch(plate.previewUrl);
           if (previewResponse.ok) {
             const blob = await previewResponse.blob();
-            previewStoragePath = `${orderNumber}/selected-plate-previews/${orderFile.id}-plate-${plate.number}-${crypto.randomUUID()}.png`;
+            previewStoragePath = `${orderNumber}/selected-plate-previews/${orderFile.id}-plate-${plate.number}-${createClientId()}.png`;
             const { error } = await supabase.storage.from("orders").upload(previewStoragePath, blob, { contentType: "image/png", upsert: false });
             if (error) throw error;
             uploadedPreviewPaths.push(previewStoragePath);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createClientId } from "@/lib/clientId";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -52,7 +53,7 @@ export default function AdminAssignments() {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
         const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-        const uploaded = await uploadFileWithHeicConversion("orders", `portfolio/${projectId}/${crypto.randomUUID()}-${safeName}`, file, { upsert: false });
+        const uploaded = await uploadFileWithHeicConversion("orders", `portfolio/${projectId}/${createClientId()}-${safeName}`, file, { upsert: false });
         if (uploaded.error) throw uploaded.error;
         const { error: mediaError } = await supabase.from("portfolio_project_media" as never).insert({ project_id: projectId, storage_path: uploaded.path, original_filename: uploaded.file.name, mime_type: uploaded.file.type || "application/octet-stream", file_size: uploaded.file.size, is_cover: index === 0, sort_order: index } as never);
         if (mediaError) { await supabase.storage.from("orders").remove([uploaded.path]); throw mediaError; }

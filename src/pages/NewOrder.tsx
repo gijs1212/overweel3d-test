@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createClientId } from "@/lib/clientId";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -94,6 +95,7 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const repeatLoaded = useRef(false);
+  const sharedProductOpened = useRef(false);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -188,6 +190,25 @@ export default function NewOrder() {
       if (error) toast({ title: "Productcatalogus laden mislukt", description: error.message, variant: "destructive" });
     });
   }, [toast]);
+
+  useEffect(() => {
+    const sharedProductId = searchParams.get("product");
+    if (!sharedProductId || !products.length || sharedProductOpened.current) return;
+    const product = products.find((candidate) => candidate.id === sharedProductId);
+    if (!product) {
+      sharedProductOpened.current = true;
+      toast({ title: "Product niet gevonden", description: "Dit gedeelde product is niet meer beschikbaar.", variant: "destructive" });
+      return;
+    }
+    sharedProductOpened.current = true;
+    setActiveTab("prebuilt");
+    setSelectedProduct(product);
+  }, [products, searchParams, toast]);
+
+  useEffect(() => {
+    const sharedCode = searchParams.get("kortingscode");
+    if (sharedCode) setDiscountCode(sharedCode.trim().toUpperCase());
+  }, [searchParams]);
 
   useEffect(() => {
     supabase.from("discount_codes")
@@ -618,7 +639,7 @@ export default function NewOrder() {
         const urls: string[] = [];
         for (const photo of cl.photos) {
           const safeName = photo.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-          const storagePath = `custom-orders/${orderNumber}/${cl.id}-${crypto.randomUUID()}-${safeName}`;
+          const storagePath = `custom-orders/${orderNumber}/${cl.id}-${createClientId()}-${safeName}`;
           const uploaded = await uploadFileWithHeicConversion("orders", storagePath, photo, { upsert: false });
           const { error } = uploaded;
           if (error) throw new Error(`Upload van ${photo.name} mislukt: ${error.message}`);
@@ -637,7 +658,7 @@ export default function NewOrder() {
           const storagePaths: string[] = [];
           for (const file of upload.files) {
             const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-            const storagePath = `custom-orders/${orderNumber}/products/${line.id}/${crypto.randomUUID()}-${safeName}`;
+            const storagePath = `custom-orders/${orderNumber}/products/${line.id}/${createClientId()}-${safeName}`;
             const uploaded = await uploadFileWithHeicConversion("orders", storagePath, file, { upsert: false });
             const { error } = uploaded;
             if (error) throw new Error(`Upload bij “${upload.label}” mislukt: ${error.message}`);
@@ -754,7 +775,7 @@ export default function NewOrder() {
       const failedFiles: string[] = [];
       for (const fl of fileLines) {
         const safeName = fl.file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-");
-        const storagePath = `${orderNumber}/files/${crypto.randomUUID()}-${safeName}`;
+        const storagePath = `${orderNumber}/files/${createClientId()}-${safeName}`;
         const uploaded = await uploadFileWithHeicConversion("orders", storagePath, fl.file, { upsert: false });
         const { error: upErr } = uploaded;
         if (upErr) { failedFiles.push(fl.file.name); continue; }

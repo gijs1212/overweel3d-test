@@ -150,6 +150,74 @@ function route0(e) {
   var p = body(e);
 
   if (name === "generate_order_number") return json(e, generateOrderNumber());
+  if (name === "get_social_publisher_settings") {
+    requireAdmin(e);
+    return json(e, cleanRecord(socialSetting()));
+  }
+  if (name === "social_publisher_status") {
+    requireAdmin(e);
+    var socialStatus = socialSetting();
+    return json(e, {
+      hook_version: "1.13.0",
+      publisher_last_seen_at: socialStatus.getString("publisher_last_seen_at"),
+      publisher_version: socialStatus.getString("publisher_version")
+    });
+  }
+  if (name === "social_publisher_next_post") {
+    requireAdmin(e);
+    return json(e, socialNextPublication(socialSetting()));
+  }
+  if (name === "set_social_publisher_enabled") {
+    requireAdmin(e);
+    if (typeof p.p_enabled !== "boolean") fail("Geef expliciet actief of gepauzeerd op.");
+    var socialToggleSetting = socialSetting();
+    socialToggleSetting.set("enabled", p.p_enabled);
+    $app.save(socialToggleSetting);
+    return json(e, { enabled: socialToggleSetting.getBool("enabled") });
+  }
+  if (name === "enqueue_social_backfill") {
+    requireAdmin(e);
+    return json(e, socialEnqueueExistingCatalog(socialSetting()));
+  }
+
+  if (name === "pair_social_publisher") {
+    requireAdmin(e);
+    var rawControlUrl = String(p.p_control_url || "").trim().replace(/\/+$/, "");
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(rawControlUrl)) rawControlUrl = "http://" + rawControlUrl + ":8787";
+    var privatePublisherUrl = /^http:\/\/(?:(?:10\.(?:\d{1,3}\.){2}\d{1,3})|(?:192\.168\.(?:\d{1,3})\.(?:\d{1,3}))|(?:172\.(?:1[6-9]|2\d|3[01])\.(?:\d{1,3})\.(?:\d{1,3}))):8787$/;
+    if (!privatePublisherUrl.test(rawControlUrl)) fail("Gebruik een lokaal container-IP met poort 8787.");
+    var pairingCode = String(p.p_pairing_code || "").trim();
+    if (!/^\d{8}$/.test(pairingCode)) fail("Vul de 8-cijferige koppelcode van de container in.");
+    var publisherSetting = socialSetting();
+    var publisherToken = String(p.p_integration_token || "").trim();
+    if (!/^[a-f0-9]{64}$/i.test(publisherToken)) fail("De website kon geen geldige interne koppelsleutel maken.");
+    var previousToken = publisherSetting.getString("integration_token");
+    var previousControlUrl = publisherSetting.getString("control_url");
+    publisherSetting.set("integration_token", publisherToken);
+    publisherSetting.set("control_url", rawControlUrl);
+    $app.save(publisherSetting);
+    var pairResponse;
+    try { pairResponse = $http.send({
+      url: rawControlUrl + "/api/pair",
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pairing_code: pairingCode, token: publisherToken, pocketbase_url: "https://api.gijsoverweel.nl" }),
+      timeout: 20
+    }); } catch (error) {
+      publisherSetting.set("integration_token", previousToken);
+      publisherSetting.set("control_url", previousControlUrl);
+      $app.save(publisherSetting);
+      throw error;
+    }
+    if (pairResponse.statusCode < 200 || pairResponse.statusCode >= 300) {
+      publisherSetting.set("integration_token", previousToken);
+      publisherSetting.set("control_url", previousControlUrl);
+      $app.save(publisherSetting);
+      var pairMessage = pairResponse.json && pairResponse.json.detail ? pairResponse.json.detail : (pairResponse.raw || "Container antwoordde niet.");
+      throw new BadRequestError("Koppelen mislukt: " + pairMessage);
+    }
+    return json(e, { paired: true, connected: !!(pairResponse.json && pairResponse.json.connected), control_url: rawControlUrl, container_version: pairResponse.json && pairResponse.json.version || "" });
+  }
 
   if (name === "create_guest_order") {
     var order = p.p_order || {};
@@ -308,7 +376,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.4.0" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.13.0" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -1337,5 +1405,574 @@ function route7(e) {
   fail("Onbekende bridgeactie: " + action);
 }
 
+var SOCIAL_DEFAULT_TEMPLATES = {
+  product: {
+    facebook: "{direct_url}\n\nNieuw bij Overweel3D: {name} ✨\n\nBekijk dit nieuwe product en stel het samen.\n\n#Overweel3D #3Dprinten #Nieuw\n\nhttps://overweel3d.gijsoverweel.nl/",
+    instagram: "{direct_url}\n\nNieuw bij Overweel3D: {name} ✨\n\nBekijk dit nieuwe product en stel het samen.\n\n#Overweel3D #3Dprinten #Nieuw\n\nhttps://overweel3d.gijsoverweel.nl/",
+  },
+  color: {
+    facebook: "{direct_url}\n\nNieuwe kleur bij Overweel3D: {name} ({material}) 🎨\n\nBekijk de kleur in ons assortiment.\n\n#Overweel3D #3Dprinten #NieuweKleur\n\nhttps://overweel3d.gijsoverweel.nl/",
+    instagram: "{direct_url}\n\nNieuwe kleur bij Overweel3D: {name} ({material}) 🎨\n\nBekijk de kleur in ons assortiment.\n\n#Overweel3D #3Dprinten #NieuweKleur\n\nhttps://overweel3d.gijsoverweel.nl/",
+  },
+  discount: {
+    facebook: "{direct_url}\n\nNieuwe korting bij Overweel3D: {discount_label}\nGebruik code {code}. Geldig tot {expires_label}; {usage_label}.\n\n#Overweel3D #Korting\n\nhttps://overweel3d.gijsoverweel.nl/",
+    instagram: "{direct_url}\n\nNieuwe korting bij Overweel3D: {discount_label}\nGebruik code {code}. Geldig tot {expires_label}; {usage_label}.\n\n#Overweel3D #Korting\n\nhttps://overweel3d.gijsoverweel.nl/",
+  },
+  spotlight: {
+    facebook: "{direct_url}\n\nUitgelicht bij Overweel3D: {name} ✨\n\nBekijk dit product in onze catalogus.\n\n#Overweel3D #3Dprinten #Uitgelicht\n\nhttps://overweel3d.gijsoverweel.nl/",
+    instagram: "{direct_url}\n\nUitgelicht bij Overweel3D: {name} ✨\n\nBekijk dit product in onze catalogus.\n\n#Overweel3D #3Dprinten #Uitgelicht\n\nhttps://overweel3d.gijsoverweel.nl/",
+  }
+};
 
-module.exports = { route0, route1, route2, route3, route4, route5, route6, route7 };
+function socialArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") { try { var parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch (_) {} }
+  return [];
+}
+
+function socialObject(value) {
+  return mutableJsonObject(value);
+}
+
+function socialSetting() {
+  var records = [];
+  try { records = $app.findRecordsByFilter("social_publisher_settings", "integration_token != \"\"", "", 1, 0) || []; } catch (error) { console.error("Social Publisher-instellingen met koppelsleutel zoeken mislukt:", error); throw error; }
+  if (!records.length) {
+    records = $app.findRecordsByFilter("social_publisher_settings", "id != \"\"", "", 1, 0) || [];
+  }
+  if (records.length) return records[0];
+  return save("social_publisher_settings", {
+    enabled: false, dry_run: true, spotlight_enabled: true, paused_platforms: [], templates: SOCIAL_DEFAULT_TEMPLATES,
+    control_url: "http://192.168.2.50:8787", backfill_started_at: new Date().toISOString()
+  });
+}
+
+function socialRequireToken(e) {
+  var supplied = String(e.requestInfo().headers["x_overweel_social_token"] || "");
+  var setting = socialSetting();
+  var expected = setting.getString("integration_token");
+  if (!expected || !supplied || !$security.equal($security.sha256(expected), $security.sha256(supplied))) {
+    throw new ForbiddenError("Ongeldige Social Publisher-koppelsleutel.");
+  }
+  return setting;
+}
+
+function socialImagesForProduct(product) {
+  var productId = product.getString("supabase_id") || product.id;
+  var rows = [];
+  try { rows = $app.findRecordsByFilter("product_images", "product_id = {:id}", "", 100, 0, { id: productId }) || []; } catch (_) {}
+  if (product.id !== productId) {
+    try { rows = rows.concat($app.findRecordsByFilter("product_images", "product_id = {:id}", "", 100, 0, { id: product.id }) || []); } catch (_) {}
+  }
+  rows.sort(function (a, b) { return Number(b.getBool("is_primary")) - Number(a.getBool("is_primary")) || a.getInt("sort_order") - b.getInt("sort_order"); });
+  var paths = rows.filter(function (row) { return row.getString("media_type").toLowerCase() !== "video"; }).map(function (row) { return row.getString("storage_path"); });
+  paths = paths.concat(socialArray(product.get("photos")));
+  var seen = {};
+  return paths.map(socialExistingMediaPath).filter(function (path) {
+    if (!path || /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(path) || seen[path]) return false;
+    seen[path] = true;
+    return true;
+  }).slice(0, 10);
+}
+
+function socialExistingMediaPath(value) {
+  var path = String(value || "").trim();
+  if (!path) return "";
+  if (storedFileForPath(path)) return path;
+  try { path = decodeURIComponent(path.split("?")[0]); } catch (_) {}
+  path = path.replace(/^.*?\/storage\/v1\/object\/(?:public|sign)\/orders\//, "").replace(/^orders\//, "").replace(/^\/+/, "");
+  return storedFileForPath(path) ? path : "";
+}
+
+function socialColorMedia(color) {
+  var hex = String(color.getString("hex") || "").trim().toUpperCase();
+  if (/^#[0-9A-F]{6}$/.test(hex)) return ["generated-color:" + hex];
+  return socialArray(color.get("photos")).map(socialExistingMediaPath).filter(Boolean).slice(0, 1);
+}
+
+function socialColorPng(hex) {
+  if (!/^#[0-9A-F]{6}$/.test(hex)) throw new BadRequestError("Ongeldige hexkleur.");
+  var width = 512, height = 512;
+  var rgb = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  var ink = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 > 150 ? [0, 0, 0] : [255, 255, 255];
+  var glyphs = {
+    "#": ["01010", "11111", "01010", "11111", "01010", "00000", "00000"],
+    "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+    "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+    "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+    "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+    "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+    "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
+    "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
+    "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+    "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+    "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
+    "A": ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+    "B": ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
+    "C": ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
+    "D": ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
+    "E": ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+    "F": ["11111", "10000", "10000", "11110", "10000", "10000", "10000"]
+  };
+  var raw = [], text = hex, scale = 9, advance = 54, textLeft = Math.floor((width - text.length * advance + 9) / 2), textTop = 404;
+  for (var y = 0; y < height; y++) {
+    raw.push(0);
+    for (var x = 0; x < width; x++) {
+      var pixel = (x < 12 || y < 12 || x >= width - 12 || y >= height - 12) ? ink : rgb;
+      if (y >= textTop && y < textTop + 7 * scale) {
+        var glyphIndex = Math.floor((x - textLeft) / advance);
+        if (glyphIndex >= 0 && glyphIndex < text.length) {
+          var localX = x - textLeft - glyphIndex * advance;
+          var gx = Math.floor(localX / scale), gy = Math.floor((y - textTop) / scale);
+          if (gx >= 0 && gx < 5 && glyphs[text[glyphIndex]][gy][gx] === "1") pixel = ink;
+        }
+      }
+      raw.push(pixel[0], pixel[1], pixel[2]);
+    }
+  }
+  function be32(value) { return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]; }
+  function crc(bytes) {
+    var result = -1;
+    for (var i = 0; i < bytes.length; i++) {
+      result ^= bytes[i];
+      for (var bit = 0; bit < 8; bit++) result = (result >>> 1) ^ ((result & 1) ? 0xEDB88320 : 0);
+    }
+    return (result ^ -1) >>> 0;
+  }
+  function chunk(name, data) {
+    var type = [name.charCodeAt(0), name.charCodeAt(1), name.charCodeAt(2), name.charCodeAt(3)];
+    return be32(data.length).concat(type, data, be32(crc(type.concat(data))));
+  }
+  var compressed = [0x78, 0x01], s1 = 1, s2 = 0;
+  for (var start = 0; start < raw.length; start += 65535) {
+    var block = raw.slice(start, start + 65535), length = block.length;
+    compressed.push(start + length >= raw.length ? 1 : 0, length & 255, length >>> 8, (~length) & 255, ((~length) >>> 8) & 255);
+    for (var n = 0; n < length; n++) { s1 = (s1 + block[n]) % 65521; s2 = (s2 + s1) % 65521; }
+    compressed = compressed.concat(block);
+  }
+  compressed = compressed.concat(be32((s2 << 16) | s1));
+  return [137, 80, 78, 71, 13, 10, 26, 10].concat(chunk("IHDR", be32(width).concat(be32(height), [8, 2, 0, 0, 0])), chunk("IDAT", compressed), chunk("IEND", []));
+}
+
+function socialJob(eventKey) {
+  try { return $app.findFirstRecordByFilter("social_post_jobs", "event_key = {:key}", { key: eventKey }); } catch (_) { return null; }
+}
+
+function socialCreateJob(setting, sourceType, record, media, payload, isBackfill, eventKey) {
+  var existing = socialJob(eventKey);
+  if (existing) {
+    if (existing.getString("status") === "waiting_for_media" && media.length) {
+      existing.set("media_paths", media); existing.set("payload", payload); existing.set("status", "queued"); existing.set("scheduled_at", new Date().toISOString());
+      $app.save(existing);
+    }
+    return null;
+  }
+  var name = record.getString("name") || record.getString("code") || sourceType;
+  return save("social_post_jobs", {
+    event_key: eventKey, source_type: sourceType, source_id: record.getString("supabase_id") || record.id, source_name: name,
+    status: media.length ? "queued" : "waiting_for_media", priority: isBackfill ? 10 : (sourceType === "spotlight" ? 50 : 100),
+    scheduled_at: new Date().toISOString(), media_paths: media, payload: payload, attempts: 0, is_backfill: isBackfill,
+    platform_state: { facebook: "pending", instagram: "pending" }
+  });
+}
+
+function socialEnqueueExistingCatalog(setting) {
+  var counts = { queued: 0, updated: 0, already_done: 0, waiting_for_media: 0, products: 0, colors: 0 };
+  function enqueue(type, record, media, payload) {
+    var id = record.getString("supabase_id") || record.id;
+    var key = "new:" + type + ":" + id;
+    var existing = socialJob(key);
+    if (existing) {
+      var status = existing.getString("status");
+      if (["completed", "published", "dry_run_complete"].indexOf(status) >= 0) {
+        if (socialCreateJob(setting, type, record, media, payload, true, "backfill:" + type + ":" + id)) {
+          counts.queued += 1;
+          if (!media.length) counts.waiting_for_media += 1;
+        } else counts.already_done += 1;
+        return;
+      }
+      if (["processing", "manual_attention", "cancelled"].indexOf(status) >= 0) { counts.already_done += 1; return; }
+      existing.set("is_backfill", true);
+      existing.set("priority", 10);
+      existing.set("media_paths", media);
+      existing.set("payload", payload);
+      existing.set("status", media.length ? "queued" : "waiting_for_media");
+      existing.set("scheduled_at", new Date().toISOString());
+      $app.save(existing);
+      counts.updated += 1;
+    } else if (socialCreateJob(setting, type, record, media, payload, true, key)) {
+      counts.queued += 1;
+    }
+    if (!media.length) counts.waiting_for_media += 1;
+  }
+  var products = $app.findRecordsByFilter("products", "active = true", "", 5000, 0) || [];
+  products.forEach(function (product) {
+    counts.products += 1;
+    var id = product.getString("supabase_id") || product.id;
+    enqueue("product", product, socialImagesForProduct(product), { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) });
+  });
+  var colors = $app.findRecordsByFilter("filament_colors", "active = true", "", 5000, 0) || [];
+  colors.forEach(function (color) {
+    counts.colors += 1;
+    var id = color.getString("supabase_id") || color.id;
+    enqueue("color", color, socialColorMedia(color), { name: color.getString("name"), material: color.getString("material"), direct_url: "https://overweel3d.gijsoverweel.nl/kleuren?color=" + encodeURIComponent(id) });
+  });
+  return counts;
+}
+
+function socialSyncCatalog(setting) {
+  var startedAt = setting.getString("backfill_started_at");
+  if (!startedAt) { startedAt = new Date().toISOString(); setting.set("backfill_started_at", startedAt); $app.save(setting); }
+  var initialSync = !setting.getString("last_sync_at");
+  var created = 0;
+  var products = [];
+  try { products = $app.findRecordsByFilter("products", "active = true", "created", 5000, 0) || []; } catch (_) {}
+  products.forEach(function (product) {
+    var id = product.getString("supabase_id") || product.id;
+    var productKey = "new:product:" + id;
+    var existingProductJob = socialJob(productKey);
+    if (existingProductJob && existingProductJob.getString("status") !== "waiting_for_media") return;
+    var media = socialImagesForProduct(product);
+    var isBackfill = initialSync;
+    if (socialCreateJob(setting, "product", product, media, { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) }, isBackfill, productKey)) created += 1;
+  });
+  var colors = [];
+  try { colors = $app.findRecordsByFilter("filament_colors", "active = true", "created", 5000, 0) || []; } catch (_) {}
+  colors.forEach(function (color) {
+    var id = color.getString("supabase_id") || color.id;
+    var colorKey = "new:color:" + id;
+    var existingColorJob = socialJob(colorKey);
+    if (existingColorJob && existingColorJob.getString("status") !== "waiting_for_media") return;
+    var photos = socialColorMedia(color);
+    var isBackfill = initialSync;
+    if (socialCreateJob(setting, "color", color, photos, { name: color.getString("name"), material: color.getString("material"), direct_url: "https://overweel3d.gijsoverweel.nl/kleuren?color=" + encodeURIComponent(id) }, isBackfill, colorKey)) created += 1;
+  });
+  var discounts = [];
+  try { discounts = $app.findRecordsByFilter("discount_codes", "active = true && is_public = true", "created", 5000, 0) || []; } catch (_) {}
+  discounts.forEach(function (discount) {
+    var id = discount.getString("supabase_id") || discount.id;
+    var discountPath = setting.getString("discount_image_path");
+    var discountType = discount.getString("discount_type");
+    var amount = Number(discount.get("discount_value") || 0);
+    var label = discountType === "percentage" ? amount + "%" : "€" + amount.toFixed(2);
+    var expires = discount.getString("expires_at");
+    var maxUses = discount.getInt("max_uses");
+    var payload = { code: discount.getString("code"), discount_label: label, expires_label: expires ? expires.slice(0, 10) : "geen einddatum", usage_label: maxUses > 0 ? "maximaal " + maxUses + " keer te gebruiken" : "onbeperkt te gebruiken", direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?kortingscode=" + encodeURIComponent(discount.getString("code")) };
+    var isBackfill = initialSync;
+    if (socialCreateJob(setting, "discount", discount, discountPath ? [discountPath] : [], payload, isBackfill, "new:discount:" + id)) created += 1;
+  });
+  setting.set("last_sync_at", new Date().toISOString()); $app.save(setting);
+  return created;
+}
+
+function socialAmsterdamOffset(date) {
+  var year = date.getUTCFullYear();
+  function lastSunday(month) { var d = new Date(Date.UTC(year, month + 1, 0)); return d.getUTCDate() - d.getUTCDay(); }
+  var start = new Date(Date.UTC(year, 2, lastSunday(2), 1));
+  var end = new Date(Date.UTC(year, 9, lastSunday(9), 1));
+  return date >= start && date < end ? 2 : 1;
+}
+
+function socialNextLocal19(now, days) {
+  var offset = socialAmsterdamOffset(now);
+  var local = new Date(now.getTime() + offset * 3600000);
+  var target = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + (days || 0), 19, 0, 0));
+  if (!days && target <= local) target.setUTCDate(target.getUTCDate() + 1);
+  var estimatedUtc = new Date(target.getTime() - offset * 3600000);
+  var correctedOffset = socialAmsterdamOffset(estimatedUtc);
+  return new Date(target.getTime() - correctedOffset * 3600000);
+}
+
+function socialStableIndex(seed, length) {
+  var hash = 5381;
+  String(seed || "").split("").forEach(function (character) { hash = (hash * 33 + character.charCodeAt(0)) >>> 0; });
+  return hash % length;
+}
+
+function socialChooseBackfill(jobs, setting) {
+  if (!jobs.length) return null;
+  var sorted = jobs.slice().sort(function (a, b) { return String(a.getString("event_key") || a.id).localeCompare(String(b.getString("event_key") || b.id)); });
+  var seed = setting.getString("backfill_last_published_at") || setting.getString("backfill_started_at") || "first-backfill";
+  return sorted[socialStableIndex(seed, sorted.length)];
+}
+
+function socialTargetPlatforms(job, setting) {
+  var payload = socialObject(job.get("payload"));
+  var requested = socialArray(payload.target_platforms).filter(function (platform) { return ["facebook", "instagram"].indexOf(platform) >= 0; });
+  if (!requested.length) requested = ["facebook", "instagram"];
+  var paused = socialArray(setting.get("paused_platforms"));
+  var state = socialObject(job.get("platform_state"));
+  return requested.filter(function (platform) { return paused.indexOf(platform) < 0 && ["published", "dry_run"].indexOf(state[platform]) < 0; });
+}
+
+function socialReadyAt(job, setting, now) {
+  var time = new Date(job.getString("scheduled_at") || now.toISOString()).getTime();
+  if (!isFinite(time)) time = now.getTime();
+  var retry = new Date(job.getString("next_retry_at")).getTime();
+  if (isFinite(retry)) time = Math.max(time, retry);
+  if (job.getBool("is_backfill")) {
+    var last = new Date(setting.getString("backfill_last_published_at")).getTime();
+    if (isFinite(last)) time = Math.max(time, last + 2 * 3600000);
+  }
+  return time;
+}
+
+function socialSelectNextJob(candidates, setting, now) {
+  var available = candidates.filter(function (job) { return job.getString("source_type") !== "session_check" && socialTargetPlatforms(job, setting).length > 0; });
+  var due = available.filter(function (job) { return socialReadyAt(job, setting, now) <= now.getTime(); });
+  var pool = due.length ? due : available;
+  if (!pool.length) return null;
+  if (!due.length) pool.sort(function (a, b) { return socialReadyAt(a, setting, now) - socialReadyAt(b, setting, now) || b.getInt("priority") - a.getInt("priority"); });
+  else pool.sort(function (a, b) { return b.getInt("priority") - a.getInt("priority") || socialReadyAt(a, setting, now) - socialReadyAt(b, setting, now); });
+  var first = pool[0];
+  var tied = pool.filter(function (job) {
+    return job.getInt("priority") === first.getInt("priority") &&
+      (due.length || socialReadyAt(job, setting, now) === socialReadyAt(first, setting, now));
+  });
+  var selected = first.getBool("is_backfill") ? socialChooseBackfill(tied.filter(function (job) { return job.getBool("is_backfill"); }), setting) : first;
+  return { job: selected, scheduled_at: new Date(Math.max(socialReadyAt(selected, setting, now), now.getTime())).toISOString() };
+}
+
+function socialSpotlightProduct(nextAt) {
+  var products = [];
+  try { products = $app.findRecordsByFilter("products", "active = true", "", 5000, 0) || []; } catch (_) {}
+  products = products.filter(function (product) { return socialImagesForProduct(product).length > 0; });
+  if (!products.length) return null;
+  products.sort(function (a, b) { return String(a.getString("supabase_id") || a.id).localeCompare(String(b.getString("supabase_id") || b.id)); });
+  return products[socialStableIndex(nextAt, products.length)];
+}
+
+function socialNextPublication(setting) {
+  var now = new Date();
+  var state = setting.getBool("enabled") ? (setting.getBool("dry_run") ? "dry_run" : "scheduled") : "paused";
+  var processing = [];
+  try { processing = $app.findRecordsByFilter("social_post_jobs", "status = 'processing' && source_type != 'session_check'", "-priority,scheduled_at", 1, 0) || []; } catch (_) {}
+  if (processing.length) return { state: state === "scheduled" ? "processing" : state, source_name: processing[0].getString("source_name"), source_type: processing[0].getString("source_type"), scheduled_at: now.toISOString(), platforms: socialTargetPlatforms(processing[0], setting), is_backfill: processing[0].getBool("is_backfill") };
+  var candidates = [];
+  try { candidates = $app.findRecordsByFilter("social_post_jobs", "status = 'queued' || status = 'failed'", "-priority,scheduled_at", 5000, 0) || []; } catch (_) {}
+  var next = socialSelectNextJob(candidates, setting, now);
+  if (next) return { state: state, source_name: next.job.getString("source_name"), source_type: next.job.getString("source_type"), scheduled_at: next.scheduled_at, platforms: socialTargetPlatforms(next.job, setting), is_backfill: next.job.getBool("is_backfill") };
+  var unfinished = [];
+  try { unfinished = $app.findRecordsByFilter("social_post_jobs", "is_backfill = true && status != 'completed' && status != 'dry_run_complete' && status != 'cancelled'", "", 1, 0) || []; } catch (_) {}
+  if (unfinished.length) return { state: "waiting_for_media", source_name: "Bestaande catalogus", source_type: "backfill", scheduled_at: null, platforms: [], is_backfill: true };
+  if (setting.getBool("spotlight_enabled")) {
+    var nextAt = setting.getString("spotlight_next_at") || socialNextLocal19(now, 0).toISOString();
+    var product = socialSpotlightProduct(nextAt);
+    if (product) {
+      var platforms = ["facebook", "instagram"].filter(function (platform) { return socialArray(setting.get("paused_platforms")).indexOf(platform) < 0; });
+      return { state: platforms.length ? state : "paused", source_name: product.getString("name"), source_type: "spotlight", scheduled_at: nextAt, platforms: platforms, is_backfill: false };
+    }
+  }
+  return { state: "none", source_name: "", source_type: "", scheduled_at: null, platforms: [], is_backfill: false };
+}
+
+function socialScheduleSpotlight(setting) {
+  if (!setting.getBool("spotlight_enabled")) return;
+  var now = new Date();
+  var unfinishedBackfill = $app.findRecordsByFilter("social_post_jobs", "is_backfill = true && status != 'completed' && status != 'dry_run_complete' && status != 'cancelled'", "", 1, 0) || [];
+  if (unfinishedBackfill.length) {
+    var deferred = setting.getString("spotlight_next_at");
+    if (!deferred || new Date(deferred) <= now) { setting.set("spotlight_next_at", socialNextLocal19(now, 0).toISOString()); $app.save(setting); }
+    return;
+  }
+  var nextText = setting.getString("spotlight_next_at");
+  if (!nextText) { setting.set("spotlight_next_at", socialNextLocal19(now, 0).toISOString()); $app.save(setting); return; }
+  var next = new Date(nextText);
+  if (next > now) return;
+  var product = socialSpotlightProduct(nextText);
+  if (product) {
+    var id = product.getString("supabase_id") || product.id;
+    var dateKey = next.toISOString().slice(0, 10);
+    socialCreateJob(setting, "spotlight", product, socialImagesForProduct(product), { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) }, false, "spotlight:" + dateKey);
+  }
+  // Bij langere uitval wordt precies één gemiste uitlichting ingehaald; de
+  // volgende planning ligt vervolgens weer twee lokale kalenderdagen vooruit.
+  setting.set("spotlight_next_at", socialNextLocal19(now, 2).toISOString()); $app.save(setting);
+}
+
+function socialRender(template, values) {
+  return String(template || "").replace(/\{([a-z_]+)\}/g, function (_, key) { return values[key] === undefined || values[key] === null ? "" : String(values[key]); });
+}
+
+function socialClaim(setting, metaReady) {
+  var now = new Date();
+  var candidates = [];
+  try { candidates = $app.findRecordsByFilter("social_post_jobs", "(status = 'queued' || status = 'failed') && scheduled_at <= {:now}", "-priority,scheduled_at", 5000, 0, { now: now.toISOString() }) || []; } catch (_) {}
+  var sessionChecks = candidates.filter(function (candidate) { return candidate.getString("source_type") === "session_check" && socialReadyAt(candidate, setting, now) <= now.getTime(); });
+  var next = metaReady ? socialSelectNextJob(candidates, setting, now) : null;
+  var job = sessionChecks.length && (!next || sessionChecks[0].getInt("priority") >= next.job.getInt("priority")) ? sessionChecks[0] : next && new Date(next.scheduled_at) <= now ? next.job : null;
+  if (!job) return null;
+  var type = job.getString("source_type");
+  if (!setting.getBool("enabled") && type !== "session_check") return null;
+  var templates = socialObject(setting.get("templates"));
+  var selected = templates[type] || SOCIAL_DEFAULT_TEMPLATES[type] || {};
+  var payload = socialObject(job.get("payload"));
+  var requestedPlatforms = socialArray(payload.target_platforms).filter(function (platform) { return ["facebook", "instagram"].indexOf(platform) >= 0; });
+  if (!requestedPlatforms.length) requestedPlatforms = ["facebook", "instagram"];
+  var platforms = type === "session_check" ? requestedPlatforms : socialTargetPlatforms(job, setting);
+  if (!platforms.length) return null;
+  var mediaPaths = socialArray(job.get("media_paths")).slice(0, 10);
+  var mediaGrant = { token: $security.randomString(48), expires_at: new Date(now.getTime() + 2 * 3600000).toISOString(), paths: mediaPaths };
+  payload.social_media_grant = mediaGrant;
+  job.set("payload", payload);
+  job.set("status", "processing"); job.set("claimed_at", now.toISOString()); $app.save(job);
+  if (job.getBool("is_backfill")) { setting.set("backfill_last_published_at", now.toISOString()); $app.save(setting); }
+  var texts = {};
+  var customTexts = socialObject(payload.texts);
+  platforms.forEach(function (platform) {
+    texts[platform] = type === "manual" ? String(customTexts[platform] || customTexts.default || "") : socialRender(selected[platform] || (SOCIAL_DEFAULT_TEMPLATES[type] || {})[platform], payload);
+  });
+  var mediaUrls = mediaPaths.map(function (_, index) {
+    return envOrSetting("POCKETBASE_PUBLIC_URL", "pocketbase_public_url", "https://api.gijsoverweel.nl").replace(/\/+$/, "") + "/api/overweel3d/social/public-media?job_id=" + encodeURIComponent(job.getString("supabase_id") || job.id) + "&index=" + index + "&token=" + encodeURIComponent(mediaGrant.token);
+  });
+  return { id: job.getString("supabase_id") || job.id, source_type: type, source_name: job.getString("source_name"), media_paths: mediaPaths, media_urls: mediaUrls, texts: texts, platforms: platforms, dry_run: setting.getBool("dry_run") };
+}
+
+function socialReport(setting, p) {
+  var job = byId("social_post_jobs", String(p.job_id || ""));
+  if (!job) throw new NotFoundError("Socialmediataak niet gevonden.");
+  var platform = String(p.platform || "");
+  if (["facebook", "instagram"].indexOf(platform) < 0) fail("Onbekend platform.");
+  var state = socialObject(job.get("platform_state"));
+  var reportedStatus = String(p.status || "failed");
+  state[platform] = reportedStatus;
+  var paused = socialArray(setting.get("paused_platforms"));
+  var jobPayload = socialObject(job.get("payload"));
+  var jobTargets = socialArray(jobPayload.target_platforms).filter(function (name) { return ["facebook", "instagram"].indexOf(name) >= 0; });
+  if (!jobTargets.length) jobTargets = ["facebook", "instagram"];
+  job.set("platform_state", state);
+  if (p.error) job.set("last_error", String(p.error).slice(0, 10000));
+  if (job.getString("source_type") === "session_check") {
+    var checksDone = jobTargets.every(function (name) { return ["connected", "disconnected", "manual_attention"].indexOf(state[name]) >= 0; });
+    if (checksDone) {
+      var allConnected = jobTargets.every(function (name) { return state[name] === "connected"; });
+      job.set("status", allConnected ? "completed" : "manual_attention");
+      job.set("completed_at", new Date().toISOString());
+    }
+    $app.save(job);
+    save("social_post_history", { job_id: job.getString("supabase_id") || job.id, platform: platform, status: reportedStatus, post_url: p.post_url || "", details: { error: p.error || "", screenshot_path: p.screenshot_path || "" }, published_at: new Date().toISOString() });
+    return cleanRecord(job);
+  }
+  var successStates = ["published", "dry_run"];
+  var payload = jobPayload;
+  var requestedPlatforms = jobTargets;
+  var allDone = requestedPlatforms.every(function (name) { return paused.indexOf(name) >= 0 || successStates.indexOf(state[name]) >= 0; });
+  if (requestedPlatforms.some(function (name) { return state[name] === "manual_attention"; })) job.set("status", "manual_attention");
+  else if (allDone) { job.set("status", setting.getBool("dry_run") ? "dry_run_complete" : "completed"); job.set("completed_at", new Date().toISOString()); }
+  else if (reportedStatus === "failed") {
+    var attempts = job.getInt("attempts") + 1; job.set("attempts", attempts);
+    if (attempts >= 3) job.set("status", "manual_attention");
+    else { job.set("status", "failed"); job.set("next_retry_at", new Date(Date.now() + [60000, 300000, 900000][attempts - 1]).toISOString()); }
+  } else job.set("status", requestedPlatforms.some(function (name) { return state[name] === "failed"; }) ? "failed" : "processing");
+  $app.save(job);
+  save("social_post_history", { job_id: job.getString("supabase_id") || job.id, platform: platform, status: reportedStatus, post_url: p.post_url || "", details: { error: p.error || "", screenshot_path: p.screenshot_path || "" }, published_at: new Date().toISOString() });
+  return cleanRecord(job);
+}
+
+function socialSessionCheckResult(p) {
+  var job = byId("social_post_jobs", String(p.job_id || ""));
+  if (!job || job.getString("source_type") !== "session_check") throw new NotFoundError("Accountcontrole niet gevonden.");
+  if (["completed", "manual_attention"].indexOf(job.getString("status")) >= 0) return cleanRecord(job);
+  var results = socialObject(p.results);
+  var targets = socialArray(socialObject(job.get("payload")).target_platforms).filter(function (name) { return ["facebook", "instagram"].indexOf(name) >= 0; });
+  if (!targets.length) targets = ["facebook", "instagram"];
+  var state = {};
+  var errors = [];
+  targets.forEach(function (platform) {
+    var result = socialObject(results[platform]);
+    var resultStatus = String(result.status || "");
+    if (["connected", "disconnected", "manual_attention"].indexOf(resultStatus) < 0) fail("Ongeldige accountcontrolestatus voor " + platform + ".");
+    state[platform] = resultStatus;
+    var error = String(result.error || "").slice(0, 10000);
+    if (error) errors.push(platform + ": " + error);
+    var values = {
+      platform: platform, status: resultStatus, last_checked_at: new Date().toISOString(),
+      last_error: error, screenshot_path: String(result.screenshot_path || ""),
+      account_name: String(result.account_name || ""), account_url: String(result.account_url || ""),
+      check_steps: socialArray(result.check_steps)
+    };
+    var existing = one("social_publisher_sessions", "platform", platform);
+    if (existing) { Object.keys(values).forEach(function (key) { existing.set(key, values[key]); }); $app.save(existing); }
+    else save("social_publisher_sessions", values);
+    save("social_post_history", {
+      job_id: job.getString("supabase_id") || job.id, platform: platform, status: resultStatus,
+      post_url: values.account_url, details: { error: error, screenshot_path: values.screenshot_path },
+      published_at: new Date().toISOString()
+    });
+  });
+  job.set("platform_state", state);
+  job.set("status", targets.every(function (name) { return state[name] === "connected"; }) ? "completed" : "manual_attention");
+  job.set("last_error", errors.join("; ").slice(0, 10000));
+  job.set("completed_at", new Date().toISOString());
+  $app.save(job);
+  return cleanRecord(job);
+}
+
+function route8(e) {
+  var setting = socialRequireToken(e);
+  var action = String(e.request.pathValue("action") || "");
+  var p = body(e);
+  if (action === "heartbeat") {
+    var heartbeatAt = new Date().toISOString();
+    setting.set("publisher_last_seen_at", heartbeatAt);
+    setting.set("publisher_version", String(p.version || "").slice(0, 100));
+    $app.save(setting);
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.13.0" });
+  }
+  if (action === "poll") {
+    socialSyncCatalog(setting); socialScheduleSpotlight(setting);
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.13.0" });
+  }
+  if (action === "report") return json(e, socialReport(setting, p));
+  if (action === "session_check_result") return json(e, socialSessionCheckResult(p));
+  if (action === "session") {
+    var sessionPlatform = String(p.platform || "");
+    if (["facebook", "instagram"].indexOf(sessionPlatform) < 0) fail("Onbekend platform.");
+    var existing = one("social_publisher_sessions", "platform", sessionPlatform);
+    var values = { platform: p.platform, status: p.status, last_checked_at: new Date().toISOString(), last_error: p.error || "", screenshot_path: p.screenshot_path || "", account_name: p.account_name || "", account_url: p.account_url || "", check_steps: socialArray(p.check_steps) };
+    if (existing) { Object.keys(values).forEach(function (key) { existing.set(key, values[key]); }); $app.save(existing); return json(e, cleanRecord(existing)); }
+    return json(e, cleanRecord(save("social_publisher_sessions", values)));
+  }
+  fail("Onbekende Social Publisher-actie: " + action);
+}
+
+function route9(e) {
+  socialRequireToken(e);
+  var path = String(e.request.url.query().get("path") || "");
+  if (!path || path.indexOf("..") >= 0) fail("Ongeldig mediapad.");
+  var stored = storedFileForPath(path);
+  if (!stored) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+  var bytes = storedFileBytes(stored, 30 * 1024 * 1024);
+  var name = stored.getString("file").toLowerCase();
+  var mime = /\.png$/.test(name) ? "image/png" : /\.webp$/.test(name) ? "image/webp" : "image/jpeg";
+  e.response.header().set("Cache-Control", "private, no-store");
+  return e.blob(200, mime, bytes);
+}
+
+function route10(e) {
+  var query = e.request.url.query();
+  var job = byId("social_post_jobs", String(query.get("job_id") || ""));
+  if (!job) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+  var grant = socialObject(socialObject(job.get("payload")).social_media_grant);
+  var token = String(query.get("token") || "");
+  var index = Number(query.get("index"));
+  var paths = socialArray(grant.paths);
+  if (!token || token !== String(grant.token || "") || !grant.expires_at || new Date(grant.expires_at).getTime() <= Date.now() || !Number.isInteger(index) || index < 0 || index >= paths.length) {
+    throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+  }
+  var path = String(paths[index] || "");
+  if (!path || path.indexOf("..") >= 0) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+  if (path.indexOf("generated-color:") === 0) {
+    e.response.header().set("Cache-Control", "private, max-age=3600");
+    return e.blob(200, "image/png", socialColorPng(path.slice("generated-color:".length)));
+  }
+  var stored = storedFileForPath(path);
+  if (!stored) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+  var name = stored.getString("file").toLowerCase();
+  var mime = /\.png$/.test(name) ? "image/png" : /\.webp$/.test(name) ? "image/webp" : "image/jpeg";
+  e.response.header().set("Cache-Control", "private, no-store");
+  return e.blob(200, mime, storedFileBytes(stored, 30 * 1024 * 1024));
+}
+
+
+module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialScheduleSpotlight, socialNextPublication };
