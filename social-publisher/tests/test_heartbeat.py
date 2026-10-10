@@ -17,13 +17,13 @@ from app.worker import SocialWorker
 class HeartbeatTests(unittest.TestCase):
     def test_heartbeat_marks_connection_only_after_pocketbase_confirms(self):
         worker = SocialWorker()
-        action = AsyncMock(return_value={"connected": True, "hook_version": "1.17.0"})
+        action = AsyncMock(return_value={"connected": True, "hook_version": "1.19.0"})
         worker.pb = SimpleNamespace(paired=True, action=action)
 
         self.assertTrue(asyncio.run(worker.heartbeat()))
         self.assertTrue(worker.is_connected)
         self.assertTrue(worker.last_heartbeat_at)
-        action.assert_awaited_once_with("heartbeat", {"version": "2.6.0"})
+        action.assert_awaited_once_with("heartbeat", {"version": "2.8.0"})
 
     def test_failed_heartbeat_clears_connection_and_exposes_error(self):
         worker = SocialWorker()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -58,7 +59,25 @@ class MetaGraphClient:
             raise MetaApiError(f"Meta Graph gaf geen JSON terug (HTTP {response.status_code}).") from exc
         if response.is_error or "error" in payload:
             error = payload.get("error") or {}
-            raise MetaApiError(f"Meta Graph HTTP {response.status_code}: {str(error.get('message') or 'onbekende fout')[:300]}")
+            code = error.get("code")
+            subcode = error.get("error_subcode")
+            identifiers = ", ".join(
+                part for part in (
+                    f"code {code}" if code is not None else "",
+                    f"subcode {subcode}" if subcode is not None else "",
+                ) if part
+            )
+            detail = str(error.get("error_user_title") or "").strip()
+            suffix = f" ({identifiers})" if identifiers else ""
+            if detail:
+                suffix += f" — {detail[:160]}"
+            error_text = (
+                f"Meta Graph HTTP {response.status_code}: "
+                f"{str(error.get('message') or 'onbekende fout')[:300]}{suffix}"
+            )
+            if uncertain_on_transport and response.status_code >= 500:
+                raise UncertainPublication(error_text + " Publicatie mogelijk al uitgevoerd; controleer het kanaal handmatig.")
+            raise MetaApiError(error_text)
         return payload
 
     async def check_accounts(self) -> dict[str, dict[str, str]]:
@@ -87,8 +106,8 @@ class MetaGraphClient:
             "instagram": {"name": str(instagram.get("username") or ""), "url": settings.instagram_account_url},
         }
 
-    async def _ready(self, container_id: str) -> None:
-        for _ in range(20):
+    async def _ready(self, container_id: str, *, video: bool = False) -> None:
+        for _ in range(100 if video else 20):
             result = await self.request("GET", container_id, params={"fields": "status_code,status"})
             state = str(result.get("status_code") or "")
             if state == "FINISHED":
@@ -96,43 +115,105 @@ class MetaGraphClient:
             if state in {"ERROR", "EXPIRED"}:
                 raise MetaApiError(f"Instagram-mediacontainer heeft status {state}.")
             await asyncio.sleep(3)
-        raise MetaApiError("Instagram-mediacontainer was na 60 seconden nog niet klaar.")
+        raise MetaApiError("Instagram-mediacontainer was niet op tijd klaar.")
 
-    async def publish(self, platform: str, text: str, image_urls: list[str], dry_run: bool) -> MetaResult:
+    async def publish(self, platform: str, text: str, image_urls: list[str | dict[str, str]], dry_run: bool,
+                      *, on_post=None, posted_media: dict[str, str] | None = None,
+                      facebook_media_mode: str = "separate") -> MetaResult:
         await self.check_accounts()
-        if platform == "instagram" and not image_urls:
-            raise MetaApiError("Instagram kan niet zonder afbeelding publiceren.")
+        media = [{"kind": "image", "url": item} if isinstance(item, str) else item for item in image_urls]
+        if platform == "instagram" and not media:
+            raise MetaApiError("Instagram kan niet zonder foto of video publiceren.")
         if dry_run:
             return MetaResult("dry_run")
         if platform == "facebook":
             page_id = settings.meta_page_id
-            if not image_urls:
+            if not media:
                 post = await self.request("POST", f"{page_id}/feed", data={"message": text}, uncertain_on_transport=True, page_auth=True)
-            elif len(image_urls) == 1:
-                post = await self.request("POST", f"{page_id}/photos", data={"url": image_urls[0], "caption": text}, uncertain_on_transport=True, page_auth=True)
-            else:
-                media_ids = []
-                for url in image_urls[:10]:
-                    photo = await self.request("POST", f"{page_id}/photos", data={"url": url, "published": "false"}, page_auth=True)
-                    media_ids.append(str(photo["id"]))
-                attachments = {f"attached_media[{index}]": '{{"media_fbid":"' + photo_id + '"}' for index, photo_id in enumerate(media_ids)}
-                post = await self.request("POST", f"{page_id}/feed", data={"message": text, **attachments}, uncertain_on_transport=True, page_auth=True)
-            return MetaResult("published", f"https://www.facebook.com/{post['id']}")
+                return MetaResult("published", f"https://www.facebook.com/{post['id']}")
+            completed = posted_media or {}
+            first_url = ""
+            if facebook_media_mode == "combined":
+                photos = [(index, item) for index, item in enumerate(media[:10]) if item["kind"] != "video"]
+                done = [(index, completed[str(index)]) for index, _ in photos if str(index) in completed]
+                if done and len(done) != len(photos):
+                    raise UncertainPublication("Een deel van het Facebook-fotobericht is al geregistreerd; controleer de pagina handmatig voordat je opnieuw publiceert.")
+                if done:
+                    first_url = done[0][1]
+                elif len(photos) > 1:
+                    staged_ids = []
+                    for _, item in photos:
+                        staged = await self.request("POST", f"{page_id}/photos", data={"url": item["url"], "published": "false"}, page_auth=True)
+                        staged_ids.append(str(staged["id"]))
+                    post = await self.request(
+                        "POST", f"{page_id}/feed",
+                        data={"message": text, "attached_media": json.dumps([{"media_fbid": media_id} for media_id in staged_ids])},
+                        uncertain_on_transport=True, page_auth=True,
+                    )
+                    first_url = f"https://www.facebook.com/{post['id']}"
+                    for index, _ in photos:
+                        if on_post:
+                            try:
+                                await on_post(index, first_url)
+                            except Exception as exc:
+                                raise UncertainPublication("Facebook heeft het gezamenlijke fotobericht geplaatst, maar de registratie mislukte; controleer de pagina handmatig.") from exc
+                elif photos:
+                    index, item = photos[0]
+                    post = await self.request("POST", f"{page_id}/photos", data={"url": item["url"], "caption": text, "published": "true"}, uncertain_on_transport=True, page_auth=True)
+                    first_url = f"https://www.facebook.com/{post['id']}"
+                    if on_post:
+                        try:
+                            await on_post(index, first_url)
+                        except Exception as exc:
+                            raise UncertainPublication("Facebook heeft de foto geplaatst, maar de registratie mislukte; controleer de pagina handmatig.") from exc
+                # Facebook ondersteunt geen video binnen een fotobericht. Video's blijven losse berichten.
+                for index, item in enumerate(media[:10]):
+                    if item["kind"] != "video" or str(index) in completed:
+                        continue
+                    post = await self.request("POST", f"{page_id}/videos", data={"file_url": item["url"], "description": text, "published": "true"}, uncertain_on_transport=True, page_auth=True)
+                    post_url = f"https://www.facebook.com/{post['id']}"
+                    if on_post:
+                        try:
+                            await on_post(index, post_url)
+                        except Exception as exc:
+                            raise UncertainPublication("Facebook heeft de video geplaatst, maar de registratie mislukte; controleer de pagina handmatig.") from exc
+                    first_url = first_url or post_url
+                return MetaResult("published", first_url)
+            for index, item in enumerate(media[:10]):
+                if str(index) in completed:
+                    first_url = first_url or completed[str(index)]
+                    continue
+                if item["kind"] == "video":
+                    post = await self.request("POST", f"{page_id}/videos", data={"file_url": item["url"], "description": text, "published": "true"}, uncertain_on_transport=True, page_auth=True)
+                else:
+                    post = await self.request("POST", f"{page_id}/photos", data={"url": item["url"], "caption": text, "published": "true"}, uncertain_on_transport=True, page_auth=True)
+                post_url = f"https://www.facebook.com/{post['id']}"
+                if on_post:
+                    try:
+                        await on_post(index, post_url)
+                    except Exception as exc:
+                        raise UncertainPublication("Facebook heeft media ontvangen, maar de publicatie kon niet worden geregistreerd; controleer de pagina handmatig.") from exc
+                first_url = first_url or post_url
+            return MetaResult("published", first_url)
         if platform == "instagram":
             ig_id = settings.meta_instagram_user_id
-            if len(image_urls) == 1:
-                container = await self.request("POST", f"{ig_id}/media", data={"image_url": image_urls[0], "caption": text})
+            has_video = any(item["kind"] == "video" for item in media)
+            if len(media) == 1:
+                item = media[0]
+                data = {"media_type": "REELS", "video_url": item["url"], "share_to_feed": "true", "caption": text} if item["kind"] == "video" else {"image_url": item["url"], "caption": text}
+                container = await self.request("POST", f"{ig_id}/media", data=data)
                 creation_id = str(container["id"])
             else:
                 children = []
-                for url in image_urls[:10]:
-                    child = await self.request("POST", f"{ig_id}/media", data={"image_url": url, "is_carousel_item": "true"})
+                for item in media[:10]:
+                    data = {"media_type": "VIDEO", "video_url": item["url"], "is_carousel_item": "true"} if item["kind"] == "video" else {"image_url": item["url"], "is_carousel_item": "true"}
+                    child = await self.request("POST", f"{ig_id}/media", data=data)
                     child_id = str(child["id"])
-                    await self._ready(child_id)
+                    await self._ready(child_id, video=item["kind"] == "video")
                     children.append(child_id)
                 container = await self.request("POST", f"{ig_id}/media", data={"media_type": "CAROUSEL", "children": ",".join(children), "caption": text})
                 creation_id = str(container["id"])
-            await self._ready(creation_id)
+            await self._ready(creation_id, video=has_video)
             published = await self.request("POST", f"{ig_id}/media_publish", data={"creation_id": creation_id}, uncertain_on_transport=True)
             media_id = str(published["id"])
             details = await self.request("GET", media_id, params={"fields": "permalink"})

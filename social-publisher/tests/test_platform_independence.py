@@ -31,7 +31,7 @@ def test_facebook_and_instagram_are_reported_separately():
 
     assert worker.meta.publish.await_count == 2
     assert prepare.await_count == 1
-    assert worker.meta.publish.await_args_list[0].args[2] == ["https://api.example.com/api/files/storage_files/id/photo.jpg"]
+    assert worker.meta.publish.await_args_list[0].args[2] == [{"kind": "image", "url": "https://api.example.com/api/files/storage_files/id/photo.jpg"}]
     reports = [call.args[1] for call in action.await_args_list if call.args[0] == "report"]
     assert [report["platform"] for report in reports] == ["facebook", "instagram"]
     assert [report["post_url"] for report in reports] == ["https://facebook.com/post", "https://instagram.com/post"]

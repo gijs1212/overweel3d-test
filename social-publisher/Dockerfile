@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PLAYWRIGHT_BROWSERS_PATH=0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium xvfb x11vnc novnc websockify ca-certificates curl fonts-liberation tini \
+    chromium xvfb x11vnc novnc websockify ca-certificates curl fonts-liberation tini ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

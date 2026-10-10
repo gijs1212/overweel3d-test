@@ -9,7 +9,12 @@ Controle na de start:
 https://api.gijsoverweel.nl/api/overweel3d/health
 ```
 
-Het antwoord hoort `"ok": true` en hookversie **1.17.0** te bevatten.
+Het antwoord hoort `"ok": true` en hookversie **1.19.0** te bevatten. De nieuwe migratie `1791590400_social_facebook_media_mode.js` bewaart de standaardkeuze voor één Facebook-fotobericht of losse berichten; eerder ingeplande taken blijven op losse berichten staan.
+
+Vanaf 1.18.2 kan de website foto's en video's van actieve producten ook zonder
+gebruikerslogin ophalen via de publieke catalogusroute. Die route controleert
+bij iedere aanvraag of de media daadwerkelijk bij een actief product hoort en
+serveert het beveiligde bestand zelf. Bestelbestanden blijven privé.
 
 Versie 1.4.0 bevat geen printwachtrij-, FTPS-, pc- of VM-besturing meer. De
 printerroutes verwerken alleen status, AMS, filamentvoorraad, Bambu-aanmelding
@@ -37,7 +42,7 @@ publisherronde probeert de verbinding opnieuw.
 Versie 1.10.3 koppelt de Social Publisher vanuit het website-adminscherm. De
 container heeft geen vooraf ingevulde integratiesleutel meer nodig.
 
-Versie 1.17.0 laat de Social Publisher afbeeldingsbronnen via de beveiligde mediafunctie lezen. Na omzetting naar JPEG krijgt Meta een rechtstreekse PocketBase-bestands-URL. Nieuwe taken gebruiken geen `public-media`-grant meer. De oude grant-route blijft alleen voor eerder geclaimde taken bestaan.
+Versie 1.18.0 voegt productvideo's aan de wachtrij toe, slaat tijdelijk omgezette MP4-video's voor Meta op en registreert iedere Facebook-media-publicatie afzonderlijk. Productfoto's blijven via de echte PocketBase-bestands-URL lopen; kleurafbeeldingen behouden hun bestaande route.
 
 Versie 1.16.9 geeft iedere te publiceren afbeelding een afzonderlijk, gehasht en tijdelijk mediatoegangsbewijs. Media-indexen worden intern 1-gebaseerd opgeslagen, omdat PocketBase de waarde 0 afwijst voor een verplicht numeriek veld. Daardoor stopt de eerste afbeelding niet meer met HTTP 400. De mediaserver hangt niet meer af van het taak-JSON, de algemene koppelsleutel of een van de instellingenrecords. De migratie ruimt foutief aangemaakte dubbele Social Publisher-instellingen op en verlopen mediatoegangsbewijzen worden automatisch verwijderd. De versie ondersteunt ook automatische wachtrijretentie: geannuleerde taken worden na vijf minuten verwijderd en afgeronde taken na één uur. Actieve, wachtende en opnieuw te proberen taken blijven staan totdat ze afgerond of handmatig verwijderd zijn. De volgende productuitlichting staat vooraf in de wachtrij; na publicatie wordt meteen een nieuw product voor twee dagen later gekozen. De admin kan alle taken ongeacht hun status direct annuleren en verwijderen. Facebook en Instagram
 krijgen afzonderlijke publicatieresultaten. Per wachtrijtaak maakt PocketBase

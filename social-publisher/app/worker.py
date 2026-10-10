@@ -57,11 +57,11 @@ class SocialWorker:
             return False
         async with self._heartbeat_lock:
             try:
-                response = await self.pb.action("heartbeat", {"version": "2.6.0"})
+                response = await self.pb.action("heartbeat", {"version": "2.8.0"})
                 if not isinstance(response, dict) or response.get("connected") is not True:
                     raise RuntimeError("PocketBase heeft de heartbeat niet bevestigd.")
-                if not version_at_least(response.get("hook_version"), "1.17.0"):
-                    raise RuntimeError("PocketBase-hook 1.17.0 of nieuwer is nodig voor voorbereide media via PocketBase-bestands-URL's.")
+                if not version_at_least(response.get("hook_version"), "1.19.0"):
+                    raise RuntimeError("PocketBase-hook 1.19.0 of nieuwer is nodig voor gecombineerde Facebook-fotoberichten.")
             except Exception as exc:
                 self.connected = False
                 self.hook_ready = False
@@ -109,17 +109,31 @@ class SocialWorker:
             text = str((job.get("texts") or {}).get(platform) or "")
             dry_run = bool(job.get("dry_run", True))
             if platform in {"facebook", "instagram"}:
-                image_urls: list[str] = []
+                media: list[dict[str, str]] = []
+                sources = (job.get("media_paths") or [])[:media_limit(platform)]
+                stored_posts = dict((job.get("posted_media") or {}).get("facebook") or {}) if platform == "facebook" else {}
+                posted_media = {str(index): stored_posts[str(path)] for index, path in enumerate(sources) if str(path) in stored_posts}
                 if dry_run:
-                    # Meta validates that Instagram has media even in dry-run.
-                    image_urls = ["dry-run://image"] * len((job.get("media_paths") or [])[:media_limit(platform)])
+                    media = [{"kind": "video" if re.search(r"\.(mp4|mov|m4v|webm)$", str(path), re.I) else "image", "url": "dry-run://media"} for path in sources]
                 else:
                     prepared_urls = job.setdefault("_prepared_media_urls", {})
-                    for index, path in enumerate((job.get("media_paths") or [])[:media_limit(platform)]):
+                    for index, path in enumerate(sources):
+                        kind = "video" if re.search(r"\.(mp4|mov|m4v|webm)$", str(path), re.I) else "image"
+                        if platform == "facebook" and str(index) in posted_media:
+                            media.append({"kind": kind, "url": "already-posted://media"})
+                            continue
                         if index not in prepared_urls:
-                            prepared_urls[index] = await self.pb.prepare_public_media(str(job["id"]), index, str(path))
-                        image_urls.append(prepared_urls[index])
-                result = await self.meta.publish(platform, text, image_urls, dry_run)
+                            prepare = self.pb.prepare_public_video if kind == "video" else self.pb.prepare_public_media
+                            prepared_urls[index] = await prepare(str(job["id"]), index, str(path))
+                        media.append({"kind": kind, "url": prepared_urls[index]})
+                if platform == "facebook":
+                    async def record_post(index: int, post_url: str) -> None:
+                        await self.pb.action("record_post", {"job_id": job["id"], "platform": "facebook", "index": index, "path": str(sources[index]), "post_url": post_url})
+                        posted_media[str(index)] = post_url
+                    result = await self.meta.publish(platform, text, media, dry_run, on_post=record_post, posted_media=posted_media,
+                                                     facebook_media_mode=str(job.get("facebook_media_mode") or "separate"))
+                else:
+                    result = await self.meta.publish(platform, text, media, dry_run)
             else:
                 raise ValueError(f"Niet-ondersteund platform: {platform}")
             await self.pb.action("session", {"platform": platform, "status": "connected", "error": "", "screenshot_path": ""})
@@ -138,7 +152,7 @@ class SocialWorker:
     async def tick(self) -> None:
         if not self.pb.paired or not self.hook_ready:
             return
-        response = await self.pb.action("poll", {"version": "2.6.0", "meta_ready": self.meta.configured})
+        response = await self.pb.action("poll", {"version": "2.8.0", "meta_ready": self.meta.configured})
         job = response.get("job") if isinstance(response, dict) else None
         if not job:
             return

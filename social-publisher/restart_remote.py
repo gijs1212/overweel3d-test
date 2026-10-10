@@ -45,7 +45,7 @@ DEBUG_POLL_COMMAND = (
     "docker compose --env-file .env exec -T social-publisher "
     "python -c 'import asyncio; from app.pocketbase import PocketBaseSocialClient; "
     "print(asyncio.run(PocketBaseSocialClient().action(\"poll\", "
-    "{\"version\":\"2.6.0\",\"meta_ready\":True,\"diagnose\":True})))'"
+    "{\"version\":\"2.8.0\",\"meta_ready\":True,\"diagnose\":True})))'"
 )
 
 

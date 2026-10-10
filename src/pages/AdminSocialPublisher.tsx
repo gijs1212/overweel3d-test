@@ -18,6 +18,7 @@ import { createClientId } from "@/lib/clientId";
 import { isVersionAtLeast } from "@/lib/compatibleVersion";
 
 type Platform = "facebook" | "instagram";
+type FacebookMediaMode = "combined" | "separate";
 type PostType = "product" | "color" | "discount" | "spotlight";
 type Templates = Record<PostType, Record<Platform, string>>;
 
@@ -45,6 +46,7 @@ interface SettingsRecord {
   enabled: boolean;
   dry_run: boolean;
   spotlight_enabled: boolean;
+  facebook_media_mode: FacebookMediaMode;
   integration_token: string;
   control_url: string;
   discount_image_path: string;
@@ -64,6 +66,7 @@ interface JobRecord {
   attempts: number;
   last_error?: string;
   platform_state?: Record<Platform, string>;
+  payload?: { facebook_media_mode?: FacebookMediaMode };
   created?: string;
 }
 
@@ -117,6 +120,7 @@ interface UploadedCustomImage {
   name: string;
   path: string;
   previewUrl: string;
+  isVideo: boolean;
 }
 
 const statusStyle: Record<string, string> = {
@@ -147,6 +151,7 @@ export default function AdminSocialPublisher() {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [postMode, setPostMode] = useState<"random" | "custom">("random");
+  const [facebookMediaMode, setFacebookMediaMode] = useState<FacebookMediaMode>("separate");
   const [customText, setCustomText] = useState("");
   const [customImages, setCustomImages] = useState<UploadedCustomImage[]>([]);
   const [uploadingCustom, setUploadingCustom] = useState(false);
@@ -216,7 +221,9 @@ export default function AdminSocialPublisher() {
           instagram: savedTemplates[type]?.instagram || DEFAULT_TEMPLATES[type].instagram,
         } }), {} as Templates),
         paused_platforms: (current.paused_platforms || []).filter((platform) => platform === "facebook" || platform === "instagram"),
+        facebook_media_mode: current.facebook_media_mode === "combined" ? "combined" : "separate",
       };
+      setFacebookMediaMode(current.facebook_media_mode);
     }
     setSettings(current);
     setPublisherHeartbeat({
@@ -270,6 +277,7 @@ export default function AdminSocialPublisher() {
       enabled: settings.enabled, dry_run: settings.dry_run, spotlight_enabled: settings.spotlight_enabled,
       integration_token: settings.integration_token, control_url: settings.control_url, discount_image_path: settings.discount_image_path,
       paused_platforms: settings.paused_platforms, templates: settings.templates,
+      facebook_media_mode: settings.facebook_media_mode,
     }).eq("id", settings.id);
     if (!error && !settings.dry_run) {
       await supabase.from("social_post_jobs").update({
@@ -307,7 +315,7 @@ export default function AdminSocialPublisher() {
       for (let attempt = 0; attempt < 10; attempt += 1) {
         if (attempt) await new Promise((resolve) => window.setTimeout(resolve, 500));
         const heartbeat = await refreshPublisherHeartbeat();
-        acknowledged = Boolean(heartbeat.lastSeen && heartbeat.lastSeen !== previousHeartbeat && /^2\.0\./.test(heartbeat.version));
+        acknowledged = Boolean(heartbeat.lastSeen && heartbeat.lastSeen !== previousHeartbeat && /^2\./.test(heartbeat.version));
         if (acknowledged) break;
       }
       if (acknowledged) {
@@ -346,25 +354,27 @@ export default function AdminSocialPublisher() {
   const uploadCustomImages = async (files: File[]) => {
     if (!files.length) return;
     if (customImages.length + files.length > 10) {
-      toast({ title: "Maximaal 10 afbeeldingen", description: "Kies maximaal tien foto's per bericht.", variant: "destructive" });
+      toast({ title: "Maximaal 10 mediabestanden", description: "Kies maximaal tien foto's of video's per bericht.", variant: "destructive" });
       return;
     }
     setUploadingCustom(true);
     const group = createClientId();
     try {
       for (const [index, file] of files.entries()) {
-        if (!file.type.startsWith("image/") && !/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name)) throw new Error(`${file.name} is geen ondersteunde afbeelding.`);
+        const isVideo = /\.(mp4|mov|m4v|webm)$/i.test(file.name);
+        if (!isVideo && !file.type.startsWith("image/") && !/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name)) throw new Error(`${file.name} is geen ondersteunde foto of video.`);
+        if (isVideo && file.size > 200 * 1024 * 1024) throw new Error(`${file.name} is groter dan 200 MB.`);
         setCustomUploadStatus(`${index + 1} van ${files.length} uploaden: ${file.name}`);
         const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
         const result = await uploadFileWithHeicConversion("orders", `social/manual/${group}/${index + 1}.${extension}`, file, { upsert: false });
         if (result.error || !result.data) throw result.error || new Error(`Upload van ${file.name} is niet bevestigd.`);
         const previewUrl = URL.createObjectURL(result.file);
-        setCustomImages((current) => [...current, { name: file.name, path: result.path, previewUrl }]);
+        setCustomImages((current) => [...current, { name: file.name, path: result.path, previewUrl, isVideo }]);
       }
-      setCustomUploadStatus(`${files.length} afbeelding${files.length === 1 ? "" : "en"} geüpload en klaar voor het bericht.`);
+      setCustomUploadStatus(`${files.length} mediabestand${files.length === 1 ? "" : "en"} geüpload en klaar voor het bericht.`);
     } catch (error) {
       setCustomUploadStatus("");
-      toast({ title: "Afbeelding uploaden mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+      toast({ title: "Media uploaden mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
     } finally {
       setUploadingCustom(false);
     }
@@ -542,9 +552,9 @@ export default function AdminSocialPublisher() {
   const queuePostNow = async () => {
     if (!targetPlatforms.length) { toast({ title: "Kies minstens één platform", variant: "destructive" }); return; }
     if (postMode === "custom" && !customText.trim()) { toast({ title: "Vul eerst de tekst in", variant: "destructive" }); return; }
-    if (uploadingCustom) { toast({ title: "Wacht tot de foto's zijn geüpload", variant: "destructive" }); return; }
+    if (uploadingCustom) { toast({ title: "Wacht tot de media is geüpload", variant: "destructive" }); return; }
     if (postMode === "custom" && targetPlatforms.includes("instagram") && !customImages.length) {
-      toast({ title: "Instagram heeft een afbeelding nodig", description: "Voeg een foto toe of schakel Instagram voor dit bericht uit.", variant: "destructive" });
+      toast({ title: "Instagram heeft media nodig", description: "Voeg een foto of video toe of schakel Instagram voor dit bericht uit.", variant: "destructive" });
       return;
     }
     setPlacing(true);
@@ -554,7 +564,7 @@ export default function AdminSocialPublisher() {
       let sourceId = eventId;
       let sourceName = "Handmatig bericht";
       let mediaPaths: string[] = [];
-      let payload: Record<string, unknown> = { target_platforms: targetPlatforms };
+      let payload: Record<string, unknown> = { target_platforms: targetPlatforms, facebook_media_mode: facebookMediaMode };
 
       if (postMode === "random") {
         const [productsResult, imagesResult] = await Promise.all([
@@ -590,12 +600,13 @@ export default function AdminSocialPublisher() {
           name: selected.product.name,
           direct_url: `https://overweel3d.gijsoverweel.nl/bestellen?product=${encodeURIComponent(selected.product.id)}`,
           target_platforms: targetPlatforms,
+          facebook_media_mode: facebookMediaMode,
         };
       } else {
         mediaPaths = customImages.map((image) => image.path);
         const homepage = "https://overweel3d.gijsoverweel.nl/";
         const text = customText.includes(homepage) ? customText.trim() : `${customText.trim()}\n\n${homepage}`;
-        payload = { target_platforms: targetPlatforms, texts: { facebook: text, instagram: text } };
+        payload = { target_platforms: targetPlatforms, facebook_media_mode: facebookMediaMode, texts: { facebook: text, instagram: text } };
       }
 
       const states = { facebook: targetPlatforms.includes("facebook") ? "pending" : "skipped", instagram: targetPlatforms.includes("instagram") ? "pending" : "skipped" };
@@ -637,6 +648,16 @@ export default function AdminSocialPublisher() {
       <div className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wider text-black/45">Docker-container</p><div className="mt-2 flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${publisherConnected ? "bg-emerald-500" : "bg-red-500"}`} /><p className="text-xl font-semibold">{publisherHeartbeat.readFailed ? "Status onbekend" : publisherConnected ? "Verbonden" : "Geen verbinding"}</p></div><p className="mt-2 text-xs text-black/45">{publisherHeartbeat.lastSeen ? `Laatste contact: ${new Date(publisherHeartbeat.lastSeen).toLocaleString("nl-NL")}` : "Nog geen heartbeat ontvangen"}{publisherHeartbeat.version ? ` · v${publisherHeartbeat.version}` : ""}</p>{settings.enabled && !publisherConnected && <p className="mt-3 text-xs text-amber-700">Automatisering blijft actief en probeert over maximaal 30 seconden opnieuw.</p>}</div>
     </div>
 
+    <section className="mb-6 rounded-2xl border bg-white p-5">
+      <h2 className="font-semibold">Standaardindeling voor Facebook</h2>
+      <p className="mt-1 text-sm text-black/55">Voor nieuwe automatische product-, kleur- en uitlichtingsberichten. Sla de instelling rechtsboven op; bestaande wachtrijtaken behouden hun eigen keuze.</p>
+      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Standaardindeling Facebookmedia">
+        <Button type="button" variant={settings.facebook_media_mode === "combined" ? "default" : "outline"} onClick={() => setSettings({ ...settings, facebook_media_mode: "combined" })}>Foto's in één bericht</Button>
+        <Button type="button" variant={settings.facebook_media_mode === "separate" ? "default" : "outline"} onClick={() => setSettings({ ...settings, facebook_media_mode: "separate" })}>Losse berichten</Button>
+      </div>
+      <p className="mt-3 text-xs text-black/50">Bij één bericht worden maximaal tien foto's gecombineerd. Video's verschijnen altijd als losse Facebook-videoberichten; Instagram behoudt de eigen carrousel.</p>
+    </section>
+
     <section className="mb-6 rounded-2xl border bg-white p-5" aria-live="polite">
       <p className="text-xs font-bold uppercase tracking-wider text-black/45">Volgende publicatie</p>
       <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -655,13 +676,13 @@ export default function AdminSocialPublisher() {
       <TabsList className="mb-5"><TabsTrigger value="now">Nu plaatsen</TabsTrigger><TabsTrigger value="queue">Wachtrij</TabsTrigger><TabsTrigger value="activity">Activiteit</TabsTrigger><TabsTrigger value="accounts">Accounts & koppeling</TabsTrigger><TabsTrigger value="templates">Teksten</TabsTrigger><TabsTrigger value="media">Kortingsafbeelding</TabsTrigger></TabsList>
       <TabsContent value="now"><section className="rounded-2xl border bg-white p-6"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Direct publiceren</p><h2 className="mt-1 text-xl font-semibold">Plaats nu een bericht</h2><p className="mt-1 text-sm text-black/50">Nieuwe handmatige berichten krijgen voorrang op de automatische wachtrij.</p></div><div className="flex rounded-full bg-neutral-100 p-1"><Button type="button" size="sm" variant={postMode === "random" ? "default" : "ghost"} className="rounded-full" onClick={() => setPostMode("random")}><Shuffle className="h-4 w-4" /> Willekeurig product</Button><Button type="button" size="sm" variant={postMode === "custom" ? "default" : "ghost"} className="rounded-full" onClick={() => setPostMode("custom")}><Send className="h-4 w-4" /> Eigen tekst</Button></div></div>
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div>{postMode === "random" ? <div className="rounded-2xl border border-dashed bg-neutral-50 p-8"><Shuffle className="mb-3 h-7 w-7" /><p className="font-semibold">Willekeurige productuitlichting</p><p className="mt-1 text-sm text-black/50">Er wordt een actief product met foto gekozen. De vaste tekst en directe cataloguslink worden automatisch gebruikt.</p></div> : <div className="space-y-4"><div><Label>Berichttekst</Label><Textarea rows={9} value={customText} onChange={(event) => setCustomText(event.target.value)} placeholder="Schrijf hier het bericht. De link naar de homepage wordt automatisch onderaan toegevoegd." /></div><div><Label>Afbeeldingen (optioneel, verplicht voor Instagram)</Label><label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed p-5 text-sm font-semibold"><ImagePlus className="h-4 w-4" /> {uploadingCustom ? "Uploaden…" : "Afbeeldingen kiezen"}<input type="file" multiple accept="image/*,.heic,.heif" disabled={uploadingCustom} className="hidden" onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void uploadCustomImages(files); }} /></label>{customUploadStatus && <p role="status" className="mt-2 text-sm text-black/60">{customUploadStatus}</p>}{customImages.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{customImages.map((image) => <div key={image.path} className="relative overflow-hidden rounded-xl border bg-neutral-50"><img src={image.previewUrl} alt={image.name} className="aspect-square w-full object-cover" /><div className="flex items-center justify-between gap-2 p-2"><span className="truncate text-xs" title={image.name}>{image.name}</span><button type="button" disabled={placing || uploadingCustom} aria-label={`${image.name} verwijderen`} onClick={() => void removeCustomImage(image)}><X className="h-4 w-4" /></button></div></div>)}</div>}</div></div>}</div>
-          <aside className="rounded-2xl bg-black p-5 text-white"><p className="text-xs font-bold uppercase tracking-[0.16em] text-white/45">Bestemmingen</p><div className="mt-4 space-y-3">{(["facebook", "instagram"] as Platform[]).map((platform) => <label key={platform} className="flex cursor-pointer items-center justify-between rounded-xl border border-white/15 p-3"><span className="capitalize">{platform}{platform === "facebook" ? " · Overweel3D" : ""}</span><Switch checked={targetPlatforms.includes(platform)} onCheckedChange={() => toggleTargetPlatform(platform)} /></label>)}</div><Button className="mt-5 w-full bg-white text-black hover:bg-white/85" onClick={() => void queuePostNow()} disabled={placing || uploadingCustom || !settings.enabled}>{placing || uploadingCustom ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{settings.dry_run ? " Droogloop nu starten" : " Nu plaatsen"}</Button>{!settings.enabled && <p className="mt-3 text-xs text-amber-300">Schakel eerst de automatisering bovenaan in.</p>}</aside>
+          <div>{postMode === "random" ? <div className="rounded-2xl border border-dashed bg-neutral-50 p-8"><Shuffle className="mb-3 h-7 w-7" /><p className="font-semibold">Willekeurige productuitlichting</p><p className="mt-1 text-sm text-black/50">Er wordt een actief product met foto gekozen. De vaste tekst en directe cataloguslink worden automatisch gebruikt.</p></div> : <div className="space-y-4"><div><Label>Berichttekst</Label><Textarea rows={9} value={customText} onChange={(event) => setCustomText(event.target.value)} placeholder="Schrijf hier het bericht. De link naar de homepage wordt automatisch onderaan toegevoegd." /></div><div><Label>Foto's en video's (optioneel, verplicht voor Instagram)</Label><label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed p-5 text-sm font-semibold"><ImagePlus className="h-4 w-4" /> {uploadingCustom ? "Uploaden…" : "Foto's of video's kiezen"}<input type="file" multiple accept="image/*,video/mp4,video/quicktime,video/webm,.heic,.heif,.mov,.m4v" disabled={uploadingCustom} className="hidden" onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void uploadCustomImages(files); }} /></label>{customUploadStatus && <p role="status" className="mt-2 text-sm text-black/60">{customUploadStatus}</p>}{customImages.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{customImages.map((image) => <div key={image.path} className="relative overflow-hidden rounded-xl border bg-neutral-50">{image.isVideo ? <video src={image.previewUrl} className="aspect-square w-full object-cover" controls preload="metadata" /> : <img src={image.previewUrl} alt={image.name} className="aspect-square w-full object-cover" />}<div className="flex items-center justify-between gap-2 p-2"><span className="truncate text-xs" title={image.name}>{image.name}</span><button type="button" disabled={placing || uploadingCustom} aria-label={`${image.name} verwijderen`} onClick={() => void removeCustomImage(image)}><X className="h-4 w-4" /></button></div></div>)}</div>}</div></div>}</div>
+          <aside className="rounded-2xl bg-black p-5 text-white"><p className="text-xs font-bold uppercase tracking-[0.16em] text-white/45">Bestemmingen</p><div className="mt-4 space-y-3">{(["facebook", "instagram"] as Platform[]).map((platform) => <label key={platform} className="flex cursor-pointer items-center justify-between rounded-xl border border-white/15 p-3"><span className="capitalize">{platform}{platform === "facebook" ? " · Overweel3D" : ""}</span><Switch checked={targetPlatforms.includes(platform)} onCheckedChange={() => toggleTargetPlatform(platform)} /></label>)}</div>{targetPlatforms.includes("facebook") && <div className="mt-5 border-t border-white/15 pt-4"><p className="text-sm font-semibold">Facebookindeling voor dit bericht</p><div className="mt-3 grid gap-2"><button type="button" aria-pressed={facebookMediaMode === "combined"} className={`rounded-lg border p-3 text-left text-sm ${facebookMediaMode === "combined" ? "border-white bg-white/15" : "border-white/20"}`} onClick={() => setFacebookMediaMode("combined")}>Foto's in één bericht</button><button type="button" aria-pressed={facebookMediaMode === "separate"} className={`rounded-lg border p-3 text-left text-sm ${facebookMediaMode === "separate" ? "border-white bg-white/15" : "border-white/20"}`} onClick={() => setFacebookMediaMode("separate")}>Losse berichten</button></div><p className="mt-2 text-xs text-white/55">Video's blijven afzonderlijke berichten.</p></div>}<Button className="mt-5 w-full bg-white text-black hover:bg-white/85" onClick={() => void queuePostNow()} disabled={placing || uploadingCustom || !settings.enabled}>{placing || uploadingCustom ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{settings.dry_run ? " Droogloop nu starten" : " Nu plaatsen"}</Button>{!settings.enabled && <p className="mt-3 text-xs text-amber-300">Schakel eerst de automatisering bovenaan in.</p>}</aside>
         </div>
       </section></TabsContent>
       <TabsContent value="queue" className="space-y-3">
         <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">Bestaande producten en kleuren</h2><p className="text-sm text-black/55">Zet alle actieve items één keer in de wachtrij. Actieve taken blijven staan tot ze zijn afgerond. Geannuleerde taken verdwijnen na 5 minuten en afgeronde taken na 1 uur. De volgende productuitlichting staat altijd alvast ingepland.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="destructive" onClick={() => void clearQueue()} disabled={clearingQueue || backfilling || jobs.length === 0}>{clearingQueue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Alles annuleren en verwijderen</Button><Button type="button" onClick={() => void enqueueBackfill()} disabled={backfilling || clearingQueue}>{backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />} Bestaande catalogus inplannen</Button></div></section>
-        {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => <article key={job.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{job.source_name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[job.status] || "bg-neutral-100"}`}>{job.status}</span>{job.is_backfill && <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">bestaand item · max. 1 per 2 uur</span>}</div><p className="mt-1 text-xs uppercase tracking-wider text-black/40">{job.source_type} · poging {job.attempts || 0}</p>{job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}<div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div></div><div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div></div></article>)}
+        {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => <article key={job.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{job.source_name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[job.status] || "bg-neutral-100"}`}>{job.status}</span>{job.is_backfill && <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">bestaand item · max. 1 per 2 uur</span>}</div><p className="mt-1 text-xs uppercase tracking-wider text-black/40">{job.source_type} · poging {job.attempts || 0} · Facebook: {job.payload?.facebook_media_mode === "combined" ? "foto's in één bericht" : "losse berichten"}</p>{job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}<div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div></div><div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div></div></article>)}
       </TabsContent>
       <TabsContent value="activity" className="space-y-4">
         <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Wat heeft de publisher gedaan?</h2><p className="mt-1 text-sm text-black/50">De laatste 100 acties, met resultaat per kanaal. Wordt elke 30 seconden bijgewerkt.</p></div><div className="flex flex-wrap gap-2">{settings.control_url && <a href={settings.control_url} target="_blank" rel="noreferrer"><Button variant="outline"><ExternalLink className="h-4 w-4" /> Containerlogs</Button></a>}<Button variant="outline" onClick={() => void refreshActivity()}><RefreshCw className="h-4 w-4" /> Vernieuwen</Button></div></section>

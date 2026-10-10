@@ -172,7 +172,7 @@ function route0(e) {
     requireAdmin(e);
     var socialStatus = socialSetting();
     return json(e, {
-      hook_version: "1.17.0",
+      hook_version: "1.19.0",
       publisher_last_seen_at: socialStatus.getString("publisher_last_seen_at"),
       publisher_version: socialStatus.getString("publisher_version")
     });
@@ -444,7 +444,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.17.0" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.0" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -1534,14 +1534,20 @@ function socialImagesForProduct(product) {
     try { rows = rows.concat($app.findRecordsByFilter("product_images", "product_id = {:id}", "", 100, 0, { id: product.id }) || []); } catch (_) {}
   }
   rows.sort(function (a, b) { return Number(b.getBool("is_primary")) - Number(a.getBool("is_primary")) || a.getInt("sort_order") - b.getInt("sort_order"); });
-  var paths = rows.filter(function (row) { return row.getString("media_type").toLowerCase() !== "video"; }).map(function (row) { return row.getString("storage_path"); });
+  var paths = rows.map(function (row) { return row.getString("storage_path"); });
   paths = paths.concat(socialArray(product.get("photos")));
   var seen = {};
-  return paths.map(socialExistingMediaPath).filter(function (path) {
-    if (!path || /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(path) || seen[path]) return false;
+  var available = paths.map(socialExistingMediaPath).filter(function (path) {
+    if (!path || !/\.(jpe?g|png|webp|heic|heif|mp4|mov|m4v|webm)$/i.test(path) || seen[path]) return false;
     seen[path] = true;
     return true;
-  }).slice(0, 10);
+  });
+  var selected = available.slice(0, 10);
+  if (selected.length === 10 && !selected.some(function (path) { return /\.(mp4|mov|m4v|webm)$/i.test(path); })) {
+    var firstVideo = available.filter(function (path) { return /\.(mp4|mov|m4v|webm)$/i.test(path); })[0];
+    if (firstVideo) selected[9] = firstVideo;
+  }
+  return selected;
 }
 
 function socialExistingMediaPath(value) {
@@ -1628,9 +1634,11 @@ function socialJob(eventKey) {
 }
 
 function socialCreateJob(setting, sourceType, record, media, payload, isBackfill, eventKey, scheduledAt) {
+  if (!payload.facebook_media_mode) payload.facebook_media_mode = setting.getString("facebook_media_mode") === "combined" ? "combined" : "separate";
   var existing = socialJob(eventKey);
   if (existing) {
     if (existing.getString("status") === "waiting_for_media" && media.length) {
+      payload.facebook_media_mode = socialObject(existing.get("payload")).facebook_media_mode || payload.facebook_media_mode;
       existing.set("media_paths", media); existing.set("payload", payload); existing.set("status", "queued"); existing.set("scheduled_at", new Date().toISOString());
       $app.save(existing);
     }
@@ -1664,6 +1672,7 @@ function socialEnqueueExistingCatalog(setting) {
       existing.set("is_backfill", true);
       existing.set("priority", 10);
       existing.set("media_paths", media);
+      payload.facebook_media_mode = socialObject(existing.get("payload")).facebook_media_mode || "separate";
       existing.set("payload", payload);
       existing.set("status", media.length ? "queued" : "waiting_for_media");
       existing.set("scheduled_at", new Date().toISOString());
@@ -1969,7 +1978,7 @@ function socialClaim(setting, metaReady) {
     } catch (historyError) { console.error("Social Publisher-start niet in activiteitengeschiedenis opgeslagen:", historyError); }
   }
   if (job.getBool("is_backfill")) { setting.set("backfill_last_published_at", now.toISOString()); $app.save(setting); }
-  return { id: job.getString("supabase_id") || job.id, source_type: type, source_name: job.getString("source_name"), media_paths: mediaPaths, media_urls: [], texts: texts, platforms: platforms, dry_run: setting.getBool("dry_run") };
+  return { id: job.getString("supabase_id") || job.id, source_type: type, source_name: job.getString("source_name"), media_paths: mediaPaths, media_urls: [], posted_media: socialObject(payload.social_platform_posts), facebook_media_mode: payload.facebook_media_mode === "combined" ? "combined" : "separate", texts: texts, platforms: platforms, dry_run: setting.getBool("dry_run") };
 }
 
 function socialReport(setting, p) {
@@ -2069,12 +2078,12 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.17.0" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.0" });
   }
   if (action === "poll") {
     var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
-    if (!publisherVersion || Number(publisherVersion[1]) < 2 || (Number(publisherVersion[1]) === 2 && Number(publisherVersion[2]) < 6)) {
-      throw new BadRequestError("Social Publisher 2.6.0 of nieuwer is vereist; oudere containers ondersteunen de nieuwe media-URL niet.");
+    if (!publisherVersion || Number(publisherVersion[1]) < 2 || (Number(publisherVersion[1]) === 2 && Number(publisherVersion[2]) < 8)) {
+      throw new BadRequestError("Social Publisher 2.8.0 of nieuwer is vereist voor gecombineerde Facebook-fotoberichten.");
     }
     socialSyncCatalog(setting); socialScheduleSpotlight(setting);
     if (p.diagnose === true) {
@@ -2088,9 +2097,35 @@ function route8(e) {
         next_due: diagnosticNext ? diagnosticNext.due : false,
         next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
         next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
-      }, version: "1.17.0" });
+      }, version: "1.19.0" });
     }
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.17.0" });
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.0" });
+  }
+  if (action === "resolve_media") {
+    var sourcePath = String(p.path || "").trim();
+    if (!sourcePath || sourcePath.indexOf("..") >= 0 || sourcePath.indexOf("generated-color:") === 0) fail("Ongeldig productmediapad.");
+    var sourceFile = storedFileForPath(sourcePath);
+    if (!sourceFile || !sourceFile.getString("file")) throw new NotFoundError("Productmedia ontbreekt in PocketBase-opslag.");
+    return json(e, { url: publicBaseUrl(e) + "/api/files/storage_files/" + encodeURIComponent(sourceFile.id) + "/" + encodeURIComponent(sourceFile.getString("file")) });
+  }
+  if (action === "record_post") {
+    var postedJob = byId("social_post_jobs", String(p.job_id || ""));
+    if (!postedJob || postedJob.getString("status") !== "processing") throw new NotFoundError("Actieve publicatietaak niet gevonden.");
+    var postedPlatform = String(p.platform || "");
+    var postedIndex = Number(p.index);
+    var postedPath = String(p.path || "");
+    var postedUrl = String(p.post_url || "");
+    if (postedPlatform !== "facebook" || !Number.isInteger(postedIndex) || postedIndex < 0 || postedPath !== socialArray(postedJob.get("media_paths"))[postedIndex] || !/^https:\/\/www\.facebook\.com\/[A-Za-z0-9_.\/-]+$/.test(postedUrl)) fail("Ongeldige mediapublicatie.");
+    var postedPayload = socialObject(postedJob.get("payload"));
+    var postedByPlatform = socialObject(postedPayload.social_platform_posts);
+    var postedFacebook = socialObject(postedByPlatform.facebook);
+    if (postedFacebook[postedPath] && postedFacebook[postedPath] !== postedUrl) fail("Deze media is al als een ander bericht geregistreerd.");
+    postedFacebook[postedPath] = postedUrl;
+    postedByPlatform.facebook = postedFacebook;
+    postedPayload.social_platform_posts = postedByPlatform;
+    postedJob.set("payload", postedPayload);
+    $app.save(postedJob);
+    return json(e, { recorded: true, posted_media: postedByPlatform });
   }
   if (action === "prepare_media") {
     var mediaJob = byId("social_post_jobs", String(p.job_id || ""));
@@ -2099,22 +2134,29 @@ function route8(e) {
     var mediaGrant = socialObject(mediaPayload.social_media_grant);
     var mediaIndex = Number(p.index);
     var mediaPaths = socialArray(mediaGrant.paths);
-    if (!mediaGrant.expires_at || new Date(mediaGrant.expires_at).getTime() <= Date.now() || !Number.isInteger(mediaIndex) || mediaIndex < 0 || mediaIndex >= mediaPaths.length) fail("Ongeldige of verlopen afbeelding.");
-    var encoded = String(p.image_base64 || "");
-    if (encoded.length > 11 * 1024 * 1024) throw new BadRequestError("Afbeelding is te groot.", 413);
-    var jpeg = base64Bytes(encoded);
-    if (jpeg.length < 100 || jpeg.length > 8 * 1024 * 1024 || jpeg[0] !== 255 || jpeg[1] !== 216 || jpeg[jpeg.length - 2] !== 255 || jpeg[jpeg.length - 1] !== 217) fail("Alleen volledige JPEG-afbeeldingen zijn toegestaan.");
-    var imagePath = "social-publisher/" + mediaJob.id + "/" + mediaIndex + ".jpg";
+    if (!mediaGrant.expires_at || new Date(mediaGrant.expires_at).getTime() <= Date.now() || !Number.isInteger(mediaIndex) || mediaIndex < 0 || mediaIndex >= mediaPaths.length) fail("Ongeldige of verlopen media.");
+    var mediaKind = String(p.media_kind || "image");
+    if (["image", "video"].indexOf(mediaKind) < 0) fail("Onbekend mediatype.");
+    var sourceIsVideo = /\.(mp4|mov|m4v|webm)$/i.test(String(mediaPaths[mediaIndex] || ""));
+    if ((mediaKind === "video") !== sourceIsVideo) fail("Mediatype komt niet overeen met het bronbestand.");
+    var encoded = String(mediaKind === "video" ? p.video_base64 || "" : p.image_base64 || "");
+    if (encoded.length > (mediaKind === "video" ? 28 : 11) * 1024 * 1024) throw new BadRequestError("Media is te groot.", 413);
+    var mediaBytes = base64Bytes(encoded);
+    if (mediaKind === "video") {
+      if (mediaBytes.length < 100 || mediaBytes.length > 20 * 1024 * 1024 || mediaBytes[4] !== 102 || mediaBytes[5] !== 116 || mediaBytes[6] !== 121 || mediaBytes[7] !== 112) fail("Alleen volledige MP4-video's zijn toegestaan.");
+    } else if (mediaBytes.length < 100 || mediaBytes.length > 8 * 1024 * 1024 || mediaBytes[0] !== 255 || mediaBytes[1] !== 216 || mediaBytes[mediaBytes.length - 2] !== 255 || mediaBytes[mediaBytes.length - 1] !== 217) fail("Alleen volledige JPEG-afbeeldingen zijn toegestaan.");
+    var extension = mediaKind === "video" ? ".mp4" : ".jpg";
+    var imagePath = "social-publisher/" + mediaJob.id + "/" + mediaIndex + extension;
     var imageRecord = storedFileForPath(imagePath);
     if (!imageRecord) {
       imageRecord = new Record($app.findCollectionByNameOrId("storage_files"));
       imageRecord.set("supabase_id", $security.randomString(8) + "-" + $security.randomString(4) + "-4" + $security.randomString(3) + "-a" + $security.randomString(3) + "-" + $security.randomString(12));
       imageRecord.set("bucket", "social-publisher"); imageRecord.set("path", imagePath); imageRecord.set("owner_user_id", ""); imageRecord.set("public", true);
     }
-    // Meta fetches this JPEG without our integration token. Existing records
+    // Meta fetches this media without our integration token. Existing records
     // from older attempts may still be private, so make retries public too.
     imageRecord.set("public", true);
-    imageRecord.set("file", $filesystem.fileFromBytes(jpeg, mediaJob.id + "-" + mediaIndex + ".jpg"));
+    imageRecord.set("file", $filesystem.fileFromBytes(mediaBytes, mediaJob.id + "-" + mediaIndex + extension));
     $app.save(imageRecord);
     var prepared = socialObject(mediaGrant.prepared);
     prepared[String(mediaIndex)] = imagePath;
@@ -2219,6 +2261,31 @@ function route10(e) {
   return e.blob(200, mime, storedFileBytes(stored, 30 * 1024 * 1024));
 }
 
+function route11(e) {
+  var path = String(e.request.url.query().get("path") || "").trim();
+  if (!path || path.length > 1024 || path.indexOf("..") >= 0 || path.indexOf("\\") >= 0 || /[\x00-\x1F]/.test(path) || /^(?:https?:|data:|blob:|\/)/i.test(path)) {
+    throw new NotFoundError("Productmedia niet gevonden.");
+  }
+  var imageRows = $app.findRecordsByFilter("product_images", "storage_path = {:path}", "", 100, 0, { path: path }) || [];
+  var published = imageRows.some(function (image) {
+    var product = byId("products", image.getString("product_id"));
+    return !!(product && product.getBool("active"));
+  });
+  if (!published) {
+    var products = $app.findRecordsByFilter("products", "active = true", "", 5000, 0) || [];
+    published = products.some(function (product) {
+      return socialArray(product.get("photos")).some(function (photo) { return String(photo) === path; });
+    });
+  }
+  if (!published) throw new NotFoundError("Productmedia niet gevonden.");
+  var stored = storedFileForPath(path);
+  if (!stored || stored.getString("bucket") !== "orders" || !stored.getString("file")) throw new NotFoundError("Productmedia niet gevonden.");
+  var mediaUrl = publicBaseUrl(e) + "/api/overweel3d/catalog/media?path=" + encodeURIComponent(path);
+  e.response.header().set("Cache-Control", "public, max-age=300");
+  if (e.request.url.query().get("resolve") === "1") return e.json(200, { url: mediaUrl });
+  return e.fileFS($os.dirFS(stored.baseFilesPath()), stored.getString("file"));
+}
+
 function socialCleanupJobs(nowMs) {
   var referenceTime = Number(nowMs);
   if (!Number.isFinite(referenceTime)) referenceTime = Date.now();
@@ -2242,13 +2309,15 @@ function socialCleanupJobs(nowMs) {
     if (referenceTime - timestampMs < retentionMs) return;
     try {
       $app.delete(job);
-      // Prepared images are public only while the post is active and for its
+      // Prepared media is public only while the post is active and for its
       // short retention window. Never leave those copies behind with the job.
       for (var mediaIndex = 0; mediaIndex < 10; mediaIndex += 1) {
-        var preparedFile = storedFileForPath("social-publisher/" + job.id + "/" + mediaIndex + ".jpg");
-        if (preparedFile && preparedFile.getString("bucket") === "social-publisher") {
-          try { $app.delete(preparedFile); } catch (mediaCleanupError) { console.error("Socialmedia-afbeelding opruimen mislukt:", mediaCleanupError); }
-        }
+        [".jpg", ".mp4"].forEach(function (extension) {
+          var preparedFile = storedFileForPath("social-publisher/" + job.id + "/" + mediaIndex + extension);
+          if (preparedFile && preparedFile.getString("bucket") === "social-publisher") {
+            try { $app.delete(preparedFile); } catch (mediaCleanupError) { console.error("Socialmedia-media opruimen mislukt:", mediaCleanupError); }
+          }
+        });
       }
       result.deleted += 1;
       if (status === "cancelled") result.cancelled += 1;
@@ -2259,4 +2328,4 @@ function socialCleanupJobs(nowMs) {
 }
 
 
-module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };
+module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, route11, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };

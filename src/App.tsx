@@ -45,6 +45,7 @@ import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
 import NewsletterPopup from "./components/NewsletterPopup";
 import UploadProgressCenter from "./components/UploadProgressCenter";
+import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ScrollToTop />
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />

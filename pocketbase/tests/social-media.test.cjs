@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const zlib = require("node:zlib");
 const sandbox = { module: { exports: {} }, console };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../pb_hooks/overweel3d-core.js"), "utf8"), sandbox);
-const { socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route8, route9, route10 } = sandbox.module.exports;
+const { socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route8, route9, route10, route11 } = sandbox.module.exports;
 
 function record(data) {
   return {
@@ -102,6 +102,50 @@ test("prepared media returns a direct PocketBase file URL and makes the copy pub
   delete sandbox.$app;
 });
 
+test("prepared MP4 is stored publicly for Meta to fetch", () => {
+  const setting = record({ integration_token: "local-token" });
+  const job = record({ id: "job-pb", supabase_id: "job-public", status: "processing", payload: {
+    social_media_grant: { expires_at: "2099-01-01T00:00:00.000Z", paths: ["products/item/video.mov"] },
+  } });
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24, 102, 116, 121, 112]), Buffer.alloc(120)]);
+  sandbox.$security = { randomString: () => "a", sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  sandbox.$os = { getenv: () => "https://api.example.test" };
+  sandbox.$filesystem = { fileFromBytes: (_bytes, name) => name };
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_publisher_settings" ? [setting] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "job-public" ? job : null,
+    findCollectionByNameOrId: () => ({}), save: () => {},
+  };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" }, body: { job_id: "job-public", index: 0, media_kind: "video", video_base64: mp4.toString("base64") } }),
+    request: { pathValue: () => "prepare_media" }, json: (status, payload) => ({ status, ...payload }),
+  };
+  const response = route8(event);
+  assert.equal(response.status, 200);
+  assert.match(response.data.url, /\.mp4$/);
+  assert.equal(job.get("payload").social_media_grant.prepared["0"], "social-publisher/job-pb/0.mp4");
+  delete sandbox.$security; delete sandbox.$os; delete sandbox.$filesystem; delete sandbox.$app;
+});
+
+test("Facebook media progress is retained for safe retries", () => {
+  const setting = record({ integration_token: "local-token" });
+  const job = record({ id: "job-pb", supabase_id: "job-public", status: "processing", media_paths: ["products/item/photo.jpg", "products/item/video.mov"], payload: {} });
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_publisher_settings" ? [setting] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "job-public" ? job : null,
+    save: () => {},
+  };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" }, body: { job_id: "job-public", platform: "facebook", index: 0, path: "products/item/photo.jpg", post_url: "https://www.facebook.com/123_456" } }),
+    request: { pathValue: () => "record_post" }, json: (status, payload) => ({ status, ...payload }),
+  };
+  const response = route8(event);
+  assert.equal(response.data.recorded, true);
+  assert.equal(job.get("payload").social_platform_posts.facebook["products/item/photo.jpg"], "https://www.facebook.com/123_456");
+  delete sandbox.$security; delete sandbox.$app;
+});
+
 test("outdated publisher cannot claim a job and silently publish without photos", () => {
   sandbox.BadRequestError = class extends Error {};
   sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
@@ -110,7 +154,7 @@ test("outdated publisher cannot claim a job and silently publish without photos"
     requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" }, body: { version: "2.5.3" } }),
     request: { pathValue: () => "poll" },
   };
-  assert.throws(() => route8(event), /2\.6\.0 of nieuwer/);
+  assert.throws(() => route8(event), /2\.8\.0 of nieuwer/);
   delete sandbox.BadRequestError;
   delete sandbox.$security;
   delete sandbox.$app;
@@ -138,7 +182,7 @@ test("social cleanup removes cancelled jobs after five minutes and completed job
   delete sandbox.$app;
 });
 
-test("product media uses its own primary photo and excludes video", () => {
+test("product media uses its own primary photo and includes video", () => {
   const images = [
     { getString: (name) => ({ media_type: "image", storage_path: "products/second.jpg" })[name] || "", getBool: () => false, getInt: () => 1 },
     { getString: (name) => ({ media_type: "image", storage_path: "products/first.jpg" })[name] || "", getBool: () => true, getInt: () => 2 },
@@ -146,11 +190,65 @@ test("product media uses its own primary photo and excludes video", () => {
   ];
   sandbox.$app = {
     findRecordsByFilter: (collection) => collection === "product_images" ? images : [],
-    findFirstRecordByFilter: (_collection, _filter, params) => params.value !== "products/movie.mp4" ? { id: "file" } : null,
+    findFirstRecordByFilter: () => ({ id: "file" }),
   };
   const product = { id: "pb-product", getString: (name) => name === "supabase_id" ? "catalog-product" : "", get: () => [] };
-  assert.deepEqual(Array.from(socialImagesForProduct(product)), ["products/first.jpg", "products/second.jpg"]);
+  assert.deepEqual(Array.from(socialImagesForProduct(product)), ["products/first.jpg", "products/second.jpg", "products/movie.mp4"]);
   delete sandbox.$app;
+});
+
+test("product media resolves to its real PocketBase file URL", () => {
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  sandbox.$os = { getenv: () => "https://api.example.test" };
+  sandbox.$app = {
+    findRecordsByFilter: () => [record({ integration_token: "local-token" })],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "storage_files" && params.value === "products/id/photo.jpeg"
+      ? record({ id: "photo-record", file: "stored-photo.jpeg" }) : null,
+  };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" }, body: { path: "products/id/photo.jpeg" } }),
+    request: { pathValue: () => "resolve_media" },
+    json: (status, payload) => ({ status, ...payload }),
+  };
+  const response = route8(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.data.url, "https://api.example.test/api/files/storage_files/photo-record/stored-photo.jpeg");
+  delete sandbox.$app;
+  delete sandbox.$os;
+  delete sandbox.$security;
+});
+
+test("public catalog resolves only media attached to active products without login", () => {
+  sandbox.NotFoundError = class extends Error {};
+  sandbox.$os = { getenv: () => "https://api.example.test", dirFS: (directory) => directory };
+  const product = record({ id: "product-pb", supabase_id: "product-public", active: true });
+  const photo = record({ product_id: "product-public", storage_path: "products/product-public/photo.jpg" });
+  const stored = record({ id: "file-pb", path: "products/product-public/photo.jpg", bucket: "orders", file: "actual.jpg" });
+  stored.baseFilesPath = () => "C:/pocketbase/files/file-pb";
+  sandbox.$app = {
+    findRecordsByFilter: (collection, filter) => collection === "product_images" && filter.includes("storage_path") ? [photo] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => {
+      if (collection === "products" && params.value === "product-public") return product;
+      if (collection === "storage_files" && params.value === stored.getString("path")) return stored;
+      return null;
+    },
+  };
+  let resolve = true;
+  const event = {
+    request: { url: { query: () => ({ get: (key) => key === "path" ? "products/product-public/photo.jpg" : resolve ? "1" : "" }) } },
+    response: { header: () => ({ set: () => {} }) },
+    json: (status, payload) => ({ status, ...payload }),
+    fileFS: (directory, filename) => ({ directory, filename }),
+  };
+  assert.equal(route11(event).url, "https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct-public%2Fphoto.jpg");
+  resolve = false;
+  assert.deepEqual(JSON.parse(JSON.stringify(route11(event))), { directory: "C:/pocketbase/files/file-pb", filename: "actual.jpg" });
+  product.set("active", false);
+  assert.throws(() => route11(event), /Productmedia niet gevonden/);
+  product.set("active", true);
+  const privateEvent = { ...event, request: { url: { query: () => ({ get: () => "orders/private-file.3mf" }) } } };
+  assert.throws(() => route11(privateEvent), /Productmedia niet gevonden/);
+  delete sandbox.$app; delete sandbox.$os; delete sandbox.NotFoundError;
 });
 
 test("backfill preview matches the next claimed item and waits two hours", () => {
@@ -207,7 +305,7 @@ test("an overdue post keeps its original time and is actually claimed", () => {
 
 test("claiming a job no longer needs the media-grant collection", () => {
   const settings = record({ enabled: true, dry_run: false, paused_platforms: [], templates: {} });
-  const job = record({ id: "safe-job", supabase_id: "safe-job", status: "queued", source_type: "color", source_name: "Zwart", priority: 100, scheduled_at: "2026-01-01T00:00:00.000Z", media_paths: ["generated-color:#000000"], payload: {} });
+  const job = record({ id: "safe-job", supabase_id: "safe-job", status: "queued", source_type: "color", source_name: "Zwart", priority: 100, scheduled_at: "2026-01-01T00:00:00.000Z", media_paths: ["generated-color:#000000"], payload: { facebook_media_mode: "combined" } });
   sandbox.$app = {
     findRecordsByFilter: (_collection, filter) => filter.includes("status = 'processing'") ? [] : [job],
     findCollectionByNameOrId: (collection) => { if (collection === "social_media_grants") throw new Error(`missing collection: ${collection}`); return {}; },
@@ -215,7 +313,9 @@ test("claiming a job no longer needs the media-grant collection", () => {
   };
   sandbox.$security = { randomString: () => "testgrant", sha256: (value) => `hash:${value}` };
   sandbox.$os = { getenv: () => "https://api.example.test" };
-  assert.equal(socialClaim(settings, true).id, "safe-job");
+  const claimed = socialClaim(settings, true);
+  assert.equal(claimed.id, "safe-job");
+  assert.equal(claimed.facebook_media_mode, "combined");
   assert.equal(job.getString("status"), "processing");
   delete sandbox.$app;
   delete sandbox.$security;

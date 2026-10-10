@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus } from "lucide-react";
 import { useMaterials } from "@/hooks/useMaterials";
 import { supabase } from "@/integrations/supabase/client";
-import { availableFilamentColorsForMaterial, FilamentColor } from "@/lib/productCatalog";
+import { getProductPhotoUrl } from "@/lib/productPhotos";
+import { availableFilamentColorsForMaterial, FilamentColor, isVideoProductMedia } from "@/lib/productCatalog";
 
 interface Product {
   id: string;
@@ -47,8 +48,8 @@ export function ProductCard({ product, onAdd }: ProductCardProps) {
       setPhotoUrl(null);
       return () => { active = false; };
     }
-    void supabase.storage.from("orders").createSignedUrl(path, 3600).then(({ data }) => {
-      if (active) setPhotoUrl(data?.signedUrl || null);
+    void getProductPhotoUrl(path).then((url) => {
+      if (active) setPhotoUrl(url || null);
     });
     return () => { active = false; };
   }, [product.photos]);
@@ -71,7 +72,9 @@ export function ProductCard({ product, onAdd }: ProductCardProps) {
     <div className="border border-border rounded-xl p-4">
       <div className="flex gap-4">
         {photoUrl && (
-          <img src={photoUrl} alt={product.name} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+          isVideoProductMedia(product.photos[0])
+            ? <video src={photoUrl} aria-label={product.name} muted playsInline preload="metadata" className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+            : <img src={photoUrl} alt={product.name} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
         )}
         <div className="flex-1">
           <div className="flex justify-between items-start mb-2">

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { pocketbase, POCKETBASE_URL } from "@/integrations/pocketbase/client";
 
 const cache = new Map<string, { url: string; expiresAt: number }>();
 
@@ -14,8 +15,10 @@ export function normalizeProductStoragePath(path: string): string | null {
 }
 
 /**
- * Returns a signed URL for a product photo stored in the private "orders" bucket.
- * Falls back to the raw path on error so the UI keeps rendering something.
+ * Active product media is public, even when the visitor has no account.
+ * The server verifies that the path belongs to an active product before
+ * resolving its PocketBase file URL. Private/admin media retains the old
+ * authenticated fallback.
  */
 export async function getProductPhotoUrl(path: string): Promise<string> {
   if (!path) return "";
@@ -29,6 +32,18 @@ export async function getProductPhotoUrl(path: string): Promise<string> {
   const cached = cache.get(normalizedPath);
   if (cached && cached.expiresAt > now + 60_000) return cached.url;
 
+  try {
+    const response = await fetch(`${POCKETBASE_URL}/api/overweel3d/catalog/media?path=${encodeURIComponent(normalizedPath)}&resolve=1`);
+    if (response.ok) {
+      const result = await response.json() as { url?: string };
+      if (result.url?.startsWith(`${POCKETBASE_URL}/api/overweel3d/catalog/media?path=`)) {
+        cache.set(normalizedPath, { url: result.url, expiresAt: now + 5 * 60 * 1000 });
+        return result.url;
+      }
+    }
+  } catch { /* An authenticated admin can still use the legacy fallback. */ }
+
+  if (!pocketbase.authStore.token) return "";
   let { data, error } = await supabase.storage.from("orders").createSignedUrl(normalizedPath, 60 * 60);
 
   // Very old rows occasionally contain only a filename instead of products/<filename>.
