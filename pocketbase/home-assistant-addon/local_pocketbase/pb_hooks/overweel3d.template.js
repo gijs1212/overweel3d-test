@@ -59,11 +59,25 @@ function cleanRecord(record) {
 
 function mutableJsonObject(value) {
   if (!value) return {};
+  value = jsonFieldValue(value);
   if (typeof value === "string") {
     try { value = JSON.parse(value); } catch (_) { return {}; }
   }
   if (typeof value !== "object" || Array.isArray(value)) return {};
   try { return JSON.parse(JSON.stringify(value)); } catch (_) { return {}; }
+}
+
+function jsonFieldValue(value) {
+  // PocketBase's Go JSON fields may arrive in hooks as UTF-8 byte arrays.
+  if (Array.isArray(value) && value.length > 2 &&
+      (value[0] === 123 || value[0] === 91) &&
+      value.every(function (byte) { return Number.isInteger(byte) && byte >= 0 && byte <= 255; })) {
+    try {
+      var encoded = value.map(function (byte) { return "%" + ("0" + byte.toString(16)).slice(-2); }).join("");
+      return JSON.parse(decodeURIComponent(encoded));
+    } catch (_) { return value; }
+  }
+  return value;
 }
 
 function nozzleDiameter(value) {
@@ -158,7 +172,7 @@ function route0(e) {
     requireAdmin(e);
     var socialStatus = socialSetting();
     return json(e, {
-      hook_version: "1.13.0",
+      hook_version: "1.17.0",
       publisher_last_seen_at: socialStatus.getString("publisher_last_seen_at"),
       publisher_version: socialStatus.getString("publisher_version")
     });
@@ -166,6 +180,10 @@ function route0(e) {
   if (name === "social_publisher_next_post") {
     requireAdmin(e);
     return json(e, socialNextPublication(socialSetting()));
+  }
+  if (name === "social_publisher_activity") {
+    requireAdmin(e);
+    return json(e, socialActivity());
   }
   if (name === "set_social_publisher_enabled") {
     requireAdmin(e);
@@ -175,9 +193,59 @@ function route0(e) {
     $app.save(socialToggleSetting);
     return json(e, { enabled: socialToggleSetting.getBool("enabled") });
   }
+  if (name === "publish_social_job_now") {
+    requireAdmin(e);
+    var immediateSetting = socialSetting();
+    if (!immediateSetting.getBool("enabled")) fail("Zet de automatisering eerst op actief.");
+    if (immediateSetting.getBool("dry_run")) fail("Schakel de droogloop uit om echt online te publiceren.");
+    var immediateJob = byId("social_post_jobs", String(p.p_job_id || ""));
+    if (!immediateJob) throw new NotFoundError("Socialmediataak niet gevonden.");
+    if (["queued", "failed"].indexOf(immediateJob.getString("status")) < 0) fail("Alleen wachtende of mislukte taken kunnen direct worden geplaatst.");
+    if (!socialTargetPlatforms(immediateJob, immediateSetting).length) fail("Deze taak heeft geen beschikbaar publicatiekanaal.");
+    var immediatePayload = socialObject(immediateJob.get("payload"));
+    if (!immediatePayload.force_now) immediatePayload.force_priority_original = immediateJob.getInt("priority");
+    immediatePayload.force_now = true;
+    immediateJob.set("payload", immediatePayload);
+    immediateJob.set("status", "queued");
+    immediateJob.set("priority", 10000);
+    immediateJob.set("scheduled_at", new Date().toISOString());
+    immediateJob.set("next_retry_at", "");
+    immediateJob.set("attempts", 0);
+    immediateJob.set("last_error", "");
+    $app.save(immediateJob);
+    var wakeSent = false;
+    try {
+      var wakeUrl = immediateSetting.getString("control_url").replace(/\/+$/, "");
+      if (/^http:\/\/(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)[\d.]+:8787$/.test(wakeUrl)) {
+        var wakeResponse = $http.send({ url: wakeUrl + "/api/wake", method: "POST", headers: { "X-Overweel-Social-Token": immediateSetting.getString("integration_token") }, timeout: 3 });
+        wakeSent = wakeResponse.statusCode >= 200 && wakeResponse.statusCode < 300;
+      }
+    } catch (wakeError) { console.error("Social Publisher wekverzoek mislukt; de gewone poll verwerkt de taak alsnog:", wakeError); }
+    return json(e, { queued: true, wake_sent: wakeSent, job_id: immediateJob.getString("supabase_id") || immediateJob.id });
+  }
   if (name === "enqueue_social_backfill") {
     requireAdmin(e);
     return json(e, socialEnqueueExistingCatalog(socialSetting()));
+  }
+  if (name === "clear_social_publisher_queue") {
+    requireAdmin(e);
+    var queueJobs = [];
+    try { queueJobs = $app.findRecordsByFilter("social_post_jobs", "id != ''", "", 5000, 0) || []; } catch (_) {}
+    var cancelledAt = new Date().toISOString();
+    queueJobs.forEach(function (job) {
+      try {
+        job.set("status", "cancelled");
+        job.set("completed_at", cancelledAt);
+        job.set("next_retry_at", "");
+        job.set("last_error", "Geannuleerd doordat de admin de volledige wachtrij heeft leeggemaakt.");
+        $app.save(job);
+      } catch (_) {}
+    });
+    var deletedJobs = 0;
+    queueJobs.forEach(function (job) {
+      try { $app.delete(job); deletedJobs += 1; } catch (_) {}
+    });
+    return json(e, { cancelled: queueJobs.length, deleted: deletedJobs });
   }
 
   if (name === "pair_social_publisher") {
@@ -376,7 +444,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.13.0" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.17.0" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -1425,6 +1493,7 @@ var SOCIAL_DEFAULT_TEMPLATES = {
 };
 
 function socialArray(value) {
+  value = jsonFieldValue(value);
   if (Array.isArray(value)) return value;
   if (typeof value === "string") { try { var parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch (_) {} }
   return [];
@@ -1436,11 +1505,11 @@ function socialObject(value) {
 
 function socialSetting() {
   var records = [];
-  try { records = $app.findRecordsByFilter("social_publisher_settings", "integration_token != \"\"", "", 1, 0) || []; } catch (error) { console.error("Social Publisher-instellingen met koppelsleutel zoeken mislukt:", error); throw error; }
+  try { records = $app.findRecordsByFilter("social_publisher_settings", "integration_token != ''", "", 100, 0) || []; } catch (error) { console.error("Social Publisher-instellingen met koppelsleutel zoeken mislukt:", error); throw error; }
   if (!records.length) {
-    records = $app.findRecordsByFilter("social_publisher_settings", "id != \"\"", "", 1, 0) || [];
+    records = $app.findRecordsByFilter("social_publisher_settings", "id != ''", "", 10000, 0) || [];
   }
-  if (records.length) return records[0];
+  if (records.length) return records.filter(function (record) { return record.getBool("enabled"); })[0] || records[0];
   return save("social_publisher_settings", {
     enabled: false, dry_run: true, spotlight_enabled: true, paused_platforms: [], templates: SOCIAL_DEFAULT_TEMPLATES,
     control_url: "http://192.168.2.50:8787", backfill_started_at: new Date().toISOString()
@@ -1558,7 +1627,7 @@ function socialJob(eventKey) {
   try { return $app.findFirstRecordByFilter("social_post_jobs", "event_key = {:key}", { key: eventKey }); } catch (_) { return null; }
 }
 
-function socialCreateJob(setting, sourceType, record, media, payload, isBackfill, eventKey) {
+function socialCreateJob(setting, sourceType, record, media, payload, isBackfill, eventKey, scheduledAt) {
   var existing = socialJob(eventKey);
   if (existing) {
     if (existing.getString("status") === "waiting_for_media" && media.length) {
@@ -1571,7 +1640,7 @@ function socialCreateJob(setting, sourceType, record, media, payload, isBackfill
   return save("social_post_jobs", {
     event_key: eventKey, source_type: sourceType, source_id: record.getString("supabase_id") || record.id, source_name: name,
     status: media.length ? "queued" : "waiting_for_media", priority: isBackfill ? 10 : (sourceType === "spotlight" ? 50 : 100),
-    scheduled_at: new Date().toISOString(), media_paths: media, payload: payload, attempts: 0, is_backfill: isBackfill,
+    scheduled_at: scheduledAt || new Date().toISOString(), media_paths: media, payload: payload, attempts: 0, is_backfill: isBackfill,
     platform_state: { facebook: "pending", instagram: "pending" }
   });
 }
@@ -1708,6 +1777,9 @@ function socialTargetPlatforms(job, setting) {
 function socialReadyAt(job, setting, now) {
   var time = new Date(job.getString("scheduled_at") || now.toISOString()).getTime();
   if (!isFinite(time)) time = now.getTime();
+  // A manual "publish now" raises priority to 10000. Honour that even when
+  // PocketBase exposes the JSON payload in a form that doesn't round-trip here.
+  if (job.getInt("priority") >= 10000 || socialObject(job.get("payload")).force_now === true) return time;
   var retry = new Date(job.getString("next_retry_at")).getTime();
   if (isFinite(retry)) time = Math.max(time, retry);
   if (job.getBool("is_backfill")) {
@@ -1730,7 +1802,8 @@ function socialSelectNextJob(candidates, setting, now) {
       (due.length || socialReadyAt(job, setting, now) === socialReadyAt(first, setting, now));
   });
   var selected = first.getBool("is_backfill") ? socialChooseBackfill(tied.filter(function (job) { return job.getBool("is_backfill"); }), setting) : first;
-  return { job: selected, scheduled_at: new Date(Math.max(socialReadyAt(selected, setting, now), now.getTime())).toISOString() };
+  var readyAt = socialReadyAt(selected, setting, now);
+  return { job: selected, scheduled_at: new Date(readyAt).toISOString(), due: readyAt <= now.getTime() };
 }
 
 function socialSpotlightProduct(nextAt) {
@@ -1747,11 +1820,11 @@ function socialNextPublication(setting) {
   var state = setting.getBool("enabled") ? (setting.getBool("dry_run") ? "dry_run" : "scheduled") : "paused";
   var processing = [];
   try { processing = $app.findRecordsByFilter("social_post_jobs", "status = 'processing' && source_type != 'session_check'", "-priority,scheduled_at", 1, 0) || []; } catch (_) {}
-  if (processing.length) return { state: state === "scheduled" ? "processing" : state, source_name: processing[0].getString("source_name"), source_type: processing[0].getString("source_type"), scheduled_at: now.toISOString(), platforms: socialTargetPlatforms(processing[0], setting), is_backfill: processing[0].getBool("is_backfill") };
+  if (processing.length) return { state: state === "scheduled" ? "processing" : state, source_name: processing[0].getString("source_name"), source_type: processing[0].getString("source_type"), scheduled_at: processing[0].getString("claimed_at") || processing[0].getString("scheduled_at"), due: true, platforms: socialTargetPlatforms(processing[0], setting), is_backfill: processing[0].getBool("is_backfill") };
   var candidates = [];
   try { candidates = $app.findRecordsByFilter("social_post_jobs", "status = 'queued' || status = 'failed'", "-priority,scheduled_at", 5000, 0) || []; } catch (_) {}
   var next = socialSelectNextJob(candidates, setting, now);
-  if (next) return { state: state, source_name: next.job.getString("source_name"), source_type: next.job.getString("source_type"), scheduled_at: next.scheduled_at, platforms: socialTargetPlatforms(next.job, setting), is_backfill: next.job.getBool("is_backfill") };
+  if (next) return { state: state, source_name: next.job.getString("source_name"), source_type: next.job.getString("source_type"), scheduled_at: next.scheduled_at, due: next.due, platforms: socialTargetPlatforms(next.job, setting), is_backfill: next.job.getBool("is_backfill") };
   var unfinished = [];
   try { unfinished = $app.findRecordsByFilter("social_post_jobs", "is_backfill = true && status != 'completed' && status != 'dry_run_complete' && status != 'cancelled'", "", 1, 0) || []; } catch (_) {}
   if (unfinished.length) return { state: "waiting_for_media", source_name: "Bestaande catalogus", source_type: "backfill", scheduled_at: null, platforms: [], is_backfill: true };
@@ -1766,66 +1839,137 @@ function socialNextPublication(setting) {
   return { state: "none", source_name: "", source_type: "", scheduled_at: null, platforms: [], is_backfill: false };
 }
 
+function socialActivity() {
+  var rows = $app.findRecordsByFilter("social_post_history", "id != ''", "-published_at", 100, 0) || [];
+  var jobs = {};
+  return rows.map(function (row) {
+    var jobId = row.getString("job_id");
+    if (jobs[jobId] === undefined) jobs[jobId] = byId("social_post_jobs", jobId) || null;
+    var job = jobs[jobId];
+    var details = socialObject(row.get("details"));
+    return {
+      id: row.getString("supabase_id") || row.id,
+      job_id: jobId,
+      source_name: String(details.source_name || (job && job.getString("source_name")) || "Onbekende taak"),
+      source_type: String(details.source_type || (job && job.getString("source_type")) || ""),
+      platform: row.getString("platform"),
+      status: row.getString("status"),
+      post_url: row.getString("post_url"),
+      error: String(details.error || ""),
+      happened_at: row.getString("published_at")
+    };
+  });
+}
+
 function socialScheduleSpotlight(setting) {
   if (!setting.getBool("spotlight_enabled")) return;
   var now = new Date();
-  var unfinishedBackfill = $app.findRecordsByFilter("social_post_jobs", "is_backfill = true && status != 'completed' && status != 'dry_run_complete' && status != 'cancelled'", "", 1, 0) || [];
-  if (unfinishedBackfill.length) {
-    var deferred = setting.getString("spotlight_next_at");
-    if (!deferred || new Date(deferred) <= now) { setting.set("spotlight_next_at", socialNextLocal19(now, 0).toISOString()); $app.save(setting); }
-    return;
-  }
+  var planned = [];
+  try { planned = $app.findRecordsByFilter("social_post_jobs", "source_type = 'spotlight' && (status = 'queued' || status = 'failed' || status = 'processing' || status = 'waiting_for_media')", "scheduled_at", 1, 0) || []; } catch (_) {}
+  if (planned.length) return;
   var nextText = setting.getString("spotlight_next_at");
-  if (!nextText) { setting.set("spotlight_next_at", socialNextLocal19(now, 0).toISOString()); $app.save(setting); return; }
+  if (!nextText) {
+    nextText = socialNextLocal19(now, 0).toISOString();
+    setting.set("spotlight_next_at", nextText);
+    $app.save(setting);
+  }
   var next = new Date(nextText);
-  if (next > now) return;
+  if (!isFinite(next.getTime())) {
+    next = socialNextLocal19(now, 0);
+    nextText = next.toISOString();
+    setting.set("spotlight_next_at", nextText);
+    $app.save(setting);
+  }
   var product = socialSpotlightProduct(nextText);
   if (product) {
     var id = product.getString("supabase_id") || product.id;
     var dateKey = next.toISOString().slice(0, 10);
-    socialCreateJob(setting, "spotlight", product, socialImagesForProduct(product), { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) }, false, "spotlight:" + dateKey);
+    socialCreateJob(setting, "spotlight", product, socialImagesForProduct(product), { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) }, false, "spotlight:" + dateKey, nextText);
   }
-  // Bij langere uitval wordt precies één gemiste uitlichting ingehaald; de
-  // volgende planning ligt vervolgens weer twee lokale kalenderdagen vooruit.
-  setting.set("spotlight_next_at", socialNextLocal19(now, 2).toISOString()); $app.save(setting);
 }
 
 function socialRender(template, values) {
   return String(template || "").replace(/\{([a-z_]+)\}/g, function (_, key) { return values[key] === undefined || values[key] === null ? "" : String(values[key]); });
 }
 
+function socialMediaSignature(setting, jobId, index, expiresAt, path) {
+  var secret = setting && setting.getString("integration_token");
+  if (!secret) return "";
+  return $security.sha256([String(jobId || ""), String(index), String(expiresAt), String(path || ""), secret].join("|"));
+}
+
+function socialCreateMediaGrant(jobId, index, path, expiresAt) {
+  var token = $security.randomString(48);
+  var grant = save("social_media_grants", {
+    job_id: jobId,
+    // PocketBase Required NumberField accepteert 0 niet. Sla de positie daarom
+    // 1-gebaseerd op; de publieke API en publisher blijven 0-gebaseerd.
+    media_index: index + 1,
+    path: path,
+    prepared_path: "",
+    token_hash: $security.sha256(token),
+    expires_at: expiresAt
+  });
+  return { id: grant.getString("supabase_id") || grant.id, token: token };
+}
+
 function socialClaim(setting, metaReady) {
   var now = new Date();
   var candidates = [];
-  try { candidates = $app.findRecordsByFilter("social_post_jobs", "(status = 'queued' || status = 'failed') && scheduled_at <= {:now}", "-priority,scheduled_at", 5000, 0, { now: now.toISOString() }) || []; } catch (_) {}
+  // Do not filter on scheduled_at in PocketBase: legacy date values and
+  // force_now tasks must be compared by socialReadyAt below, not SQL text order.
+  try { candidates = $app.findRecordsByFilter("social_post_jobs", "status = 'queued' || status = 'failed'", "-priority,scheduled_at", 5000, 0) || []; }
+  catch (error) { console.error("Social Publisher kon de wachtrij niet lezen:", error); throw error; }
   var sessionChecks = candidates.filter(function (candidate) { return candidate.getString("source_type") === "session_check" && socialReadyAt(candidate, setting, now) <= now.getTime(); });
   var next = metaReady ? socialSelectNextJob(candidates, setting, now) : null;
-  var job = sessionChecks.length && (!next || sessionChecks[0].getInt("priority") >= next.job.getInt("priority")) ? sessionChecks[0] : next && new Date(next.scheduled_at) <= now ? next.job : null;
+  var job = sessionChecks.length && (!next || sessionChecks[0].getInt("priority") >= next.job.getInt("priority")) ? sessionChecks[0] : next && next.due ? next.job : null;
   if (!job) return null;
   var type = job.getString("source_type");
   if (!setting.getBool("enabled") && type !== "session_check") return null;
   var templates = socialObject(setting.get("templates"));
   var selected = templates[type] || SOCIAL_DEFAULT_TEMPLATES[type] || {};
   var payload = socialObject(job.get("payload"));
+  if (payload.force_now === true) {
+    job.set("priority", Number(payload.force_priority_original) || (job.getBool("is_backfill") ? 10 : 100));
+    delete payload.force_now;
+    delete payload.force_priority_original;
+  }
   var requestedPlatforms = socialArray(payload.target_platforms).filter(function (platform) { return ["facebook", "instagram"].indexOf(platform) >= 0; });
   if (!requestedPlatforms.length) requestedPlatforms = ["facebook", "instagram"];
   var platforms = type === "session_check" ? requestedPlatforms : socialTargetPlatforms(job, setting);
   if (!platforms.length) return null;
   var mediaPaths = socialArray(job.get("media_paths")).slice(0, 10);
-  var mediaGrant = { token: $security.randomString(48), expires_at: new Date(now.getTime() + 2 * 3600000).toISOString(), paths: mediaPaths };
+  if (type === "product" || type === "spotlight") {
+    var sourceProduct = byId("products", job.getString("source_id"));
+    if (sourceProduct) {
+      var productId = sourceProduct.getString("supabase_id") || sourceProduct.id;
+      payload.name = sourceProduct.getString("name");
+      payload.direct_url = "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(productId);
+      var currentMedia = socialImagesForProduct(sourceProduct);
+      if (currentMedia.length) { mediaPaths = currentMedia; job.set("media_paths", mediaPaths); }
+    }
+  }
+  var mediaGrant = { token: $security.randomString(48), expires_at: new Date(now.getTime() + 24 * 3600000).toISOString(), paths: mediaPaths };
   payload.social_media_grant = mediaGrant;
   job.set("payload", payload);
-  job.set("status", "processing"); job.set("claimed_at", now.toISOString()); $app.save(job);
-  if (job.getBool("is_backfill")) { setting.set("backfill_last_published_at", now.toISOString()); $app.save(setting); }
   var texts = {};
   var customTexts = socialObject(payload.texts);
   platforms.forEach(function (platform) {
     texts[platform] = type === "manual" ? String(customTexts[platform] || customTexts.default || "") : socialRender(selected[platform] || (SOCIAL_DEFAULT_TEMPLATES[type] || {})[platform], payload);
   });
-  var mediaUrls = mediaPaths.map(function (_, index) {
-    return envOrSetting("POCKETBASE_PUBLIC_URL", "pocketbase_public_url", "https://api.gijsoverweel.nl").replace(/\/+$/, "") + "/api/overweel3d/social/public-media?job_id=" + encodeURIComponent(job.getString("supabase_id") || job.id) + "&index=" + index + "&token=" + encodeURIComponent(mediaGrant.token);
-  });
-  return { id: job.getString("supabase_id") || job.id, source_type: type, source_name: job.getString("source_name"), media_paths: mediaPaths, media_urls: mediaUrls, texts: texts, platforms: platforms, dry_run: setting.getBool("dry_run") };
+  // The publisher now reads sources through /media and uses a prepared
+  // PocketBase file URL for Meta. No new public-media grants are issued.
+  job.set("status", "processing"); job.set("claimed_at", now.toISOString()); $app.save(job);
+  if (type !== "session_check") {
+    try {
+      save("social_post_history", {
+        job_id: job.getString("supabase_id") || job.id, platform: "system", status: "started",
+        details: { source_name: job.getString("source_name"), source_type: type }, published_at: now.toISOString()
+      });
+    } catch (historyError) { console.error("Social Publisher-start niet in activiteitengeschiedenis opgeslagen:", historyError); }
+  }
+  if (job.getBool("is_backfill")) { setting.set("backfill_last_published_at", now.toISOString()); $app.save(setting); }
+  return { id: job.getString("supabase_id") || job.id, source_type: type, source_name: job.getString("source_name"), media_paths: mediaPaths, media_urls: [], texts: texts, platforms: platforms, dry_run: setting.getBool("dry_run") };
 }
 
 function socialReport(setting, p) {
@@ -1850,7 +1994,7 @@ function socialReport(setting, p) {
       job.set("completed_at", new Date().toISOString());
     }
     $app.save(job);
-    save("social_post_history", { job_id: job.getString("supabase_id") || job.id, platform: platform, status: reportedStatus, post_url: p.post_url || "", details: { error: p.error || "", screenshot_path: p.screenshot_path || "" }, published_at: new Date().toISOString() });
+    save("social_post_history", { job_id: job.getString("supabase_id") || job.id, platform: platform, status: reportedStatus, post_url: p.post_url || "", details: { error: p.error || "", screenshot_path: p.screenshot_path || "", source_name: job.getString("source_name"), source_type: job.getString("source_type") }, published_at: new Date().toISOString() });
     return cleanRecord(job);
   }
   var successStates = ["published", "dry_run"];
@@ -1858,14 +2002,22 @@ function socialReport(setting, p) {
   var requestedPlatforms = jobTargets;
   var allDone = requestedPlatforms.every(function (name) { return paused.indexOf(name) >= 0 || successStates.indexOf(state[name]) >= 0; });
   if (requestedPlatforms.some(function (name) { return state[name] === "manual_attention"; })) job.set("status", "manual_attention");
-  else if (allDone) { job.set("status", setting.getBool("dry_run") ? "dry_run_complete" : "completed"); job.set("completed_at", new Date().toISOString()); }
+  else if (allDone) {
+    job.set("status", setting.getBool("dry_run") ? "dry_run_complete" : "completed");
+    job.set("completed_at", new Date().toISOString());
+    if (job.getString("source_type") === "spotlight") {
+      setting.set("spotlight_next_at", socialNextLocal19(new Date(), 2).toISOString());
+      $app.save(setting);
+    }
+  }
   else if (reportedStatus === "failed") {
     var attempts = job.getInt("attempts") + 1; job.set("attempts", attempts);
     if (attempts >= 3) job.set("status", "manual_attention");
     else { job.set("status", "failed"); job.set("next_retry_at", new Date(Date.now() + [60000, 300000, 900000][attempts - 1]).toISOString()); }
   } else job.set("status", requestedPlatforms.some(function (name) { return state[name] === "failed"; }) ? "failed" : "processing");
   $app.save(job);
-  save("social_post_history", { job_id: job.getString("supabase_id") || job.id, platform: platform, status: reportedStatus, post_url: p.post_url || "", details: { error: p.error || "", screenshot_path: p.screenshot_path || "" }, published_at: new Date().toISOString() });
+  if (allDone && job.getString("source_type") === "spotlight") socialScheduleSpotlight(setting);
+  save("social_post_history", { job_id: job.getString("supabase_id") || job.id, platform: platform, status: reportedStatus, post_url: p.post_url || "", details: { error: p.error || "", screenshot_path: p.screenshot_path || "", source_name: job.getString("source_name"), source_type: job.getString("source_type") }, published_at: new Date().toISOString() });
   return cleanRecord(job);
 }
 
@@ -1896,7 +2048,7 @@ function socialSessionCheckResult(p) {
     else save("social_publisher_sessions", values);
     save("social_post_history", {
       job_id: job.getString("supabase_id") || job.id, platform: platform, status: resultStatus,
-      post_url: values.account_url, details: { error: error, screenshot_path: values.screenshot_path },
+      post_url: values.account_url, details: { error: error, screenshot_path: values.screenshot_path, source_name: job.getString("source_name"), source_type: job.getString("source_type") },
       published_at: new Date().toISOString()
     });
   });
@@ -1917,11 +2069,73 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.13.0" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.17.0" });
   }
   if (action === "poll") {
+    var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!publisherVersion || Number(publisherVersion[1]) < 2 || (Number(publisherVersion[1]) === 2 && Number(publisherVersion[2]) < 6)) {
+      throw new BadRequestError("Social Publisher 2.6.0 of nieuwer is vereist; oudere containers ondersteunen de nieuwe media-URL niet.");
+    }
     socialSyncCatalog(setting); socialScheduleSpotlight(setting);
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.13.0" });
+    if (p.diagnose === true) {
+      var diagnosticCandidates = $app.findRecordsByFilter("social_post_jobs", "status = 'queued' || status = 'failed'", "-priority,scheduled_at", 5000, 0) || [];
+      var diagnosticNow = new Date();
+      var diagnosticNext = socialSelectNextJob(diagnosticCandidates, setting, diagnosticNow);
+      return json(e, { diagnostic: {
+        now: diagnosticNow.toISOString(), enabled: setting.getBool("enabled"), meta_ready: p.meta_ready === true,
+        candidate_count: diagnosticCandidates.length,
+        next_id: diagnosticNext ? diagnosticNext.job.id : "",
+        next_due: diagnosticNext ? diagnosticNext.due : false,
+        next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
+        next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
+      }, version: "1.17.0" });
+    }
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.17.0" });
+  }
+  if (action === "prepare_media") {
+    var mediaJob = byId("social_post_jobs", String(p.job_id || ""));
+    if (!mediaJob || mediaJob.getString("status") !== "processing") throw new NotFoundError("Actieve publicatietaak niet gevonden.");
+    var mediaPayload = socialObject(mediaJob.get("payload"));
+    var mediaGrant = socialObject(mediaPayload.social_media_grant);
+    var mediaIndex = Number(p.index);
+    var mediaPaths = socialArray(mediaGrant.paths);
+    if (!mediaGrant.expires_at || new Date(mediaGrant.expires_at).getTime() <= Date.now() || !Number.isInteger(mediaIndex) || mediaIndex < 0 || mediaIndex >= mediaPaths.length) fail("Ongeldige of verlopen afbeelding.");
+    var encoded = String(p.image_base64 || "");
+    if (encoded.length > 11 * 1024 * 1024) throw new BadRequestError("Afbeelding is te groot.", 413);
+    var jpeg = base64Bytes(encoded);
+    if (jpeg.length < 100 || jpeg.length > 8 * 1024 * 1024 || jpeg[0] !== 255 || jpeg[1] !== 216 || jpeg[jpeg.length - 2] !== 255 || jpeg[jpeg.length - 1] !== 217) fail("Alleen volledige JPEG-afbeeldingen zijn toegestaan.");
+    var imagePath = "social-publisher/" + mediaJob.id + "/" + mediaIndex + ".jpg";
+    var imageRecord = storedFileForPath(imagePath);
+    if (!imageRecord) {
+      imageRecord = new Record($app.findCollectionByNameOrId("storage_files"));
+      imageRecord.set("supabase_id", $security.randomString(8) + "-" + $security.randomString(4) + "-4" + $security.randomString(3) + "-a" + $security.randomString(3) + "-" + $security.randomString(12));
+      imageRecord.set("bucket", "social-publisher"); imageRecord.set("path", imagePath); imageRecord.set("owner_user_id", ""); imageRecord.set("public", true);
+    }
+    // Meta fetches this JPEG without our integration token. Existing records
+    // from older attempts may still be private, so make retries public too.
+    imageRecord.set("public", true);
+    imageRecord.set("file", $filesystem.fileFromBytes(jpeg, mediaJob.id + "-" + mediaIndex + ".jpg"));
+    $app.save(imageRecord);
+    var prepared = socialObject(mediaGrant.prepared);
+    prepared[String(mediaIndex)] = imagePath;
+    mediaGrant.prepared = prepared;
+    mediaPayload.social_media_grant = mediaGrant;
+    mediaJob.set("payload", mediaPayload); $app.save(mediaJob);
+    var mediaJobId = mediaJob.getString("supabase_id") || mediaJob.id;
+    var activeMediaGrants = [];
+    try {
+      activeMediaGrants = $app.findRecordsByFilter("social_media_grants", "job_id = {:job} && media_index = {:index} && expires_at > {:now}", "", 100, 0, {
+        job: mediaJobId, index: mediaIndex + 1, now: new Date().toISOString()
+      }) || [];
+    } catch (_) {}
+    activeMediaGrants.forEach(function (activeGrant) {
+      activeGrant.set("prepared_path", imagePath);
+      $app.save(activeGrant);
+    });
+    return json(e, {
+      prepared: true,
+      url: publicBaseUrl(e) + "/api/files/storage_files/" + encodeURIComponent(imageRecord.id) + "/" + encodeURIComponent(imageRecord.getString("file"))
+    });
   }
   if (action === "report") return json(e, socialReport(setting, p));
   if (action === "session_check_result") return json(e, socialSessionCheckResult(p));
@@ -1940,6 +2154,10 @@ function route9(e) {
   socialRequireToken(e);
   var path = String(e.request.url.query().get("path") || "");
   if (!path || path.indexOf("..") >= 0) fail("Ongeldig mediapad.");
+  if (path.indexOf("generated-color:") === 0) {
+    e.response.header().set("Cache-Control", "private, no-store");
+    return e.blob(200, "image/png", socialColorPng(path.slice("generated-color:".length)));
+  }
   var stored = storedFileForPath(path);
   if (!stored) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
   var bytes = storedFileBytes(stored, 30 * 1024 * 1024);
@@ -1951,16 +2169,43 @@ function route9(e) {
 
 function route10(e) {
   var query = e.request.url.query();
-  var job = byId("social_post_jobs", String(query.get("job_id") || ""));
-  if (!job) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
-  var grant = socialObject(socialObject(job.get("payload")).social_media_grant);
-  var token = String(query.get("token") || "");
-  var index = Number(query.get("index"));
-  var paths = socialArray(grant.paths);
-  if (!token || token !== String(grant.token || "") || !grant.expires_at || new Date(grant.expires_at).getTime() <= Date.now() || !Number.isInteger(index) || index < 0 || index >= paths.length) {
-    throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+  var path = "";
+  var grantId = String(query.get("grant_id") || "");
+  var grantToken = String(query.get("token") || "");
+  if (grantId && grantToken) {
+    var mediaAccess = byId("social_media_grants", grantId);
+    var tokenHash = $security.sha256(grantToken);
+    if (!mediaAccess || !mediaAccess.getString("token_hash") || !$security.equal(mediaAccess.getString("token_hash"), tokenHash) || !mediaAccess.getString("expires_at") || new Date(mediaAccess.getString("expires_at")).getTime() <= Date.now()) {
+      throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+    }
+    path = mediaAccess.getString("prepared_path") || mediaAccess.getString("path");
+  } else {
+    // Achterwaartse compatibiliteit voor reeds geclaimde taken van 1.16.7 en ouder.
+    var jobId = String(query.get("job_id") || "");
+    var job = byId("social_post_jobs", jobId);
+    var index = Number(query.get("index"));
+    var signedPath = String(query.get("path") || "");
+    var signedExpires = Number(query.get("expires"));
+    var suppliedSignature = String(query.get("signature") || "");
+    if (jobId && signedPath && Number.isInteger(index) && index >= 0 && Number.isFinite(signedExpires) && signedExpires > Date.now() && suppliedSignature) {
+      var expectedSignature = socialMediaSignature(socialSetting(), jobId, index, signedExpires, signedPath);
+      if (!expectedSignature || !$security.equal(expectedSignature, suppliedSignature)) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+      path = signedPath;
+      if (job) {
+        var signedGrant = socialObject(socialObject(job.get("payload")).social_media_grant);
+        path = String(socialObject(signedGrant.prepared)[String(index)] || path);
+      }
+    } else {
+      if (!job) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+      var legacyGrant = socialObject(socialObject(job.get("payload")).social_media_grant);
+      var legacyToken = String(query.get("token") || "");
+      var paths = socialArray(legacyGrant.paths);
+      if (!legacyToken || legacyToken !== String(legacyGrant.token || "") || !legacyGrant.expires_at || new Date(legacyGrant.expires_at).getTime() <= Date.now() || !Number.isInteger(index) || index < 0 || index >= paths.length) {
+        throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
+      }
+      path = String(socialObject(legacyGrant.prepared)[String(index)] || paths[index] || "");
+    }
   }
-  var path = String(paths[index] || "");
   if (!path || path.indexOf("..") >= 0) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
   if (path.indexOf("generated-color:") === 0) {
     e.response.header().set("Cache-Control", "private, max-age=3600");
@@ -1974,5 +2219,44 @@ function route10(e) {
   return e.blob(200, mime, storedFileBytes(stored, 30 * 1024 * 1024));
 }
 
+function socialCleanupJobs(nowMs) {
+  var referenceTime = Number(nowMs);
+  if (!Number.isFinite(referenceTime)) referenceTime = Date.now();
+  var result = { deleted: 0, cancelled: 0, expired: 0, grants: 0 };
+  var expiredGrants = [];
+  try {
+    expiredGrants = $app.findRecordsByFilter("social_media_grants", "expires_at <= {:now}", "", 5000, 0, { now: new Date(referenceTime).toISOString() }) || [];
+  } catch (_) {}
+  expiredGrants.forEach(function (grant) {
+    try { $app.delete(grant); result.grants += 1; } catch (_) {}
+  });
+  var jobs = [];
+  try { jobs = $app.findRecordsByFilter("social_post_jobs", "id != ''", "", 5000, 0) || []; } catch (_) { return result; }
+  jobs.forEach(function (job) {
+    var status = job.getString("status");
+    if (status !== "cancelled" && ["completed", "dry_run_complete"].indexOf(status) < 0) return;
+    var timestamp = job.getString("completed_at") || job.getString("updated") || job.getString("created");
+    var timestampMs = timestamp ? new Date(timestamp).getTime() : NaN;
+    if (!Number.isFinite(timestampMs)) return;
+    var retentionMs = status === "cancelled" ? 5 * 60 * 1000 : 60 * 60 * 1000;
+    if (referenceTime - timestampMs < retentionMs) return;
+    try {
+      $app.delete(job);
+      // Prepared images are public only while the post is active and for its
+      // short retention window. Never leave those copies behind with the job.
+      for (var mediaIndex = 0; mediaIndex < 10; mediaIndex += 1) {
+        var preparedFile = storedFileForPath("social-publisher/" + job.id + "/" + mediaIndex + ".jpg");
+        if (preparedFile && preparedFile.getString("bucket") === "social-publisher") {
+          try { $app.delete(preparedFile); } catch (mediaCleanupError) { console.error("Socialmedia-afbeelding opruimen mislukt:", mediaCleanupError); }
+        }
+      }
+      result.deleted += 1;
+      if (status === "cancelled") result.cancelled += 1;
+      else result.expired += 1;
+    } catch (_) {}
+  });
+  return result;
+}
 
-module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialScheduleSpotlight, socialNextPublication };
+
+module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };

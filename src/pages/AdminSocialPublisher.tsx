@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, ExternalLink, ImagePlus, Loader2, Pause, Play, RefreshCw, RotateCcw, Save, Send, Shuffle, X, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, ImagePlus, Loader2, Pause, Play, RefreshCw, RotateCcw, Save, Send, Shuffle, Trash2, X, XCircle } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { createClientId } from "@/lib/clientId";
+import { isVersionAtLeast } from "@/lib/compatibleVersion";
 
 type Platform = "facebook" | "instagram";
 type PostType = "product" | "color" | "discount" | "spotlight";
@@ -91,7 +92,26 @@ interface NextPublication {
   scheduled_at: string | null;
   platforms: Platform[];
   is_backfill: boolean;
+  due?: boolean;
 }
+
+interface ActivityRecord {
+  id: string;
+  job_id: string;
+  source_name: string;
+  source_type: string;
+  platform: string;
+  status: string;
+  post_url: string;
+  error: string;
+  happened_at: string;
+}
+
+const activityLabels: Record<string, string> = {
+  started: "Opgepakt", published: "Online geplaatst", dry_run: "Droogloop voltooid",
+  failed: "Mislukt", manual_attention: "Handmatige actie nodig", connected: "Account verbonden",
+  disconnected: "Account niet verbonden",
+};
 
 interface UploadedCustomImage {
   name: string;
@@ -110,7 +130,7 @@ export default function AdminSocialPublisher() {
   const navigate = useNavigate();
   const { section } = useParams<{ section?: string }>();
   const activeTab = section === "account" || section === "accounts" ? "accounts"
-    : ["queue", "templates", "media"].includes(section || "") ? section! : "now";
+    : ["queue", "activity", "templates", "media"].includes(section || "") ? section! : "now";
   const selectTab = (tab: string) => navigate(`/admin/social/${tab === "accounts" ? "account" : tab}`);
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -121,6 +141,9 @@ export default function AdminSocialPublisher() {
   const [saving, setSaving] = useState(false);
   const [togglingEnabled, setTogglingEnabled] = useState(false);
   const [nextPublication, setNextPublication] = useState<NextPublication | null>(null);
+  const [activity, setActivity] = useState<ActivityRecord[]>([]);
+  const [activityError, setActivityError] = useState("");
+  const [activitySearch, setActivitySearch] = useState("");
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [postMode, setPostMode] = useState<"random" | "custom">("random");
@@ -129,6 +152,8 @@ export default function AdminSocialPublisher() {
   const [uploadingCustom, setUploadingCustom] = useState(false);
   const [customUploadStatus, setCustomUploadStatus] = useState("");
   const [backfilling, setBackfilling] = useState(false);
+  const [clearingQueue, setClearingQueue] = useState(false);
+  const [publishingJobId, setPublishingJobId] = useState("");
   const [targetPlatforms, setTargetPlatforms] = useState<Platform[]>(["facebook", "instagram"]);
   const [placing, setPlacing] = useState(false);
   const [testingAccounts, setTestingAccounts] = useState(false);
@@ -158,12 +183,22 @@ export default function AdminSocialPublisher() {
     if (!result.error) setNextPublication(result.data as NextPublication);
   }, []);
 
+  const refreshActivity = useCallback(async () => {
+    const result = await supabase.rpc("social_publisher_activity");
+    if (result.error) setActivityError(result.error.message);
+    else {
+      setActivity((result.data || []) as ActivityRecord[]);
+      setActivityError("");
+    }
+  }, []);
+
   const load = useCallback(async () => {
-    const [settingsResult, jobsResult, sessionsResult, nextResult] = await Promise.all([
+    const [settingsResult, jobsResult, sessionsResult, nextResult, activityResult] = await Promise.all([
       supabase.rpc("get_social_publisher_settings"),
       supabase.from("social_post_jobs").select("*").order("scheduled_at", { ascending: false }).limit(100),
       supabase.from("social_publisher_sessions").select("*").order("platform"),
       supabase.rpc("social_publisher_next_post"),
+      supabase.rpc("social_publisher_activity"),
     ]);
     const error = settingsResult.error || jobsResult.error || sessionsResult.error;
     if (error) {
@@ -191,6 +226,8 @@ export default function AdminSocialPublisher() {
     });
     setJobs((jobsResult.data || []) as JobRecord[]);
     if (!nextResult.error) setNextPublication(nextResult.data as NextPublication);
+    if (activityResult.error) setActivityError(activityResult.error.message);
+    else { setActivity((activityResult.data || []) as ActivityRecord[]); setActivityError(""); }
     setSessions(((sessionsResult.data || []) as SessionRecord[]).filter((session) => session.platform === "facebook" || session.platform === "instagram"));
     if (current?.discount_image_path) setPreviewUrl(await getProductPhotoUrl(current.discount_image_path));
     else setPreviewUrl("");
@@ -203,9 +240,12 @@ export default function AdminSocialPublisher() {
     const timer = window.setInterval(() => {
       void refreshPublisherHeartbeat();
       void refreshNextPublication();
+      void refreshActivity();
+      void supabase.from("social_post_jobs").select("*").order("scheduled_at", { ascending: false }).limit(100)
+        .then(({ data, error }) => { if (!error) setJobs((data || []) as JobRecord[]); });
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [isAdmin, refreshPublisherHeartbeat, refreshNextPublication]);
+  }, [isAdmin, refreshPublisherHeartbeat, refreshNextPublication, refreshActivity]);
 
   const toggleEnabled = async (enabled: boolean) => {
     if (!settings || togglingEnabled) return;
@@ -368,8 +408,64 @@ export default function AdminSocialPublisher() {
   };
 
   const cancelJob = async (job: JobRecord) => {
-    const { error } = await supabase.from("social_post_jobs").update({ status: "cancelled" }).eq("id", job.id);
+    const { error } = await supabase.from("social_post_jobs").update({ status: "cancelled", completed_at: new Date().toISOString(), next_retry_at: null }).eq("id", job.id);
     if (error) toast({ title: "Annuleren mislukt", description: error.message, variant: "destructive" }); else void load();
+  };
+
+  const clearQueue = async () => {
+    if (!window.confirm("Alle taken annuleren en definitief uit de Social Publisher-wachtrij verwijderen? De publicatiegeschiedenis blijft bewaard.")) return;
+    setClearingQueue(true);
+    try {
+      const { data, error } = await supabase.rpc("clear_social_publisher_queue");
+      if (error) throw error;
+      const deleted = Number(data?.deleted || 0);
+      setJobs([]);
+      setNextPublication(null);
+      toast({ title: "Wachtrij leeggemaakt", description: `${deleted} ${deleted === 1 ? "taak is" : "taken zijn"} geannuleerd en verwijderd.` });
+      await load();
+    } catch (error) {
+      toast({ title: "Wachtrij leegmaken mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+    } finally {
+      setClearingQueue(false);
+    }
+  };
+
+  const publishJobNow = async (job: JobRecord) => {
+    if (!settings?.enabled || settings.dry_run) {
+      toast({ title: "Live publiceren niet beschikbaar", description: "Zet de automatisering aan en schakel droogloop uit.", variant: "destructive" });
+      return;
+    }
+    if (!window.confirm(`"${job.source_name}" nu publiceren op de nog openstaande kanalen?`)) return;
+    setPublishingJobId(job.id);
+    try {
+      const { data, error } = await supabase.rpc("publish_social_job_now", { p_job_id: job.id });
+      if (error) throw error;
+      toast({ title: "Direct publiceren gestart", description: data?.wake_sent ? "De container is gewekt. De taak wacht niet op het volgende geplande tijdslot." : "De taak wacht niet op het volgende geplande tijdslot en wordt bij de eerstvolgende poll opgepakt." });
+      await load();
+      for (let attempt = 0; attempt < 45; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+        const result = await supabase.from("social_post_jobs").select("status,platform_state,last_error").eq("id", job.id).maybeSingle();
+        if (result.error) throw result.error;
+        if (!result.data) break;
+        const current = result.data as Pick<JobRecord, "status" | "platform_state" | "last_error">;
+        setJobs((items) => items.map((item) => item.id === job.id ? { ...item, ...current } : item));
+        if (current.status === "completed") {
+          toast({ title: `"${job.source_name}" is online`, description: "De geslaagde kanalen staan in de publicatiegeschiedenis." });
+          await load();
+          return;
+        }
+        if (["manual_attention", "failed", "cancelled"].includes(current.status)) {
+          toast({ title: `"${job.source_name}" niet volledig gepubliceerd`, description: current.last_error || "Controleer de kanaalstatus en activiteitengeschiedenis.", variant: "destructive" });
+          await load();
+          return;
+        }
+      }
+      toast({ title: "Publicatie wordt nog verwerkt", description: "Controleer de kanaalstatus en activiteitengeschiedenis; start de taak niet opnieuw zolang die bezig is." });
+    } catch (error) {
+      toast({ title: "Direct publiceren mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+    } finally {
+      setPublishingJobId("");
+    }
   };
 
   const toggleTargetPlatform = (platform: Platform) => {
@@ -382,11 +478,11 @@ export default function AdminSocialPublisher() {
     try {
       const capability = await supabase.rpc("social_publisher_status");
       if (capability.error) throw capability.error;
-      if (String(capability.data?.hook_version || "") !== "1.13.0") {
-        throw new Error("Werk eerst de PocketBase-app bij naar 1.13.0; de huidige hook kan de accountcontrole niet afronden.");
+      if (!isVersionAtLeast(capability.data?.hook_version, "1.15.0")) {
+        throw new Error(`PocketBase-hook ${capability.data?.hook_version || "onbekend"} ondersteunt deze accountcontrole niet; versie 1.15.0 of nieuwer is nodig.`);
       }
-      if (String(capability.data?.publisher_version || "") !== "2.2.0") {
-        throw new Error("Werk eerst de Social Publisher-container bij naar 2.2.0.");
+      if (!isVersionAtLeast(capability.data?.publisher_version, "2.4.0")) {
+        throw new Error(`Social Publisher ${capability.data?.publisher_version || "onbekend"} ondersteunt deze accountcontrole niet; versie 2.4.0 of nieuwer is nodig.`);
       }
       const eventId = createClientId();
       const { data, error } = await supabase.from("social_post_jobs").insert({
@@ -433,7 +529,7 @@ export default function AdminSocialPublisher() {
           return;
         }
       }
-      throw new Error("De container antwoordde niet binnen 150 seconden. Controleer de containerlogs en PocketBase-hook 1.13.0.");
+      throw new Error("De container antwoordde niet binnen 150 seconden. Controleer de containerlogs en de PocketBase-hookstatus.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Onbekende fout.";
       setAccountTestSteps((steps) => [...steps, `Controle mislukt: ${message}`]);
@@ -521,6 +617,7 @@ export default function AdminSocialPublisher() {
   };
 
   const attentionCount = useMemo(() => jobs.filter((job) => ["manual_attention", "waiting_for_media", "failed"].includes(job.status)).length, [jobs]);
+  const visibleActivity = useMemo(() => activity.filter((item) => `${item.source_name} ${item.source_type} ${item.platform} ${item.status} ${item.error}`.toLocaleLowerCase("nl-NL").includes(activitySearch.toLocaleLowerCase("nl-NL"))), [activity, activitySearch]);
   const publisherConnected = Boolean(publisherHeartbeat.lastSeen) && Date.now() - new Date(publisherHeartbeat.lastSeen).getTime() <= 75_000;
 
   if (authLoading || loading) return <div className="min-h-screen"><Navbar /><main className="flex min-h-[60vh] items-center justify-center pt-20"><Loader2 className="h-8 w-8 animate-spin" /></main><Footer /></div>;
@@ -528,7 +625,7 @@ export default function AdminSocialPublisher() {
 
   return <div className="min-h-screen bg-neutral-100"><Navbar /><main className="container mx-auto max-w-7xl px-4 pb-20 pt-28">
     <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div><Link to="/admin" className="mb-3 inline-flex items-center gap-2 text-sm text-black/55"><ArrowLeft className="h-4 w-4" /> Terug naar dashboard</Link><h1 className="text-3xl font-semibold tracking-tight">Social Publisher</h1><p className="mt-2 text-sm text-black/55">Versie 2.2.0 · Publiceert via de officiële Meta Graph API op Facebookpagina Overweel3D en het gekoppelde Instagram-account.</p></div>
+      <div><Link to="/admin" className="mb-3 inline-flex items-center gap-2 text-sm text-black/55"><ArrowLeft className="h-4 w-4" /> Terug naar dashboard</Link><h1 className="text-3xl font-semibold tracking-tight">Social Publisher</h1><p className="mt-2 text-sm text-black/55">{publisherHeartbeat.version ? `Containerversie ${publisherHeartbeat.version}` : "Containerversie nog onbekend"} · Publiceert via de officiële Meta Graph API op Facebookpagina Overweel3D en het gekoppelde Instagram-account.</p></div>
       <div className="flex gap-2"><Button variant="outline" onClick={() => void load()}><RefreshCw className="h-4 w-4" /> Vernieuwen</Button><Button onClick={save} disabled={saving || togglingEnabled}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Instellingen opslaan</Button></div>
     </div>
 
@@ -544,13 +641,18 @@ export default function AdminSocialPublisher() {
       <p className="text-xs font-bold uppercase tracking-wider text-black/45">Volgende publicatie</p>
       <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div><h2 className="text-xl font-semibold">{nextPublication?.source_name || "Nog niets ingepland"}</h2><p className="mt-1 text-sm text-black/55">{nextPublication?.source_type === "product" ? "Product" : nextPublication?.source_type === "color" ? "Kleur" : nextPublication?.source_type === "discount" ? "Kortingscode" : nextPublication?.source_type === "spotlight" ? "Productuitlichting" : nextPublication?.source_type === "manual" ? "Eigen bericht" : nextPublication?.source_type === "backfill" ? "Bestaande catalogus" : "Wachtrij leeg"}{nextPublication?.platforms.length ? ` · ${nextPublication.platforms.join(" en ")}` : ""}</p></div>
-        <p className="text-sm font-semibold">{nextPublication?.state === "paused" ? "Gepauzeerd — planning wordt hervat zodra je activeert" : nextPublication?.state === "dry_run" ? "Droogloop — wordt nog niet online geplaatst" : nextPublication?.state === "processing" ? "Wordt nu verwerkt" : nextPublication?.state === "waiting_for_media" ? "Wacht op foto of handmatige actie" : nextPublication?.scheduled_at ? new Date(nextPublication.scheduled_at).toLocaleString("nl-NL", { dateStyle: "full", timeStyle: "short" }) : "Nog geen tijd bekend"}</p>
+        <p className="text-sm font-semibold">{nextPublication?.state === "paused" ? "Gepauzeerd — planning wordt hervat zodra je activeert" : nextPublication?.state === "dry_run" ? "Droogloop — wordt nog niet online geplaatst" : nextPublication?.state === "processing" ? "Wordt nu verwerkt" : nextPublication?.state === "waiting_for_media" ? "Wacht op foto of handmatige actie" : nextPublication?.due ? "Klaar voor publicatie — wacht op verwerking" : nextPublication?.scheduled_at ? new Date(nextPublication.scheduled_at).toLocaleString("nl-NL", { dateStyle: "full", timeStyle: "short" }) : "Nog geen tijd bekend"}</p>
       </div>
       {nextPublication?.scheduled_at && nextPublication.state === "scheduled" && <p className="mt-3 text-xs text-black/45">Verwachte tijd; nieuwe berichten met voorrang of een niet-verbonden container kunnen dit wijzigen.</p>}
     </section>
 
+    <section className="mb-6 flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between" aria-live="polite">
+      <div><p className="text-xs font-bold uppercase tracking-wider text-black/45">Laatste publisheractiviteit</p><p className="mt-2 font-semibold">{activity[0] ? `${activity[0].source_name} · ${activityLabels[activity[0].status] || activity[0].status}` : "Nog geen acties geregistreerd"}</p>{activity[0]?.happened_at && <p className="mt-1 text-xs text-black/50">{new Date(activity[0].happened_at).toLocaleString("nl-NL")} · {activity[0].platform === "system" ? "Publisher" : activity[0].platform}</p>}</div>
+      <Button variant="outline" onClick={() => selectTab("activity")}>Alle activiteiten bekijken</Button>
+    </section>
+
     <Tabs value={activeTab} onValueChange={selectTab}>
-      <TabsList className="mb-5"><TabsTrigger value="now">Nu plaatsen</TabsTrigger><TabsTrigger value="queue">Wachtrij</TabsTrigger><TabsTrigger value="accounts">Accounts & koppeling</TabsTrigger><TabsTrigger value="templates">Teksten</TabsTrigger><TabsTrigger value="media">Kortingsafbeelding</TabsTrigger></TabsList>
+      <TabsList className="mb-5"><TabsTrigger value="now">Nu plaatsen</TabsTrigger><TabsTrigger value="queue">Wachtrij</TabsTrigger><TabsTrigger value="activity">Activiteit</TabsTrigger><TabsTrigger value="accounts">Accounts & koppeling</TabsTrigger><TabsTrigger value="templates">Teksten</TabsTrigger><TabsTrigger value="media">Kortingsafbeelding</TabsTrigger></TabsList>
       <TabsContent value="now"><section className="rounded-2xl border bg-white p-6"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Direct publiceren</p><h2 className="mt-1 text-xl font-semibold">Plaats nu een bericht</h2><p className="mt-1 text-sm text-black/50">Nieuwe handmatige berichten krijgen voorrang op de automatische wachtrij.</p></div><div className="flex rounded-full bg-neutral-100 p-1"><Button type="button" size="sm" variant={postMode === "random" ? "default" : "ghost"} className="rounded-full" onClick={() => setPostMode("random")}><Shuffle className="h-4 w-4" /> Willekeurig product</Button><Button type="button" size="sm" variant={postMode === "custom" ? "default" : "ghost"} className="rounded-full" onClick={() => setPostMode("custom")}><Send className="h-4 w-4" /> Eigen tekst</Button></div></div>
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>{postMode === "random" ? <div className="rounded-2xl border border-dashed bg-neutral-50 p-8"><Shuffle className="mb-3 h-7 w-7" /><p className="font-semibold">Willekeurige productuitlichting</p><p className="mt-1 text-sm text-black/50">Er wordt een actief product met foto gekozen. De vaste tekst en directe cataloguslink worden automatisch gebruikt.</p></div> : <div className="space-y-4"><div><Label>Berichttekst</Label><Textarea rows={9} value={customText} onChange={(event) => setCustomText(event.target.value)} placeholder="Schrijf hier het bericht. De link naar de homepage wordt automatisch onderaan toegevoegd." /></div><div><Label>Afbeeldingen (optioneel, verplicht voor Instagram)</Label><label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed p-5 text-sm font-semibold"><ImagePlus className="h-4 w-4" /> {uploadingCustom ? "Uploaden…" : "Afbeeldingen kiezen"}<input type="file" multiple accept="image/*,.heic,.heif" disabled={uploadingCustom} className="hidden" onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void uploadCustomImages(files); }} /></label>{customUploadStatus && <p role="status" className="mt-2 text-sm text-black/60">{customUploadStatus}</p>}{customImages.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{customImages.map((image) => <div key={image.path} className="relative overflow-hidden rounded-xl border bg-neutral-50"><img src={image.previewUrl} alt={image.name} className="aspect-square w-full object-cover" /><div className="flex items-center justify-between gap-2 p-2"><span className="truncate text-xs" title={image.name}>{image.name}</span><button type="button" disabled={placing || uploadingCustom} aria-label={`${image.name} verwijderen`} onClick={() => void removeCustomImage(image)}><X className="h-4 w-4" /></button></div></div>)}</div>}</div></div>}</div>
@@ -558,8 +660,15 @@ export default function AdminSocialPublisher() {
         </div>
       </section></TabsContent>
       <TabsContent value="queue" className="space-y-3">
-        <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">Bestaande producten en kleuren</h2><p className="text-sm text-black/55">Zet alle actieve items één keer in de wachtrij. De volgorde is willekeurig, maximaal één bericht per twee uur. Daarna volgt iedere twee dagen om 19:00 een productuitlichting.</p></div><Button type="button" onClick={() => void enqueueBackfill()} disabled={backfilling}>{backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />} Bestaande catalogus inplannen</Button></section>
-        {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => <article key={job.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{job.source_name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[job.status] || "bg-neutral-100"}`}>{job.status}</span>{job.is_backfill && <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">bestaand item · max. 1 per 2 uur</span>}</div><p className="mt-1 text-xs uppercase tracking-wider text-black/40">{job.source_type} · poging {job.attempts || 0}</p>{job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}<div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div></div></article>)}
+        <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">Bestaande producten en kleuren</h2><p className="text-sm text-black/55">Zet alle actieve items één keer in de wachtrij. Actieve taken blijven staan tot ze zijn afgerond. Geannuleerde taken verdwijnen na 5 minuten en afgeronde taken na 1 uur. De volgende productuitlichting staat altijd alvast ingepland.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="destructive" onClick={() => void clearQueue()} disabled={clearingQueue || backfilling || jobs.length === 0}>{clearingQueue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Alles annuleren en verwijderen</Button><Button type="button" onClick={() => void enqueueBackfill()} disabled={backfilling || clearingQueue}>{backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />} Bestaande catalogus inplannen</Button></div></section>
+        {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => <article key={job.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{job.source_name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[job.status] || "bg-neutral-100"}`}>{job.status}</span>{job.is_backfill && <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">bestaand item · max. 1 per 2 uur</span>}</div><p className="mt-1 text-xs uppercase tracking-wider text-black/40">{job.source_type} · poging {job.attempts || 0}</p>{job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}<div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div></div><div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div></div></article>)}
+      </TabsContent>
+      <TabsContent value="activity" className="space-y-4">
+        <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Wat heeft de publisher gedaan?</h2><p className="mt-1 text-sm text-black/50">De laatste 100 acties, met resultaat per kanaal. Wordt elke 30 seconden bijgewerkt.</p></div><div className="flex flex-wrap gap-2">{settings.control_url && <a href={settings.control_url} target="_blank" rel="noreferrer"><Button variant="outline"><ExternalLink className="h-4 w-4" /> Containerlogs</Button></a>}<Button variant="outline" onClick={() => void refreshActivity()}><RefreshCw className="h-4 w-4" /> Vernieuwen</Button></div></section>
+        <Input aria-label="Zoek in publisheractiviteit" placeholder="Zoek product, kleur, kanaal of fout…" value={activitySearch} onChange={(event) => setActivitySearch(event.target.value)} />
+        {activityError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">Activiteit laden mislukt: {activityError}</p>}
+        {!activityError && !visibleActivity.length && <p className="rounded-2xl border bg-white p-8 text-center text-sm text-black/50">{activitySearch ? "Geen activiteiten gevonden voor deze zoekopdracht." : "Er zijn nog geen publicatiepogingen geregistreerd."}</p>}
+        {visibleActivity.map((item) => <article key={item.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.source_name}</p><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[item.status] || (item.status === "started" ? "bg-blue-100 text-blue-900" : "bg-neutral-100 text-neutral-700")}`}>{activityLabels[item.status] || item.status}</span></div><p className="mt-1 text-sm text-black/55">{item.platform === "system" ? "Publisher" : item.platform} · {item.source_type || "accountcontrole"}</p>{item.error && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm text-red-700">{item.error}</p>}{/^https:\/\//i.test(item.post_url || "") && item.status === "published" && <a className="mt-3 inline-flex items-center gap-1 text-sm font-semibold underline" href={item.post_url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Bericht openen</a>}</div><time className="shrink-0 text-xs text-black/45" dateTime={item.happened_at}>{item.happened_at ? new Date(item.happened_at).toLocaleString("nl-NL") : "Tijd onbekend"}</time></div></article>)}
       </TabsContent>
       <TabsContent value="accounts" className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-2xl border bg-white p-6"><h2 className="text-lg font-semibold">Containerkoppeling</h2><p className="mt-1 text-sm text-black/50">De geheime sleutel wordt automatisch aangemaakt en naar de container gestuurd.</p><div className="mt-5 space-y-4"><div><Label>Container-IP of lokale beheer-URL</Label><Input value={settings.control_url || ""} onChange={(event) => setSettings({ ...settings, control_url: event.target.value })} placeholder="192.168.2.50" /></div><div><Label>Koppelcode uit de container</Label><Input inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={pairingCode} onChange={(event) => setPairingCode(event.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="8 cijfers" /></div><Button className="w-full" onClick={() => void pairContainer()} disabled={pairingContainer}>{pairingContainer ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Container koppelen</Button>{settings.control_url && <a href={settings.control_url} target="_blank" rel="noreferrer"><Button variant="outline" className="w-full"><ExternalLink className="h-4 w-4" /> Lokale containerpagina openen</Button></a>}</div></section>

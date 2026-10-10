@@ -9,7 +9,7 @@ Controle na de start:
 https://api.gijsoverweel.nl/api/overweel3d/health
 ```
 
-Het antwoord hoort `"ok": true` en hookversie **1.13.0** te bevatten.
+Het antwoord hoort `"ok": true` en hookversie **1.17.0** te bevatten.
 
 Versie 1.4.0 bevat geen printwachtrij-, FTPS-, pc- of VM-besturing meer. De
 printerroutes verwerken alleen status, AMS, filamentvoorraad, Bambu-aanmelding
@@ -37,11 +37,15 @@ publisherronde probeert de verbinding opnieuw.
 Versie 1.10.3 koppelt de Social Publisher vanuit het website-adminscherm. De
 container heeft geen vooraf ingevulde integratiesleutel meer nodig.
 
-Versie 1.13.0 ondersteunt de officiële Meta Graph API, het handmatig inplannen van bestaande producten en kleuren, gegenereerde PNG-kleurafbeeldingen en een voorspelling van de volgende publicatie. Facebook en Instagram
+Versie 1.17.0 laat de Social Publisher afbeeldingsbronnen via de beveiligde mediafunctie lezen. Na omzetting naar JPEG krijgt Meta een rechtstreekse PocketBase-bestands-URL. Nieuwe taken gebruiken geen `public-media`-grant meer. De oude grant-route blijft alleen voor eerder geclaimde taken bestaan.
+
+Versie 1.16.9 geeft iedere te publiceren afbeelding een afzonderlijk, gehasht en tijdelijk mediatoegangsbewijs. Media-indexen worden intern 1-gebaseerd opgeslagen, omdat PocketBase de waarde 0 afwijst voor een verplicht numeriek veld. Daardoor stopt de eerste afbeelding niet meer met HTTP 400. De mediaserver hangt niet meer af van het taak-JSON, de algemene koppelsleutel of een van de instellingenrecords. De migratie ruimt foutief aangemaakte dubbele Social Publisher-instellingen op en verlopen mediatoegangsbewijzen worden automatisch verwijderd. De versie ondersteunt ook automatische wachtrijretentie: geannuleerde taken worden na vijf minuten verwijderd en afgeronde taken na één uur. Actieve, wachtende en opnieuw te proberen taken blijven staan totdat ze afgerond of handmatig verwijderd zijn. De volgende productuitlichting staat vooraf in de wachtrij; na publicatie wordt meteen een nieuw product voor twee dagen later gekozen. De admin kan alle taken ongeacht hun status direct annuleren en verwijderen. Facebook en Instagram
 krijgen afzonderlijke publicatieresultaten. Per wachtrijtaak maakt PocketBase
 tijdelijke HTTPS-links voor uitsluitend de geselecteerde afbeeldingen; de
 integratiesleutel wordt niet in die links verwerkt. De website kan de API-
-accountcontrole van Social Publisher 2.2.0 tonen.
+accountcontrole van Social Publisher 2.5.1 tonen. Een admin kan een taak met voorrang
+laten publiceren; PocketBase wekt de gekoppelde container via een beveiligd
+lokaal endpoint. Als dit wekverzoek niet lukt, verwerkt de gewone poll de taak.
 
 Bij upgrades zoekt de app naar bestaande `data.db`-bestanden in `/data` en
 `/share/pocketbase`. De grootste bestaande database wordt gekozen en de keuze

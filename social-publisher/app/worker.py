@@ -17,6 +17,15 @@ from .publishers import BrowserManager, ManualAttention, check_meta_accounts, pu
 log = logging.getLogger("overweel3d.social")
 
 
+def version_at_least(actual: str, minimum: str) -> bool:
+    try:
+        current = tuple(int(part) for part in actual.split("."))
+        required = tuple(int(part) for part in minimum.split("."))
+        return len(current) == len(required) == 3 and current >= required
+    except (AttributeError, ValueError):
+        return False
+
+
 class SocialWorker:
     def __init__(self) -> None:
         self.pb = PocketBaseSocialClient()
@@ -48,11 +57,11 @@ class SocialWorker:
             return False
         async with self._heartbeat_lock:
             try:
-                response = await self.pb.action("heartbeat", {"version": "2.2.0"})
+                response = await self.pb.action("heartbeat", {"version": "2.6.0"})
                 if not isinstance(response, dict) or response.get("connected") is not True:
                     raise RuntimeError("PocketBase heeft de heartbeat niet bevestigd.")
-                if response.get("hook_version") != "1.13.0":
-                    raise RuntimeError("PocketBase-hook 1.13.0 is nodig voordat publicatietaken worden opgehaald.")
+                if not version_at_least(response.get("hook_version"), "1.17.0"):
+                    raise RuntimeError("PocketBase-hook 1.17.0 of nieuwer is nodig voor voorbereide media via PocketBase-bestands-URL's.")
             except Exception as exc:
                 self.connected = False
                 self.hook_ready = False
@@ -100,7 +109,16 @@ class SocialWorker:
             text = str((job.get("texts") or {}).get(platform) or "")
             dry_run = bool(job.get("dry_run", True))
             if platform in {"facebook", "instagram"}:
-                image_urls = list(job.get("media_urls") or [])[:media_limit(platform)]
+                image_urls: list[str] = []
+                if dry_run:
+                    # Meta validates that Instagram has media even in dry-run.
+                    image_urls = ["dry-run://image"] * len((job.get("media_paths") or [])[:media_limit(platform)])
+                else:
+                    prepared_urls = job.setdefault("_prepared_media_urls", {})
+                    for index, path in enumerate((job.get("media_paths") or [])[:media_limit(platform)]):
+                        if index not in prepared_urls:
+                            prepared_urls[index] = await self.pb.prepare_public_media(str(job["id"]), index, str(path))
+                        image_urls.append(prepared_urls[index])
                 result = await self.meta.publish(platform, text, image_urls, dry_run)
             else:
                 raise ValueError(f"Niet-ondersteund platform: {platform}")
@@ -120,7 +138,7 @@ class SocialWorker:
     async def tick(self) -> None:
         if not self.pb.paired or not self.hook_ready:
             return
-        response = await self.pb.action("poll", {"version": "2.2.0", "meta_ready": self.meta.configured})
+        response = await self.pb.action("poll", {"version": "2.6.0", "meta_ready": self.meta.configured})
         job = response.get("job") if isinstance(response, dict) else None
         if not job:
             return

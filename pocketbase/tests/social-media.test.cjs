@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const zlib = require("node:zlib");
 const sandbox = { module: { exports: {} }, console };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../pb_hooks/overweel3d-core.js"), "utf8"), sandbox);
-const { socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialScheduleSpotlight, socialNextPublication, route10 } = sandbox.module.exports;
+const { socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route8, route9, route10 } = sandbox.module.exports;
 
 function record(data) {
   return {
@@ -16,8 +16,15 @@ function record(data) {
     getInt: (name) => Number(data[name] || 0),
     get: (name) => data[name],
     set: (name, value) => { data[name] = value; },
+    publicExport: () => ({ ...data }),
   };
 }
+
+sandbox.Record = class {
+  constructor() { this.id = "history-record"; this.data = {}; }
+  getString(name) { return String(this.data[name] || ""); }
+  set(name, value) { this.data[name] = value; }
+};
 
 function pngPixels(bytes) {
   const png = Buffer.from(bytes);
@@ -46,6 +53,91 @@ test("colors with a hex code always use their generated image", () => {
   assert.deepEqual(Array.from(socialColorMedia(color)), ["generated-color:#0A2B89"]);
 });
 
+test("authenticated source route serves a generated color without a storage record", () => {
+  const setting = record({ integration_token: "local-token" });
+  sandbox.$app = { findRecordsByFilter: () => [setting] };
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" } }),
+    request: { url: { query: () => ({ get: () => "generated-color:#A12B3C" }) } },
+    response: { header: () => ({ set: () => {} }) },
+    blob: (status, mime, bytes) => ({ status, mime, bytes }),
+  };
+  const result = route9(event);
+  assert.equal(result.status, 200);
+  assert.equal(result.mime, "image/png");
+  assert.equal(Buffer.from(result.bytes).subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  delete sandbox.$app;
+  delete sandbox.$security;
+});
+
+test("prepared media returns a direct PocketBase file URL and makes the copy public", () => {
+  const setting = record({ integration_token: "local-token" });
+  const job = record({ id: "job-pb", supabase_id: "job-public", status: "processing", payload: {
+    social_media_grant: { expires_at: "2099-01-01T00:00:00.000Z", paths: ["products/roos/photo.jpeg"] },
+  } });
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(120), Buffer.from([0xff, 0xd9])]);
+  const saved = [];
+  sandbox.$security = { randomString: () => "a", sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  sandbox.$os = { getenv: () => "https://api.example.test" };
+  sandbox.$filesystem = { fileFromBytes: () => "prepared.jpg" };
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_publisher_settings" ? [setting] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "job-public" ? job : null,
+    findCollectionByNameOrId: () => ({}),
+    save: (value) => saved.push(value),
+  };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" }, body: { job_id: "job-public", index: 0, image_base64: jpeg.toString("base64") } }),
+    request: { pathValue: () => "prepare_media" },
+    json: (status, payload) => ({ status, ...payload }),
+  };
+  const response = route8(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.data.url, "https://api.example.test/api/files/storage_files/history-record/prepared.jpg");
+  assert.equal(saved.find((value) => value.data?.bucket === "social-publisher")?.data?.public, true);
+  delete sandbox.$security;
+  delete sandbox.$os;
+  delete sandbox.$filesystem;
+  delete sandbox.$app;
+});
+
+test("outdated publisher cannot claim a job and silently publish without photos", () => {
+  sandbox.BadRequestError = class extends Error {};
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  sandbox.$app = { findRecordsByFilter: () => [record({ integration_token: "local-token" })] };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" }, body: { version: "2.5.3" } }),
+    request: { pathValue: () => "poll" },
+  };
+  assert.throws(() => route8(event), /2\.6\.0 of nieuwer/);
+  delete sandbox.BadRequestError;
+  delete sandbox.$security;
+  delete sandbox.$app;
+});
+
+test("social cleanup removes cancelled jobs after five minutes and completed jobs after one hour", () => {
+  const now = Date.parse("2026-10-09T12:00:00.000Z");
+  const cancelledExpired = record({ id: "cancelled-expired", status: "cancelled", updated: "2026-10-09T11:54:59.000Z" });
+  const cancelledFresh = record({ id: "cancelled-fresh", status: "cancelled", updated: "2026-10-09T11:55:01.000Z" });
+  const completedExpired = record({ id: "completed-expired", status: "completed", updated: "2026-10-09T10:59:59.000Z" });
+  const processingExpired = record({ id: "processing-expired", status: "processing", updated: "2026-10-09T10:00:00.000Z" });
+  const failedExpired = record({ id: "failed-expired", status: "failed", updated: "2026-10-09T10:00:00.000Z" });
+  const mediaGrantExpired = record({ id: "grant-expired", expires_at: "2026-10-09T11:59:59.000Z" });
+  const preparedCopy = record({ id: "prepared-copy", bucket: "social-publisher", path: "social-publisher/completed-expired/0.jpg" });
+  const removed = [];
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_media_grants"
+      ? [mediaGrantExpired]
+      : [cancelledExpired, cancelledFresh, completedExpired, processingExpired, failedExpired],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "storage_files" && params.value === preparedCopy.getString("path") ? preparedCopy : null,
+    delete: (job) => removed.push(job.id),
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(socialCleanupJobs(now))), { deleted: 2, cancelled: 1, expired: 1, grants: 1 });
+  assert.deepEqual(removed, ["grant-expired", "cancelled-expired", "completed-expired", "prepared-copy"], "actieve taken blijven staan en voorbereide kopieën verdwijnen met afgeronde taken");
+  delete sandbox.$app;
+});
+
 test("product media uses its own primary photo and excludes video", () => {
   const images = [
     { getString: (name) => ({ media_type: "image", storage_path: "products/second.jpg" })[name] || "", getBool: () => false, getInt: () => 1 },
@@ -66,8 +158,8 @@ test("backfill preview matches the next claimed item and waits two hours", () =>
   const settings = record(settingsData);
   const first = record({ id: "first", supabase_id: "first", event_key: "backfill:first", source_type: "product", source_name: "Eerste", status: "queued", priority: 10, is_backfill: true, media_paths: ["products/first.jpg"], payload: { name: "Eerste", direct_url: "https://example.test/first" } });
   const second = record({ id: "second", supabase_id: "second", event_key: "backfill:second", source_type: "product", source_name: "Tweede", status: "queued", priority: 10, is_backfill: true, media_paths: ["products/second.jpg"], payload: { name: "Tweede", direct_url: "https://example.test/second" } });
-  sandbox.$app = { findRecordsByFilter: (_collection, filter) => filter.includes("status = 'processing'") ? [] : [first, second].filter((job) => job.getString("status") === "queued"), save: () => {} };
-  sandbox.$security = { randomString: () => "testgrant" };
+  sandbox.$app = { findRecordsByFilter: (_collection, filter) => filter.includes("status = 'processing'") ? [] : [first, second].filter((job) => job.getString("status") === "queued"), findCollectionByNameOrId: () => ({}), save: () => {} };
+  sandbox.$security = { randomString: () => "testgrant", sha256: (value) => `hash:${value}` };
   sandbox.$os = { getenv: () => "https://api.example.test" };
   const preview = socialNextPublication(settings);
   assert.equal(socialNextPublication(settings).source_name, preview.source_name);
@@ -91,12 +183,153 @@ test("next publication explains paused mode without changing the scheduled item"
   delete sandbox.$app;
 });
 
-test("spotlight stays deferred while backfill is unfinished", () => {
-  const data = { spotlight_enabled: true, spotlight_next_at: "2020-01-01T00:00:00.000Z" };
-  sandbox.$app = { findRecordsByFilter: () => [record({ status: "queued" })], save: () => {} };
-  socialScheduleSpotlight(record(data));
-  assert.ok(new Date(data.spotlight_next_at).getTime() > Date.now());
+test("an overdue post keeps its original time and is actually claimed", () => {
+  const settings = record({ enabled: true, dry_run: false, paused_platforms: [], templates: {} });
+  const scheduledAt = "2026-01-01T12:00:00.000Z";
+  const job = record({ id: "due-job", supabase_id: "due-job", status: "queued", source_type: "color", source_name: "Zwart", priority: 100, scheduled_at: scheduledAt, media_paths: ["generated-color:#000000"], payload: {} });
+  const saved = [];
+  sandbox.$app = { findRecordsByFilter: (_collection, filter) => filter.includes("status = 'processing'") ? [] : [job], findCollectionByNameOrId: () => ({}), save: (value) => saved.push(value) };
+  sandbox.$security = { randomString: () => "testgrant", sha256: (value) => `hash:${value}` };
+  sandbox.$os = { getenv: () => "https://api.example.test" };
+  const preview = socialNextPublication(settings);
+  assert.equal(preview.scheduled_at, scheduledAt);
+  assert.equal(preview.due, true);
+  const claimed = socialClaim(settings, true);
+  assert.equal(claimed.id, "due-job");
+  assert.deepEqual(Array.from(claimed.media_urls), [], "nieuwe taken mogen de falende public-media-route niet meer gebruiken");
+  assert.equal(claimed.media_paths[0], "generated-color:#000000");
+  assert.equal(saved.some((value) => value.data?.media_index === 1), false, "nieuwe taken maken geen tijdelijke grant meer aan");
+  assert.ok(saved.some((value) => value.data?.status === "started" && value.data?.platform === "system"));
   delete sandbox.$app;
+  delete sandbox.$security;
+  delete sandbox.$os;
+});
+
+test("claiming a job no longer needs the media-grant collection", () => {
+  const settings = record({ enabled: true, dry_run: false, paused_platforms: [], templates: {} });
+  const job = record({ id: "safe-job", supabase_id: "safe-job", status: "queued", source_type: "color", source_name: "Zwart", priority: 100, scheduled_at: "2026-01-01T00:00:00.000Z", media_paths: ["generated-color:#000000"], payload: {} });
+  sandbox.$app = {
+    findRecordsByFilter: (_collection, filter) => filter.includes("status = 'processing'") ? [] : [job],
+    findCollectionByNameOrId: (collection) => { if (collection === "social_media_grants") throw new Error(`missing collection: ${collection}`); return {}; },
+    save: () => {},
+  };
+  sandbox.$security = { randomString: () => "testgrant", sha256: (value) => `hash:${value}` };
+  sandbox.$os = { getenv: () => "https://api.example.test" };
+  assert.equal(socialClaim(settings, true).id, "safe-job");
+  assert.equal(job.getString("status"), "processing");
+  delete sandbox.$app;
+  delete sandbox.$security;
+  delete sandbox.$os;
+});
+
+test("admin can prioritize one queued job without reopening an already published channel", () => {
+  const settings = record({ enabled: true, dry_run: false, paused_platforms: [], integration_token: "local-token", control_url: "http://192.168.2.50:8787", templates: {} });
+  const job = record({ id: "pb-job", supabase_id: "chosen-job", status: "queued", source_type: "product", source_name: "Roos", priority: 10, is_backfill: true, scheduled_at: "2099-01-01T00:00:00.000Z", media_paths: ["products/rose.jpg"], payload: {}, platform_state: { facebook: "published", instagram: "pending" } });
+  let claimFilter = "";
+  sandbox.$app = {
+    findRecordsByFilter: (collection, filter) => {
+      if (collection === "social_publisher_settings") return [settings];
+      if (filter.includes("status = 'processing'")) return [];
+      if (filter.includes("status = 'queued'") && job.get("payload").force_now) claimFilter = filter;
+      return [job];
+    },
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "chosen-job" ? job : null,
+    findCollectionByNameOrId: () => ({}),
+    save: () => {},
+  };
+  sandbox.$http = { send: () => ({ statusCode: 200 }) };
+  const event = { auth: { getString: () => "admin" }, request: { pathValue: () => "publish_social_job_now" }, requestInfo: () => ({ body: { p_job_id: "chosen-job" } }), json: (_status, response) => response };
+  assert.equal(route0(event).data.wake_sent, true);
+  assert.equal(job.getInt("priority"), 10000);
+  assert.equal(socialNextPublication(settings).source_name, "Roos");
+  sandbox.$security = { randomString: () => "testgrant", sha256: (value) => `hash:${value}` };
+  sandbox.$os = { getenv: () => "https://api.example.test" };
+  const claimed = socialClaim(settings, true);
+  assert.deepEqual(Array.from(claimed.platforms), ["instagram"]);
+  assert.equal(claimFilter.includes("scheduled_at <="), false, "directe taken mogen niet door een database-datumfilter verdwijnen");
+  assert.equal(job.getInt("priority"), 10);
+  assert.equal(job.get("payload").force_now, undefined);
+  delete sandbox.$app;
+  delete sandbox.$http;
+  delete sandbox.$security;
+  delete sandbox.$os;
+});
+
+test("manual priority bypasses backfill delay even when payload is unreadable", () => {
+  const settings = record({ backfill_last_published_at: "2026-10-09T10:00:00.000Z" });
+  const job = record({ priority: 10000, is_backfill: true, scheduled_at: "2026-10-09T10:01:00.000Z", payload: "invalid-json" });
+  const now = new Date("2026-10-09T10:02:00.000Z");
+  assert.equal(sandbox.socialReadyAt(job, settings, now), new Date("2026-10-09T10:01:00.000Z").getTime());
+});
+
+test("PocketBase UTF-8 JSON byte fields decode to media and payload values", () => {
+  const paths = ["products/roos/afbeelding-één.jpeg"];
+  const payload = { force_now: true, name: "Roos" };
+  assert.deepEqual(Array.from(sandbox.socialArray(Array.from(Buffer.from(JSON.stringify(paths)))), String), paths);
+  assert.equal(sandbox.socialObject(Array.from(Buffer.from(JSON.stringify(payload)))).force_now, true);
+  assert.equal(sandbox.socialObject(Array.from(Buffer.from(JSON.stringify(payload)))).name, "Roos");
+});
+
+test("admin activity shows channel result, source name and error without exposing the job payload", () => {
+  const history = record({ id: "history-id", supabase_id: "history-id", job_id: "older-job", platform: "instagram", status: "failed", details: { error: "Meta weigerde afbeelding" }, published_at: "2026-10-08T19:00:00.000Z" });
+  const job = record({ id: "pocketbase-job", supabase_id: "older-job", source_name: "Roos", source_type: "product", payload: { social_media_grant: { token: "secret" } } });
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_post_history" ? [history] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "older-job" ? job : null,
+  };
+  const event = { auth: { getString: () => "admin" }, request: { pathValue: () => "social_publisher_activity" }, requestInfo: () => ({ body: {} }), json: (_status, response) => response };
+  const result = route0(event).data[0];
+  assert.equal(result.source_name, "Roos");
+  assert.equal(result.status, "failed");
+  assert.equal(result.error, "Meta weigerde afbeelding");
+  assert.equal(JSON.stringify(result).includes("secret"), false);
+  delete sandbox.$app;
+});
+
+test("the next spotlight is stored in the queue before its publication time", () => {
+  const nextAt = "2099-01-03T18:00:00.000Z";
+  const data = { spotlight_enabled: true, spotlight_next_at: nextAt };
+  const product = record({ id: "product-pb", supabase_id: "product-1", name: "Roos", active: true });
+  const image = record({ media_type: "image", storage_path: "products/roos.jpg", is_primary: true, display_order: 0 });
+  const saved = [];
+  sandbox.$security = { randomString: () => "random-id", sha256: (value) => `hash:${value}` };
+  sandbox.$app = {
+    findRecordsByFilter: (collection, filter) => collection === "social_post_jobs" && filter.includes("source_type = 'spotlight'") ? [] : collection === "products" ? [product] : collection === "product_images" ? [image] : [],
+    findFirstRecordByFilter: (collection) => collection === "storage_files" ? { id: "stored-photo" } : null,
+    findCollectionByNameOrId: () => ({}),
+    save: (item) => saved.push(item),
+  };
+  socialScheduleSpotlight(record(data));
+  const queued = saved.find((item) => item.data?.source_type === "spotlight");
+  assert.equal(queued?.data?.source_name, "Roos");
+  assert.equal(queued?.data?.scheduled_at, nextAt);
+  assert.equal(queued?.data?.status, "queued");
+  delete sandbox.$app;
+  delete sandbox.$security;
+});
+
+test("completing a spotlight immediately queues the next product two days ahead", () => {
+  const settingsData = { enabled: true, dry_run: false, spotlight_enabled: true, spotlight_next_at: "2026-10-09T17:00:00.000Z", paused_platforms: [] };
+  const settings = record(settingsData);
+  const current = record({ id: "current-pb", supabase_id: "current-job", source_type: "spotlight", source_id: "product-1", source_name: "Roos", status: "processing", platform_state: { facebook: "published", instagram: "pending" }, payload: { target_platforms: ["facebook", "instagram"] } });
+  const nextProduct = record({ id: "next-product-pb", supabase_id: "product-2", name: "Tetr_s", active: true });
+  const image = record({ media_type: "image", storage_path: "products/tetr-s.jpg", is_primary: true, display_order: 0 });
+  const saved = [];
+  sandbox.$security = { randomString: () => "random-id", sha256: (value) => `hash:${value}` };
+  sandbox.$app = {
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "current-job" ? current : collection === "storage_files" ? { id: "stored-photo" } : null,
+    findRecordsByFilter: (collection, filter) => collection === "social_post_jobs" && filter.includes("source_type = 'spotlight'") ? [] : collection === "products" ? [nextProduct] : collection === "product_images" ? [image] : [],
+    findCollectionByNameOrId: () => ({}),
+    save: (item) => saved.push(item),
+  };
+  socialReport(settings, { job_id: "current-job", platform: "instagram", status: "published", post_url: "https://instagram.test/post" });
+  assert.equal(current.getString("status"), "completed");
+  const queued = saved.find((item) => item.data?.source_type === "spotlight");
+  assert.equal(queued?.data?.source_name, "Tetr_s");
+  assert.equal(queued?.data?.scheduled_at, settingsData.spotlight_next_at);
+  assert.ok(new Date(settingsData.spotlight_next_at).getTime() > Date.now() + 24 * 60 * 60 * 1000);
+  delete sandbox.$app;
+  delete sandbox.$security;
 });
 
 test("temporary social media link serves the photo uploaded for custom text", () => {
@@ -112,6 +345,62 @@ test("temporary social media link serves the photo uploaded for custom text", ()
   assert.equal(response.mime, "image/jpeg");
   assert.deepEqual(Array.from(response.bytes), [1, 2, 3]);
   delete sandbox.$app;
+  delete sandbox.$os;
+  delete sandbox.$filepath;
+});
+
+test("signed public media link works without reading the job payload", () => {
+  const path = "products/roos/photo.jpeg";
+  const expires = Date.parse("2099-01-01T00:00:00.000Z");
+  const secret = "publisher-secret";
+  const signature = `hash:job-1|0|${expires}|${path}|${secret}`;
+  const settings = record({ integration_token: secret });
+  const file = { getString: () => "photo.jpeg", baseFilesPath: () => "/files" };
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (left, right) => left === right };
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_publisher_settings" ? [settings] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "storage_files" && params.value === path ? file : null,
+  };
+  sandbox.$os = { stat: () => ({ size: () => 3 }), readFile: () => [4, 5, 6] };
+  sandbox.$filepath = { join: (...parts) => parts.join("/") };
+  const query = { job_id: "job-1", index: "0", path, expires: String(expires), signature };
+  const event = { request: { url: { query: () => ({ get: (key) => query[key] || "" }) } }, response: { header: () => ({ set: () => {} }) }, blob: (status, mime, bytes) => ({ status, mime, bytes }) };
+  const response = route10(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.mime, "image/jpeg");
+  assert.deepEqual(Array.from(response.bytes), [4, 5, 6]);
+  delete sandbox.$app;
+  delete sandbox.$security;
+  delete sandbox.$os;
+  delete sandbox.$filepath;
+});
+
+test("media grant serves the prepared image without reading jobs or settings", () => {
+  const originalPath = "products/roos/photo.jpeg";
+  const preparedPath = "social-publisher/job-1/0.jpg";
+  const grant = record({
+    id: "grant-pb", supabase_id: "grant-public", token_hash: "hash:secret-token",
+    expires_at: "2099-01-01T00:00:00.000Z", path: originalPath, prepared_path: preparedPath,
+  });
+  const file = { getString: () => "prepared.jpg", baseFilesPath: () => "/files" };
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (left, right) => left === right };
+  sandbox.$app = {
+    findFirstRecordByFilter: (collection, _filter, params) => {
+      if (collection === "social_media_grants" && params.value === "grant-public") return grant;
+      if (collection === "storage_files" && params.value === preparedPath) return file;
+      return null;
+    },
+  };
+  sandbox.$os = { stat: () => ({ size: () => 3 }), readFile: () => [7, 8, 9] };
+  sandbox.$filepath = { join: (...parts) => parts.join("/") };
+  const query = { grant_id: "grant-public", token: "secret-token" };
+  const event = { request: { url: { query: () => ({ get: (key) => query[key] || "" }) } }, response: { header: () => ({ set: () => {} }) }, blob: (status, mime, bytes) => ({ status, mime, bytes }) };
+  const response = route10(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.mime, "image/jpeg");
+  assert.deepEqual(Array.from(response.bytes), [7, 8, 9]);
+  delete sandbox.$app;
+  delete sandbox.$security;
   delete sandbox.$os;
   delete sandbox.$filepath;
 });

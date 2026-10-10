@@ -8,7 +8,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
@@ -18,7 +18,7 @@ from .meta_config import load_meta_config, save_meta_config
 from .pairing import pairing_store
 from .worker import SocialWorker
 
-VERSION = "2.2.0"
+VERSION = "2.6.0"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("overweel3d.social")
 
@@ -115,6 +115,15 @@ async def pair_container(payload: PairRequest, background_tasks: BackgroundTasks
     background_tasks.add_task(worker.heartbeat)
     worker.request_immediate_poll()
     return {"ok": True, "paired": True, "heartbeat_pending": True, "version": VERSION}
+
+
+@app.post("/api/wake")
+async def wake_publisher(x_overweel_social_token: str = Header(default="")):
+    if not pairing_store.token or not hmac.compare_digest(x_overweel_social_token, pairing_store.token):
+        raise HTTPException(status_code=403, detail="Ongeldige interne publishersleutel.")
+    worker.request_immediate_poll()
+    log.info("Directe publicatie gevraagd; wachtrij wordt meteen gecontroleerd.")
+    return {"ok": True}
 
 
 @app.get("/api/status")

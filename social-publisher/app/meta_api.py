@@ -33,6 +33,7 @@ class MetaGraphClient:
             timeout=httpx.Timeout(60.0, connect=15.0),
             transport=transport,
         )
+        self.page_token = ""
 
     @property
     def configured(self) -> bool:
@@ -42,9 +43,11 @@ class MetaGraphClient:
         await self.client.aclose()
 
     async def request(self, method: str, path: str, *, data: dict[str, Any] | None = None,
-                      params: dict[str, Any] | None = None, uncertain_on_transport: bool = False) -> dict[str, Any]:
+                      params: dict[str, Any] | None = None, uncertain_on_transport: bool = False,
+                      page_auth: bool = False) -> dict[str, Any]:
         try:
-            response = await self.client.request(method, f"{self.root}/{path.lstrip('/')}", data=data, params=params)
+            headers = {"Authorization": f"Bearer {self.page_token}"} if page_auth and self.page_token else None
+            response = await self.client.request(method, f"{self.root}/{path.lstrip('/')}", data=data, params=params, headers=headers)
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             if uncertain_on_transport:
                 raise UncertainPublication("Meta bevestigde de publicatie niet; handmatige controle is nodig.") from exc
@@ -61,12 +64,23 @@ class MetaGraphClient:
     async def check_accounts(self) -> dict[str, dict[str, str]]:
         if not self.configured:
             raise MetaApiError("Meta Page Access Token, pagina-ID of Instagram-account-ID ontbreekt in de containerconfiguratie.")
-        page = await self.request("GET", settings.meta_page_id, params={"fields": "id,name,instagram_business_account"})
+        page = await self.request("GET", settings.meta_page_id, params={"fields": "id,name,instagram_business_account,access_token"})
         linked_id = str((page.get("instagram_business_account") or {}).get("id") or "")
         if str(page.get("id")) != settings.meta_page_id:
             raise MetaApiError("De token hoort niet bij de ingestelde Facebookpagina.")
         if linked_id != settings.meta_instagram_user_id:
             raise MetaApiError("Het gekoppelde Instagram-account wijkt af van het ingestelde account-ID.")
+        page_token = str(page.get("access_token") or "")
+        if not page_token:
+            identity = await self.request("GET", "me", params={"fields": "id"})
+            if str(identity.get("id")) == settings.meta_page_id:
+                page_token = settings.meta_page_access_token
+            else:
+                accounts = await self.request("GET", "me/accounts", params={"fields": "id,access_token", "limit": "100"})
+                page_token = next((str(item.get("access_token") or "") for item in accounts.get("data", []) if str(item.get("id")) == settings.meta_page_id), "")
+        if not page_token:
+            raise MetaApiError("Geen Facebook-paginatoken beschikbaar. Geef de Meta-app pages_show_list en pages_manage_posts en vernieuw de token.")
+        self.page_token = page_token
         instagram = await self.request("GET", linked_id, params={"fields": "id,username"})
         return {
             "facebook": {"name": str(page.get("name") or ""), "url": settings.facebook_page_url},
@@ -93,16 +107,16 @@ class MetaGraphClient:
         if platform == "facebook":
             page_id = settings.meta_page_id
             if not image_urls:
-                post = await self.request("POST", f"{page_id}/feed", data={"message": text}, uncertain_on_transport=True)
+                post = await self.request("POST", f"{page_id}/feed", data={"message": text}, uncertain_on_transport=True, page_auth=True)
             elif len(image_urls) == 1:
-                post = await self.request("POST", f"{page_id}/photos", data={"url": image_urls[0], "caption": text}, uncertain_on_transport=True)
+                post = await self.request("POST", f"{page_id}/photos", data={"url": image_urls[0], "caption": text}, uncertain_on_transport=True, page_auth=True)
             else:
                 media_ids = []
                 for url in image_urls[:10]:
-                    photo = await self.request("POST", f"{page_id}/photos", data={"url": url, "published": "false"})
+                    photo = await self.request("POST", f"{page_id}/photos", data={"url": url, "published": "false"}, page_auth=True)
                     media_ids.append(str(photo["id"]))
                 attachments = {f"attached_media[{index}]": '{{"media_fbid":"' + photo_id + '"}' for index, photo_id in enumerate(media_ids)}
-                post = await self.request("POST", f"{page_id}/feed", data={"message": text, **attachments}, uncertain_on_transport=True)
+                post = await self.request("POST", f"{page_id}/feed", data={"message": text, **attachments}, uncertain_on_transport=True, page_auth=True)
             return MetaResult("published", f"https://www.facebook.com/{post['id']}")
         if platform == "instagram":
             ig_id = settings.meta_instagram_user_id

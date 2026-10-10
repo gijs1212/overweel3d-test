@@ -20,15 +20,18 @@ def test_facebook_and_instagram_are_reported_separately():
     job = {
         "id": "job-1", "source_type": "product", "platforms": ["facebook", "instagram"],
         "texts": {"facebook": "FB", "instagram": "IG"},
-        "media_urls": ["https://api.example.com/photo.jpg"], "dry_run": False,
+        "media_paths": ["products/roos/photo.jpg"], "dry_run": False,
     }
     action = AsyncMock(side_effect=[{"job": job}, {}, {}, {}, {}])
-    worker.pb = SimpleNamespace(paired=True, action=action)
+    prepare = AsyncMock(return_value="https://api.example.com/api/files/storage_files/id/photo.jpg")
+    worker.pb = SimpleNamespace(paired=True, action=action, prepare_public_media=prepare)
     worker.meta.publish = AsyncMock(side_effect=[MetaResult("published", "https://facebook.com/post"), MetaResult("published", "https://instagram.com/post")])
 
     asyncio.run(worker.tick())
 
     assert worker.meta.publish.await_count == 2
+    assert prepare.await_count == 1
+    assert worker.meta.publish.await_args_list[0].args[2] == ["https://api.example.com/api/files/storage_files/id/photo.jpg"]
     reports = [call.args[1] for call in action.await_args_list if call.args[0] == "report"]
     assert [report["platform"] for report in reports] == ["facebook", "instagram"]
     assert [report["post_url"] for report in reports] == ["https://facebook.com/post", "https://instagram.com/post"]

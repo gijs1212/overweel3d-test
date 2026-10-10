@@ -13,3 +13,8 @@ routerAdd("POST", "/api/overweel3d/bridge/control", function (e) { return requir
 routerAdd("POST", "/api/overweel3d/social/{action}", function (e) { return require(__hooks + "/overweel3d-core.js").route8(e); });
 routerAdd("GET", "/api/overweel3d/social/media", function (e) { return require(__hooks + "/overweel3d-core.js").route9(e); }, $apis.bodyLimit(32 * 1024 * 1024));
 routerAdd("GET", "/api/overweel3d/social/public-media", function (e) { return require(__hooks + "/overweel3d-core.js").route10(e); }, $apis.bodyLimit(32 * 1024 * 1024));
+
+cronAdd("overweel3d-social-job-retention", "* * * * *", function () {
+  try { require(__hooks + "/overweel3d-core.js").socialCleanupJobs(); }
+  catch (error) { console.error("Social Publisher-wachtrij opschonen mislukt:", error); }
+});
