@@ -66,7 +66,7 @@ interface JobRecord {
   attempts: number;
   last_error?: string;
   platform_state?: Record<Platform, string>;
-  payload?: { facebook_media_mode?: FacebookMediaMode };
+  payload?: { facebook_media_mode?: FacebookMediaMode; target_platforms?: Platform[]; social_platform_posts?: { facebook?: Record<string, string> } };
   created?: string;
 }
 
@@ -159,6 +159,7 @@ export default function AdminSocialPublisher() {
   const [backfilling, setBackfilling] = useState(false);
   const [clearingQueue, setClearingQueue] = useState(false);
   const [publishingJobId, setPublishingJobId] = useState("");
+  const [updatingFacebookModeJobId, setUpdatingFacebookModeJobId] = useState("");
   const [targetPlatforms, setTargetPlatforms] = useState<Platform[]>(["facebook", "instagram"]);
   const [placing, setPlacing] = useState(false);
   const [testingAccounts, setTestingAccounts] = useState(false);
@@ -415,6 +416,24 @@ export default function AdminSocialPublisher() {
   const resetJob = async (job: JobRecord) => {
     const { error } = await supabase.from("social_post_jobs").update({ status: "queued", attempts: 0, last_error: "", platform_state: { facebook: "pending", instagram: "pending" } }).eq("id", job.id);
     if (error) toast({ title: "Opnieuw proberen mislukt", description: error.message, variant: "destructive" }); else void load();
+  };
+
+  const setQueuedFacebookMode = async (job: JobRecord, mode: FacebookMediaMode) => {
+    if ((job.payload?.facebook_media_mode || "separate") === mode) return;
+    setUpdatingFacebookModeJobId(job.id);
+    try {
+      const { error } = await supabase.rpc("set_social_facebook_mode", { p_job_id: job.id, p_mode: mode });
+      if (error) throw error;
+      setJobs((current) => current.map((item) => item.id === job.id
+        ? { ...item, payload: { ...item.payload, facebook_media_mode: mode } }
+        : item));
+      toast({ title: "Facebookindeling opgeslagen", description: `"${job.source_name}" gebruikt ${mode === "combined" ? "één fotobericht" : "losse berichten"}.` });
+    } catch (error) {
+      toast({ title: "Facebookindeling wijzigen mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+      await load();
+    } finally {
+      setUpdatingFacebookModeJobId("");
+    }
   };
 
   const cancelJob = async (job: JobRecord) => {
@@ -682,7 +701,24 @@ export default function AdminSocialPublisher() {
       </section></TabsContent>
       <TabsContent value="queue" className="space-y-3">
         <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">Bestaande producten en kleuren</h2><p className="text-sm text-black/55">Zet alle actieve items één keer in de wachtrij. Actieve taken blijven staan tot ze zijn afgerond. Geannuleerde taken verdwijnen na 5 minuten en afgeronde taken na 1 uur. De volgende productuitlichting staat altijd alvast ingepland.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="destructive" onClick={() => void clearQueue()} disabled={clearingQueue || backfilling || jobs.length === 0}>{clearingQueue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Alles annuleren en verwijderen</Button><Button type="button" onClick={() => void enqueueBackfill()} disabled={backfilling || clearingQueue}>{backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />} Bestaande catalogus inplannen</Button></div></section>
-        {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => <article key={job.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{job.source_name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[job.status] || "bg-neutral-100"}`}>{job.status}</span>{job.is_backfill && <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">bestaand item · max. 1 per 2 uur</span>}</div><p className="mt-1 text-xs uppercase tracking-wider text-black/40">{job.source_type} · poging {job.attempts || 0} · Facebook: {job.payload?.facebook_media_mode === "combined" ? "foto's in één bericht" : "losse berichten"}</p>{job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}<div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div></div><div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div></div></article>)}
+        {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => {
+          const facebookTargeted = !job.payload?.target_platforms?.length || job.payload.target_platforms.includes("facebook");
+          const facebookPosted = job.platform_state?.facebook === "published" || Boolean(Object.keys(job.payload?.social_platform_posts?.facebook || {}).length);
+          const canChangeMode = facebookTargeted && !facebookPosted && ["queued", "waiting_for_media", "failed"].includes(job.status) && job.source_type !== "session_check";
+          const currentMode = job.payload?.facebook_media_mode === "combined" ? "combined" : "separate";
+          return <article key={job.id} className="rounded-2xl border bg-white p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{job.source_name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle[job.status] || "bg-neutral-100"}`}>{job.status}</span>{job.is_backfill && <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">bestaand item · max. 1 per 2 uur</span>}</div>
+                <p className="mt-1 text-xs uppercase tracking-wider text-black/40">{job.source_type} · poging {job.attempts || 0}{facebookTargeted ? ` · Facebook: ${currentMode === "combined" ? "foto's in één bericht" : "losse berichten"}` : ""}</p>
+                {job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}
+                <div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run || updatingFacebookModeJobId === job.id}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div>
+            </div>
+            {canChangeMode && <div className="mt-4 border-t pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-black/45">Facebookindeling voor deze taak</p><div className="mt-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant={currentMode === "combined" ? "default" : "outline"} disabled={Boolean(updatingFacebookModeJobId) || Boolean(publishingJobId)} onClick={() => void setQueuedFacebookMode(job, "combined")}>Foto's in één bericht</Button><Button type="button" size="sm" variant={currentMode === "separate" ? "default" : "outline"} disabled={Boolean(updatingFacebookModeJobId) || Boolean(publishingJobId)} onClick={() => void setQueuedFacebookMode(job, "separate")}>Losse berichten</Button></div></div>}
+          </article>;
+        })}
       </TabsContent>
       <TabsContent value="activity" className="space-y-4">
         <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Wat heeft de publisher gedaan?</h2><p className="mt-1 text-sm text-black/50">De laatste 100 acties, met resultaat per kanaal. Wordt elke 30 seconden bijgewerkt.</p></div><div className="flex flex-wrap gap-2">{settings.control_url && <a href={settings.control_url} target="_blank" rel="noreferrer"><Button variant="outline"><ExternalLink className="h-4 w-4" /> Containerlogs</Button></a>}<Button variant="outline" onClick={() => void refreshActivity()}><RefreshCw className="h-4 w-4" /> Vernieuwen</Button></div></section>

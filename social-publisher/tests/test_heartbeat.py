@@ -17,7 +17,7 @@ from app.worker import SocialWorker
 class HeartbeatTests(unittest.TestCase):
     def test_heartbeat_marks_connection_only_after_pocketbase_confirms(self):
         worker = SocialWorker()
-        action = AsyncMock(return_value={"connected": True, "hook_version": "1.19.0"})
+        action = AsyncMock(return_value={"connected": True, "hook_version": "1.19.1"})
         worker.pb = SimpleNamespace(paired=True, action=action)
 
         self.assertTrue(asyncio.run(worker.heartbeat()))

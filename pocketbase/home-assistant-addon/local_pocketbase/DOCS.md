@@ -9,7 +9,7 @@ Controle na de start:
 https://api.gijsoverweel.nl/api/overweel3d/health
 ```
 
-Het antwoord hoort `"ok": true` en hookversie **1.19.0** te bevatten. De nieuwe migratie `1791590400_social_facebook_media_mode.js` bewaart de standaardkeuze voor één Facebook-fotobericht of losse berichten; eerder ingeplande taken blijven op losse berichten staan.
+Het antwoord hoort `"ok": true` en hookversie **1.19.1** te bevatten. De migratie `1791590400_social_facebook_media_mode.js` bewaart de standaardkeuze voor één Facebook-fotobericht of losse berichten. Versie 1.19.1 laat admins ook de indeling van nog niet gepubliceerde wachtrijtaken veilig wijzigen.
 
 Vanaf 1.18.2 kan de website foto's en video's van actieve producten ook zonder
 gebruikerslogin ophalen via de publieke catalogusroute. Die route controleert

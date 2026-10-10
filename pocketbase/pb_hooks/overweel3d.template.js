@@ -172,7 +172,7 @@ function route0(e) {
     requireAdmin(e);
     var socialStatus = socialSetting();
     return json(e, {
-      hook_version: "1.19.0",
+      hook_version: "1.19.1",
       publisher_last_seen_at: socialStatus.getString("publisher_last_seen_at"),
       publisher_version: socialStatus.getString("publisher_version")
     });
@@ -192,6 +192,25 @@ function route0(e) {
     socialToggleSetting.set("enabled", p.p_enabled);
     $app.save(socialToggleSetting);
     return json(e, { enabled: socialToggleSetting.getBool("enabled") });
+  }
+  if (name === "set_social_facebook_mode") {
+    requireAdmin(e);
+    var facebookMode = String(p.p_mode || "");
+    if (["combined", "separate"].indexOf(facebookMode) < 0) fail("Kies één Facebook-indeling.");
+    var modeJob = byId("social_post_jobs", String(p.p_job_id || ""));
+    if (!modeJob) throw new NotFoundError("Socialmediataak niet gevonden.");
+    if (["queued", "waiting_for_media", "failed"].indexOf(modeJob.getString("status")) < 0) fail("Deze taak wordt al verwerkt of is afgerond.");
+    var modePayload = socialObject(modeJob.get("payload"));
+    var modeTargets = socialArray(modePayload.target_platforms);
+    if (modeTargets.length && modeTargets.indexOf("facebook") < 0) fail("Deze taak is niet voor Facebook bedoeld.");
+    if (modeJob.getString("source_type") === "session_check") fail("Accountcontrole heeft geen Facebook-indeling.");
+    if (socialObject(modeJob.get("platform_state")).facebook === "published" || Object.keys(socialObject(socialObject(modePayload.social_platform_posts).facebook)).length) {
+      fail("Facebook heeft al media van deze taak ontvangen; de indeling kan niet meer veilig worden gewijzigd.");
+    }
+    modePayload.facebook_media_mode = facebookMode;
+    modeJob.set("payload", modePayload);
+    $app.save(modeJob);
+    return json(e, { job_id: modeJob.getString("supabase_id") || modeJob.id, facebook_media_mode: facebookMode });
   }
   if (name === "publish_social_job_now") {
     requireAdmin(e);
@@ -444,7 +463,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.0" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.1" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -2078,7 +2097,7 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.0" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.1" });
   }
   if (action === "poll") {
     var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -2097,9 +2116,9 @@ function route8(e) {
         next_due: diagnosticNext ? diagnosticNext.due : false,
         next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
         next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
-      }, version: "1.19.0" });
+      }, version: "1.19.1" });
     }
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.0" });
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.1" });
   }
   if (action === "resolve_media") {
     var sourcePath = String(p.path || "").trim();

@@ -60,8 +60,8 @@ class SocialWorker:
                 response = await self.pb.action("heartbeat", {"version": "2.8.0"})
                 if not isinstance(response, dict) or response.get("connected") is not True:
                     raise RuntimeError("PocketBase heeft de heartbeat niet bevestigd.")
-                if not version_at_least(response.get("hook_version"), "1.19.0"):
-                    raise RuntimeError("PocketBase-hook 1.19.0 of nieuwer is nodig voor gecombineerde Facebook-fotoberichten.")
+                if not version_at_least(response.get("hook_version"), "1.19.1"):
+                    raise RuntimeError("PocketBase-hook 1.19.1 of nieuwer is nodig voor de Facebook-publicatiemodus.")
             except Exception as exc:
                 self.connected = False
                 self.hook_ready = False

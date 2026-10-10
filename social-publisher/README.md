@@ -6,7 +6,7 @@ De container haalt socialmediataakjes uit PocketBase en publiceert afzonderlijk 
 
 De uitgepakte map `social-publisher/` is de permanente distributie voor GoodSync. De bestaande Docker-volume `overweel3d_social_publisher_data` bewaart de PocketBase-koppeling en mag niet met `docker compose down -v` worden verwijderd.
 
-1. Werk eerst de PocketBase-app/hook bij met de bestanden uit `pocketbase/home-assistant-addon/local_pocketbase/`. Versie **1.19.0** voegt de opgeslagen keuze toe voor één Facebook-fotobericht of losse berichten.
+1. Werk eerst de PocketBase-app/hook bij met de bestanden uit `pocketbase/home-assistant-addon/local_pocketbase/`. Versie **1.19.1** voegt de opgeslagen keuze toe voor één Facebook-fotobericht of losse berichten, ook per ongepubliceerde wachtrijtaak.
 2. Kopieer `.env.example` naar `.env` op de Docker-host en vul de twee lokale wachtwoorden in. De drie Meta-waarden `META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID` en `META_INSTAGRAM_USER_ID` mogen in `.env`, maar kunnen ook na de eerste start op het wachtwoordbeveiligde lokale containerdashboard worden opgeslagen. Dat bewaart ze met beperkte bestandsrechten in de blijvende Docker-volume en voorkomt opname in Git. Gebruik dat dashboard uitsluitend vanaf het vertrouwde lokale netwerk: de poort 8787 gebruikt standaard HTTP zonder TLS.
 3. Voer in de publishermap `sh start-or-update.sh` uit. Deze opdracht bouwt versie **2.8.0** uit de actuele map en start de container opnieuw. De image bevat FFmpeg voor omzetting van productvideo's naar MP4.
 

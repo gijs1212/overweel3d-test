@@ -160,6 +160,33 @@ test("outdated publisher cannot claim a job and silently publish without photos"
   delete sandbox.$app;
 });
 
+test("admin can choose Facebook mode for an unpublished queued job only", () => {
+  const job = record({ id: "pocketbase-job", supabase_id: "queued-job", source_type: "product", status: "queued", payload: { name: "Roos" }, platform_state: { facebook: "pending" } });
+  let saves = 0;
+  sandbox.BadRequestError = class extends Error {};
+  sandbox.$app = {
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.value === "queued-job" ? job : null,
+    save: () => { saves += 1; },
+  };
+  const event = {
+    auth: { getString: () => "admin" },
+    request: { pathValue: () => "set_social_facebook_mode" },
+    requestInfo: () => ({ body: { p_job_id: "queued-job", p_mode: "combined" } }),
+    json: (_status, response) => response,
+  };
+  assert.equal(route0(event).data.facebook_media_mode, "combined");
+  assert.equal(job.get("payload").facebook_media_mode, "combined");
+  assert.equal(saves, 1);
+  job.set("status", "processing");
+  assert.throws(() => route0(event), /verwerkt|afgerond/);
+  job.set("status", "queued");
+  job.set("payload", { social_platform_posts: { facebook: { "products/roos.jpg": "https://facebook.com/1" } } });
+  assert.throws(() => route0(event), /al media/);
+  assert.equal(saves, 1);
+  delete sandbox.BadRequestError;
+  delete sandbox.$app;
+});
+
 test("social cleanup removes cancelled jobs after five minutes and completed jobs after one hour", () => {
   const now = Date.parse("2026-10-09T12:00:00.000Z");
   const cancelledExpired = record({ id: "cancelled-expired", status: "cancelled", updated: "2026-10-09T11:54:59.000Z" });
