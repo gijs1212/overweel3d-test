@@ -3,6 +3,16 @@ import { pocketbase, POCKETBASE_URL } from "@/integrations/pocketbase/client";
 
 const cache = new Map<string, { url: string; expiresAt: number }>();
 
+function isTrustedProductMediaUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const base = new URL(POCKETBASE_URL);
+    return url.origin === base.origin && url.pathname.startsWith("/api/files/");
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeProductStoragePath(path: string): string | null {
   if (!path || /^(https?:|data:|blob:)/i.test(path)) return null;
   if (path.startsWith("/") && !path.startsWith("/storage/")) return null;
@@ -36,7 +46,7 @@ export async function getProductPhotoUrl(path: string): Promise<string> {
     const response = await fetch(`${POCKETBASE_URL}/api/overweel3d/catalog/media?path=${encodeURIComponent(normalizedPath)}&resolve=1`);
     if (response.ok) {
       const result = await response.json() as { url?: string };
-      if (result.url?.startsWith(`${POCKETBASE_URL}/api/overweel3d/catalog/media?path=`)) {
+      if (result.url && isTrustedProductMediaUrl(result.url)) {
         cache.set(normalizedPath, { url: result.url, expiresAt: now + 5 * 60 * 1000 });
         return result.url;
       }

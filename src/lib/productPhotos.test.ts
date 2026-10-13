@@ -19,14 +19,21 @@ afterEach(() => {
 describe("publieke productmedia", () => {
   it("toont een actieve productfoto zonder account of bestandstoken", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      url: "https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct123%2Fphoto.jpg",
+      url: "https://api.example.test/api/files/pbc_storage/file123/photo.jpg",
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
 
     const url = await getProductPhotoUrl("products/product123/photo.jpg");
-    expect(url).toBe("https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct123%2Fphoto.jpg");
+    expect(url).toBe("https://api.example.test/api/files/pbc_storage/file123/photo.jpg");
     expect(fetcher).toHaveBeenCalledWith("https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct123%2Fphoto.jpg&resolve=1");
     expect(signedUrl).not.toHaveBeenCalled();
+  });
+
+  it("weigert een media-URL van een andere host", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      url: "https://example.org/api/files/storage/file/photo.jpg",
+    }), { status: 200 })));
+    expect(await getProductPhotoUrl("products/product123/untrusted.jpg")).toBe("");
   });
 
   it("vraagt zonder account geen privé-bestandstoken op", async () => {

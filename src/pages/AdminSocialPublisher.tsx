@@ -342,14 +342,28 @@ export default function AdminSocialPublisher() {
   const uploadDiscountImage = async (file?: File) => {
     if (!file || !settings) return;
     setUploading(true);
-    const extension = file.name.split(".").pop() || "jpg";
-    const path = `social/discount-template/${createClientId()}.${extension}`;
-    const result = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
-    setUploading(false);
-    if (result.error) { toast({ title: "Afbeelding uploaden mislukt", description: result.error.message, variant: "destructive" }); return; }
-    setSettings({ ...settings, discount_image_path: result.path });
-    setPreviewUrl(await getProductPhotoUrl(result.path));
-    toast({ title: "Kortingsafbeelding geüpload", description: "Sla de instellingen nog op." });
+    try {
+      if (!file.type.startsWith("image/") && !/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
+        throw new Error(`${file.name} is geen ondersteunde afbeelding.`);
+      }
+      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `social/discount-template/${createClientId()}.${extension}`;
+      const result = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
+      if (result.error || !result.data) throw result.error || new Error("PocketBase heeft de upload niet bevestigd.");
+      const saved = await supabase.from("social_publisher_settings").update({ discount_image_path: result.path }).eq("id", settings.id);
+      if (saved.error) {
+        await supabase.storage.from("orders").remove([result.path]);
+        throw saved.error;
+      }
+      setSettings({ ...settings, discount_image_path: result.path });
+      const uploadedPreview = await getProductPhotoUrl(result.path);
+      setPreviewUrl(uploadedPreview || URL.createObjectURL(result.file));
+      toast({ title: "Kortingsafbeelding geüpload", description: "De afbeelding is direct opgeslagen en klaar voor kortingsberichten." });
+    } catch (error) {
+      toast({ title: "Afbeelding uploaden mislukt", description: error instanceof Error ? error.message : "Onbekende uploadfout.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const uploadCustomImages = async (files: File[]) => {
@@ -733,7 +747,7 @@ export default function AdminSocialPublisher() {
         <section className="rounded-2xl border bg-white p-6 lg:col-span-2"><h2 className="text-lg font-semibold">Platformstatus</h2><div className="mt-5 grid gap-3 md:grid-cols-2">{(["facebook", "instagram"] as Platform[]).map((platform) => { const session = sessions.find((item) => item.platform === platform); const paused = settings.paused_platforms.includes(platform); const screenshotName = session?.screenshot_path?.split(/[\\/]/).pop(); const connected = session?.status === "connected"; return <div key={platform} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-500" : "bg-neutral-300"}`} /><p className="font-semibold capitalize">{platform}</p></div><p className="mt-1 text-xs text-black/45">{session?.status || "Nog niet gecontroleerd"}{session?.last_checked_at ? ` · ${new Date(session.last_checked_at).toLocaleString("nl-NL")}` : ""}</p></div><Button variant={paused ? "default" : "outline"} size="sm" onClick={() => togglePause(platform)}>{paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}{paused ? " Hervatten" : " Pauzeren"}</Button></div>{session?.account_url && <a className="mt-3 inline-flex items-center gap-1 text-sm font-semibold underline" href={session.account_url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> {session.account_name || `${platform} account`} openen</a>}{session?.last_error && <p className="mt-3 text-sm text-red-700">{session.last_error}</p>}{session?.check_steps && session.check_steps.length > 0 && <details className="mt-3 rounded-lg bg-neutral-50 p-3 text-xs"><summary className="cursor-pointer font-semibold">Uitgevoerde controlestappen</summary><ol className="mt-2 space-y-1">{session.check_steps.map((step, index) => <li key={`${step}-${index}`}>{index + 1}. {step}</li>)}</ol></details>}{screenshotName && settings.control_url && <a className="mt-3 inline-flex items-center gap-1 text-xs font-semibold underline" target="_blank" rel="noreferrer" href={`${settings.control_url.replace(/\/$/, "")}/failures/${encodeURIComponent(screenshotName)}`}><ExternalLink className="h-3 w-3" /> Controlescherm bekijken</a>}</div>; })}</div></section>
       </TabsContent>
       <TabsContent value="templates"><div className="space-y-6">{(Object.keys(DEFAULT_TEMPLATES) as PostType[]).map((type) => <section key={type} className="rounded-2xl border bg-white p-6"><h2 className="mb-4 text-lg font-semibold capitalize">{type}</h2><div className="grid gap-4 lg:grid-cols-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <div key={platform}><div className="mb-2 flex items-center justify-between"><Label className="capitalize">{platform}</Label></div><Textarea rows={10} value={settings.templates[type][platform]} onChange={(event) => updateTemplate(type, platform, event.target.value)} /></div>)}</div><p className="mt-3 text-xs text-black/45">Variabelen: {type === "discount" ? "{direct_url}, {code}, {discount_label}, {expires_label}, {usage_label}" : type === "color" ? "{direct_url}, {name}, {material}" : "{direct_url}, {name}"}</p></section>)}</div></TabsContent>
-      <TabsContent value="media"><section className="rounded-2xl border bg-white p-6"><h2 className="text-lg font-semibold">Vaste kortingsafbeelding</h2><p className="mt-1 text-sm text-black/50">Deze afbeelding wordt voor iedere openbare kortingscode gebruikt.</p><div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">{previewUrl ? <img src={previewUrl} alt="Kortingsafbeelding" className="h-44 w-44 rounded-2xl border object-cover" /> : <div className="flex h-44 w-44 items-center justify-center rounded-2xl border border-dashed text-black/35"><ImagePlus /></div>}<label className="cursor-pointer"><input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={(event) => void uploadDiscountImage(event.target.files?.[0])} /><span className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-semibold text-white">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />} Afbeelding kiezen</span></label></div></section></TabsContent>
+      <TabsContent value="media"><section className="rounded-2xl border bg-white p-6"><h2 className="text-lg font-semibold">Vaste kortingsafbeelding</h2><p className="mt-1 text-sm text-black/50">Deze afbeelding wordt voor iedere openbare kortingscode gebruikt.</p><div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">{previewUrl ? <img src={previewUrl} alt="Kortingsafbeelding" className="h-44 w-44 rounded-2xl border object-cover" /> : <div className="flex h-44 w-44 items-center justify-center rounded-2xl border border-dashed text-black/35"><ImagePlus /></div>}<label className={uploading ? "cursor-wait opacity-60" : "cursor-pointer"}><input type="file" accept="image/*,.heic,.heif" disabled={uploading} className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void uploadDiscountImage(file); }} /><span className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-semibold text-white">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />} {uploading ? "Uploaden…" : "Afbeelding kiezen"}</span></label></div></section></TabsContent>
     </Tabs>
   </main><Footer /></div>;
 }

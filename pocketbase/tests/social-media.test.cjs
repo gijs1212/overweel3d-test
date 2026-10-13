@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const zlib = require("node:zlib");
 const sandbox = { module: { exports: {} }, console };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../pb_hooks/overweel3d-core.js"), "utf8"), sandbox);
-const { socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route8, route9, route10, route11 } = sandbox.module.exports;
+const { applyOrderDefaults, socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route2, route8, route9, route10, route11 } = sandbox.module.exports;
 
 function record(data) {
   return {
@@ -51,6 +51,155 @@ test("generated hex image is a valid 512px PNG with the expected swatch", () => 
 test("colors with a hex code always use their generated image", () => {
   const color = { getString: (name) => name === "hex" ? "#0a2b89" : "", get: () => ["colors/old.jpg"] };
   assert.deepEqual(Array.from(socialColorMedia(color)), ["generated-color:#0A2B89"]);
+});
+
+test("order creation always assigns a token, timestamps and authenticated owner", () => {
+  const saved = [];
+  sandbox.$security = { randomString: () => "secure-customer-token" };
+  sandbox.$app = {
+    findCollectionByNameOrId: () => ({}),
+    save: (value) => saved.push(value),
+  };
+  const event = {
+    auth: { id: "user-record", getString: (name) => name === "supabase_id" ? "customer-id" : "" },
+    request: { pathValue: () => "create_guest_order" },
+    requestInfo: () => ({ body: { p_order: {
+      order_number: "OW3D-00034",
+      customer_name: "Testklant",
+      customer_email: "test@example.com",
+      user_id: "forged-user-id",
+    } } }),
+    json: (_status, payload) => payload,
+  };
+
+  const response = route0(event);
+  assert.equal(response.data[0].customer_order_token, "secure-customer-token");
+  assert.equal(saved[0].data.customer_order_token, "secure-customer-token");
+  assert.equal(saved[0].data.user_id, "customer-id");
+  assert.notEqual(saved[0].data.user_id, "forged-user-id");
+  assert.match(saved[0].data.submitted_at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(saved[0].data.created_at, saved[0].data.submitted_at);
+  assert.equal(saved[0].data.updated_at, saved[0].data.submitted_at);
+  delete sandbox.$security;
+  delete sandbox.$app;
+});
+
+test("guest order creation assigns a token without accepting a forged owner", () => {
+  const saved = [];
+  sandbox.$security = { randomString: () => "guest-customer-token" };
+  sandbox.$app = { findCollectionByNameOrId: () => ({}), save: (value) => saved.push(value) };
+  const event = {
+    auth: null,
+    request: { pathValue: () => "create_guest_order" },
+    requestInfo: () => ({ body: { p_order: {
+      order_number: "OW3D-00035",
+      customer_name: "Gastklant",
+      customer_email: "guest@example.com",
+      user_id: "forged-user-id",
+    } } }),
+    json: (_status, payload) => payload,
+  };
+
+  const response = route0(event);
+  assert.equal(response.data[0].customer_order_token, "guest-customer-token");
+  assert.equal(saved[0].data.user_id, undefined);
+  delete sandbox.$security;
+  delete sandbox.$app;
+});
+
+test("all PocketBase order creation paths receive the former database defaults", () => {
+  const order = record({ customer_name: "Adminbestelling" });
+  sandbox.$security = { randomString: () => "default-customer-token" };
+  sandbox.$app = { findRecordsByFilter: () => [] };
+  applyOrderDefaults(order);
+  assert.equal(order.getString("order_number"), "OW3D-00001");
+  assert.equal(order.getString("customer_order_token"), "default-customer-token");
+  assert.equal(order.getString("status"), "submitted");
+  assert.match(order.getString("submitted_at"), /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(order.getString("created_at"), order.getString("submitted_at"));
+  assert.equal(order.getString("updated_at"), order.getString("submitted_at"));
+  delete sandbox.$security;
+  delete sandbox.$app;
+});
+
+test("PocketBase registers the order defaults hook for direct record creation", () => {
+  const wrapper = fs.readFileSync(path.join(__dirname, "../pb_hooks/overweel3d.pb.js"), "utf8");
+  assert.match(wrapper, /onRecordCreate\([\s\S]*applyOrderDefaults\(e\.record\)[\s\S]*"orders"\)/);
+});
+
+test("customer order detail uses migrated timestamp fields and preserves the response contract", () => {
+  const order = record({
+    id: "order-record",
+    supabase_id: "order-public-id",
+    customer_order_token: "customer-token-with-more-than-24-chars",
+    order_number: "OW3D-00034",
+    customer_name: "Testklant",
+    user_id: "customer-user-id",
+  });
+  const sorts = [];
+  sandbox.$app = {
+    findFirstRecordByFilter: (collection) => collection === "orders" ? order : null,
+    findRecordsByFilter: (collection, _filter, sort) => {
+      sorts.push([collection, sort]);
+      return [];
+    },
+    settings: () => ({ fileToken: { secret: "file-token" } }),
+    save: () => {},
+  };
+  const event = {
+    auth: { id: "user-record", getString: (name) => name === "supabase_id" ? "customer-user-id" : "" },
+    request: { pathValue: () => "get-order-by-token" },
+    requestInfo: () => ({ body: { token: "customer-token-with-more-than-24-chars", registerVisit: false } }),
+    json: (status, payload) => ({ status, ...payload }),
+  };
+
+  const response = route2(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.order.id, "order-public-id");
+  assert.equal(response.order.linked_to_current_user, true);
+  assert.deepEqual(sorts, [
+    ["order_3mf_plate_mappings", "logical_plate_number"],
+    ["order_files", "created_at"],
+    ["order_events", "-created_at"],
+    ["order_messages", "created_at"],
+    ["delivery_appointments", "-created_at"],
+  ]);
+  delete sandbox.$app;
+});
+
+test("customer order token actions store chat messages and delivery proposals", () => {
+  const order = record({
+    supabase_id: "order-public-id",
+    customer_order_token: "customer-token-with-more-than-24-chars",
+    order_number: "OW3D-00034",
+    user_id: "customer-user-id",
+  });
+  const saved = [];
+  sandbox.$security = { randomString: () => "random" };
+  sandbox.MailerMessage = class { constructor(value) { Object.assign(this, value); } };
+  sandbox.$app = {
+    findFirstRecordByFilter: (collection) => collection === "orders" ? order : null,
+    findCollectionByNameOrId: () => ({}),
+    save: (value) => saved.push(value),
+    settings: () => ({ meta: { senderAddress: "test@example.com", senderName: "Overweel3D" } }),
+    newMailClient: () => ({ send: () => {} }),
+  };
+  const event = (body) => ({
+    auth: null,
+    request: { pathValue: () => "get-order-by-token" },
+    requestInfo: () => ({ body: { token: "customer-token-with-more-than-24-chars", ...body } }),
+    json: (status, payload) => ({ status, ...payload }),
+  });
+
+  assert.deepEqual(route2(event({ action: "send_message", message: "Wanneer is mijn bestelling klaar?" })), { status: 200, success: true });
+  assert.deepEqual(route2(event({ action: "propose_delivery", appointmentData: { date: "2026-10-20", timeSlot: "13:00-17:00", notes: "Bel bij aankomst" } })), { status: 200, success: true });
+  assert.equal(saved[0].data.message, "Wanneer is mijn bestelling klaar?");
+  assert.equal(saved[0].data.sender_type, "customer");
+  assert.equal(saved[1].data.proposed_date, "2026-10-20");
+  assert.equal(saved[1].data.status, "pending");
+  delete sandbox.$security;
+  delete sandbox.MailerMessage;
+  delete sandbox.$app;
 });
 
 test("authenticated source route serves a generated color without a storage record", () => {
@@ -251,6 +400,7 @@ test("public catalog resolves only media attached to active products without log
   const product = record({ id: "product-pb", supabase_id: "product-public", active: true });
   const photo = record({ product_id: "product-public", storage_path: "products/product-public/photo.jpg" });
   const stored = record({ id: "file-pb", path: "products/product-public/photo.jpg", bucket: "orders", file: "actual.jpg" });
+  stored.collection = () => ({ id: "pbc_storage" });
   stored.baseFilesPath = () => "C:/pocketbase/files/file-pb";
   sandbox.$app = {
     findRecordsByFilter: (collection, filter) => collection === "product_images" && filter.includes("storage_path") ? [photo] : [],
@@ -265,11 +415,11 @@ test("public catalog resolves only media attached to active products without log
     request: { url: { query: () => ({ get: (key) => key === "path" ? "products/product-public/photo.jpg" : resolve ? "1" : "" }) } },
     response: { header: () => ({ set: () => {} }) },
     json: (status, payload) => ({ status, ...payload }),
-    fileFS: (directory, filename) => ({ directory, filename }),
+    redirect: (status, url) => ({ status, url }),
   };
-  assert.equal(route11(event).url, "https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct-public%2Fphoto.jpg");
+  assert.equal(route11(event).url, "https://api.example.test/api/files/pbc_storage/file-pb/actual.jpg");
   resolve = false;
-  assert.deepEqual(JSON.parse(JSON.stringify(route11(event))), { directory: "C:/pocketbase/files/file-pb", filename: "actual.jpg" });
+  assert.deepEqual(JSON.parse(JSON.stringify(route11(event))), { status: 302, url: "https://api.example.test/api/files/pbc_storage/file-pb/actual.jpg" });
   product.set("active", false);
   assert.throws(() => route11(event), /Productmedia niet gevonden/);
   product.set("active", true);

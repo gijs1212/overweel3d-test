@@ -58,7 +58,28 @@ for (const match of source.matchAll(routePattern)) {
   replacements.push({ start, end, text: `function ${name}(e) {${body}}` });
 }
 
-if (routes.length !== 8) throw new Error(`Verwachtte 8 routes, maar vond ${routes.length}.`);
+// Older source files contained routerAdd declarations and still need splitting.
+// Current templates are already split CommonJS modules; in that format the
+// checked-in wrapper remains the route manifest and only needs validation.
+if (routes.length === 0 && /^function route0\(e\)/m.test(source)) {
+  const existingWrapper = await fs.readFile(routesPath, "utf8");
+  const wrapperRoutes = [...existingWrapper.matchAll(/routerAdd\(/g)].length;
+  const exportedRoutes = [...source.matchAll(/^function route\d+\(e\)/gm)].length;
+  if (!exportedRoutes || wrapperRoutes !== exportedRoutes) {
+    throw new Error(`Hookmanifest en kern komen niet overeen: ${wrapperRoutes} routes tegenover ${exportedRoutes} handlers.`);
+  }
+  await fs.writeFile(corePath, source);
+  await fs.mkdir(addonHooksDir, { recursive: true });
+  await Promise.all([
+    fs.copyFile(templatePath, path.join(addonHooksDir, "overweel3d.template.js")),
+    fs.copyFile(corePath, path.join(addonHooksDir, "overweel3d-core.js")),
+    fs.copyFile(routesPath, path.join(addonHooksDir, "overweel3d.pb.js")),
+  ]);
+  console.log(JSON.stringify({ ok: true, routes: exportedRoutes, format: "split-commonjs" }, null, 2));
+  process.exit(0);
+}
+
+if (routes.length !== 12) throw new Error(`Verwachtte 12 routes, maar vond ${routes.length}.`);
 
 let core = source;
 for (const replacement of replacements.reverse()) {

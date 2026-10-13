@@ -15,6 +15,13 @@ routerAdd("GET", "/api/overweel3d/social/media", function (e) { return require(_
 routerAdd("GET", "/api/overweel3d/social/public-media", function (e) { return require(__hooks + "/overweel3d-core.js").route10(e); }, $apis.bodyLimit(32 * 1024 * 1024));
 routerAdd("GET", "/api/overweel3d/catalog/media", function (e) { return require(__hooks + "/overweel3d-core.js").route11(e); });
 
+// Enforce the defaults that used to be supplied by PostgreSQL for every
+// PocketBase order creation path, including admin and future integrations.
+onRecordCreate(function (e) {
+  require(__hooks + "/overweel3d-core.js").applyOrderDefaults(e.record);
+  e.next();
+}, "orders");
+
 cronAdd("overweel3d-social-job-retention", "* * * * *", function () {
   try { require(__hooks + "/overweel3d-core.js").socialCleanupJobs(); }
   catch (error) { console.error("Social Publisher-wachtrij opschonen mislukt:", error); }

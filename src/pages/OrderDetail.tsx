@@ -74,6 +74,7 @@ export default function OrderDetail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [selectedPlates, setSelectedPlates] = useState<CustomerPlatePreview[]>([]);
   const [events, setEvents] = useState<OrderEvent[]>([]);
@@ -98,15 +99,22 @@ export default function OrderDetail() {
   const [addressForm, setAddressForm] = useState({ shipping_address: "", postal_code: "", city: "", country: "Nederland" });
   const addressInitializedOrderId = useRef<string | null>(null);
   const fetchOrder = useCallback(async (registerVisit = true, silent = false) => {
-    if (!token) return;
+    if (!token) {
+      setLoadError("De bestellink bevat geen klanttoken.");
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("get-order-by-token", {
       body: { token, registerVisit },
     });
     if (error || !data?.order) {
-      if (!silent) toast({ title: "Bestelling niet gevonden", variant: "destructive" });
+      const description = error?.message || data?.error || "De server gaf geen bestelling terug in het antwoord.";
+      setLoadError(description);
+      if (!silent) toast({ title: "Bestelling laden mislukt", description, variant: "destructive" });
       setLoading(false);
       return;
     }
+    setLoadError("");
     setOrder(data.order);
     if (addressInitializedOrderId.current !== data.order.id) {
       setAddressForm({
@@ -316,7 +324,7 @@ export default function OrderDetail() {
   }
 
   if (!order) {
-    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16"><div className="container mx-auto px-4 py-16 text-center"><AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" /><h1 className="text-2xl font-bold text-primary mb-2">Bestelling niet gevonden</h1><p className="text-muted-foreground">Controleer of de link correct is.</p></div></main><Footer /></div>);
+    return (<div className="min-h-screen"><Navbar /><main className="pt-20 pb-16"><div className="container mx-auto px-4 py-16 text-center"><AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" /><h1 className="text-2xl font-bold text-primary mb-2">Bestelling kon niet worden geladen</h1><p className="text-muted-foreground">Controleer of de link correct is.</p>{loadError && <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left"><p className="text-xs font-semibold uppercase tracking-wide text-destructive">Volledige foutmelding · versie 1.19.7</p><p className="mt-2 whitespace-pre-wrap break-words font-mono text-sm text-foreground">{loadError}</p></div>}</div></main><Footer /></div>);
   }
 
   const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.submitted;
@@ -337,6 +345,12 @@ export default function OrderDetail() {
       <Navbar />
       <main className="pt-20 pb-16">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
+          {loadError && (
+            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Volledige foutmelding · versie 1.19.7</p>
+              <p className="mt-2 whitespace-pre-wrap break-words font-mono text-sm text-foreground">{loadError}</p>
+            </div>
+          )}
           {isSuccess && (
             <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
               className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-8 text-center">
@@ -545,7 +559,7 @@ export default function OrderDetail() {
                 <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                   <h3 className="font-bold text-primary mb-4">Bestanden ({files.length})</h3>
 
-                  {order.customer_upload_requested && user && order.user_id === user.id && (
+                  {order.customer_upload_requested && user && order.linked_to_current_user && (
                     <div className="mb-4 p-4 rounded-lg border-2 border-dashed border-accent/50 bg-accent/5">
                       <p className="text-sm font-medium text-primary mb-1">📤 Upload-verzoek van Overweel3D</p>
                       {order.customer_upload_request_note && (

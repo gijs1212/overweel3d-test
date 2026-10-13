@@ -448,11 +448,10 @@ export default function NewOrder() {
   };
 
   // ===== Totals =====
-  const calcFilePrice = (f: FileLine) => {
-    const mat = MATERIALS.find((m) => m.id === f.material);
-    if (!mat || !f.estimatedGrams) return 0;
-    return f.estimatedGrams * mat.pricePerGram * f.quantity;
-  };
+  // Bestanden, downloadlinks en maatwerk krijgen pas na controle een prijs.
+  // Het geschatte gewicht blijft beschikbaar voor de admin, maar wordt nooit
+  // automatisch naar een klantprijs omgerekend.
+  const calcFilePrice = (_file: FileLine) => 0;
 
   const estimatedSubtotal = cart.reduce((sum, line) => {
     if (line.kind === "file") return sum + calcFilePrice(line);
@@ -472,7 +471,7 @@ export default function NewOrder() {
 
   const giftCardAmount = giftCardApplied ? Math.min(giftCardApplied.balance, Math.max(0, estimatedSubtotal - discountAmount)) : 0;
   const estimatedTotal = Math.max(0, estimatedSubtotal - discountAmount - giftCardAmount);
-  const hasOnlyQuoteItems = cart.length > 0 && cart.every((l) => l.kind === "link" || l.kind === "custom");
+  const hasQuoteItems = cart.some((line) => line.kind !== "prebuilt");
   const applicablePublicDiscounts = publicDiscounts.filter((discount) => {
     if (discount.starts_at && new Date(discount.starts_at) > new Date()) return false;
     if (discount.expires_at && new Date(discount.expires_at) <= new Date()) return false;
@@ -748,27 +747,16 @@ export default function NewOrder() {
         status: "submitted" as const,
       };
 
-      let order: { id: string; customer_order_token: string };
-      if (user) {
-        const { data, error } = await supabase
-          .from("orders")
-          .insert(orderPayload)
-          .select("id, customer_order_token")
-          .single();
-        if (error) throw error;
-        order = data;
-      } else {
-        // Guest RETURNING previously depended on an unsafe anon SELECT policy.
-        // The SECURITY DEFINER RPC accepts a strict allow-list and returns only
-        // the id plus high-entropy customer token.
-        const { data, error } = await supabase.rpc("create_guest_order", {
-          p_order: orderPayload as unknown as Json,
-        });
-        if (error) throw error;
-        const guestOrder = data?.[0];
-        if (!guestOrder) throw new Error("De bestelling kon niet worden aangemaakt.");
-        order = guestOrder;
-      }
+      // Both guests and authenticated customers use the server route. This
+      // guarantees that every order receives a high-entropy customer token;
+      // direct collection inserts cannot apply the old Supabase defaults.
+      const { data, error } = await supabase.rpc("create_guest_order", {
+        p_order: orderPayload as unknown as Json,
+      });
+      if (error) throw error;
+      const order = data?.[0] as { id?: string; customer_order_token?: string } | undefined;
+      if (!order?.id) throw new Error("De server heeft geen bestel-ID teruggestuurd.");
+      if (!order.customer_order_token) throw new Error("De server heeft geen veilige bestellink aangemaakt. De bestelling is opgeslagen; neem contact op met Overweel3D en plaats haar niet nogmaals.");
       orderCreated = true;
 
       // Upload file lines
@@ -811,7 +799,15 @@ export default function NewOrder() {
       }
       if (giftCardApplied && giftCardAmount > 0) {
         const { error: giftError } = await supabase.rpc("redeem_gift_card", { code_text: giftCardApplied.code, order_id_value: order.id, requested_amount: giftCardAmount });
-        if (giftError) throw new Error(`Cadeaubon verwerken mislukt: ${giftError.message}`);
+        if (giftError) {
+          console.error("Cadeaubon verwerken mislukt nadat de bestelling is opgeslagen:", giftError);
+          toast({
+            title: "Bestelling geplaatst, cadeaubon vereist controle",
+            description: `De bestelling is veilig opgeslagen, maar de cadeaubon kon niet automatisch worden verwerkt: ${giftError.message}`,
+            variant: "destructive",
+            duration: 30_000,
+          });
+        }
       }
       if (user) await supabase.from("saved_carts").update({ status: "converted", checkout_at: new Date().toISOString() }).eq("user_id", user.id);
       const { data: confirmationData, error: confirmationError } = await supabase.functions.invoke("send-order-email", {
@@ -828,7 +824,14 @@ export default function NewOrder() {
       navigate(`/order/${order.customer_order_token}?success=true`);
     } catch (error: unknown) {
       if (!orderCreated && stagedStoragePaths.length) await supabase.storage.from("orders").remove(stagedStoragePaths);
-      toast({ title: "Er ging iets mis", description: error instanceof Error ? error.message : "Probeer het opnieuw.", variant: "destructive" });
+      const message = error instanceof Error ? error.message : String(error || "Onbekende fout");
+      console.error("Bestelling plaatsen mislukt:", error);
+      toast({
+        title: "Bestelling plaatsen mislukt",
+        description: message,
+        variant: "destructive",
+        duration: 30_000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -844,11 +847,7 @@ export default function NewOrder() {
 
   const cartLinePrice = (line: CartLine): string => {
     if (line.kind === "prebuilt") return `€${line.price.toFixed(2)}`;
-    if (line.kind === "file") {
-      const p = calcFilePrice(line);
-      return p > 0 ? `~€${p.toFixed(2)}` : "op offerte";
-    }
-    return "op offerte";
+    return "Op offerte";
   };
 
   return (
@@ -868,7 +867,7 @@ export default function NewOrder() {
               <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Belangrijk:</strong> De indicatieprijs is slechts een schatting en nooit de definitieve prijs. De definitieve prijs wordt na controle vastgesteld.
+                  <strong>Belangrijk:</strong> Voor bestanden, downloadlinks en maatwerk ontvangt u na controle een vrijblijvende offerte. Alleen kant-en-klare producten tonen direct een prijs.
                 </p>
               </div>
             </div>
@@ -1287,10 +1286,10 @@ export default function NewOrder() {
                         ))}
 
                         <div className="border-t border-border pt-3 space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Subtotaal</span>
+                          {estimatedSubtotal > 0 && <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Kant-en-klare producten</span>
                             <span className="font-medium">€{estimatedSubtotal.toFixed(2)}</span>
-                          </div>
+                          </div>}
                           {discountApplied && (
                             <div className="flex justify-between text-sm text-green-700">
                               <span>Korting ({discountApplied.code})</span>
@@ -1299,17 +1298,17 @@ export default function NewOrder() {
                           )}
                           {giftCardApplied && <div className="flex justify-between text-sm text-blue-700"><span>Cadeaubon ({giftCardApplied.code})</span><span>−€{giftCardAmount.toFixed(2)}</span></div>}
                           <div className="flex justify-between items-center pt-1">
-                            <span className="font-semibold text-primary">{hasOnlyQuoteItems ? "Op offerte" : "Indicatie"}</span>
-                            <span className="text-xl font-bold text-accent">€{estimatedTotal.toFixed(2)}</span>
+                            <span className="font-semibold text-primary">{hasQuoteItems ? "Op offerte" : "Totaal"}</span>
+                            <span className="text-xl font-bold text-accent">{hasQuoteItems ? (estimatedTotal > 0 ? `Kant-en-klaar €${estimatedTotal.toFixed(2)}` : "Op offerte") : `€${estimatedTotal.toFixed(2)}`}</span>
                           </div>
                         </div>
                       </div>
                     )}
-                    <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                    {hasQuoteItems && <div className="mt-4 bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-800 rounded-lg p-3">
                       <p className="text-xs text-amber-800 dark:text-amber-200">
-                        ⚠️ Indicatie is een schatting. Definitieve prijs wordt na controle vastgesteld.
+                        ⚠️ Voor bestanden, links en maatwerk wordt de prijs na controle als offerte doorgegeven.
                       </p>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               </div>

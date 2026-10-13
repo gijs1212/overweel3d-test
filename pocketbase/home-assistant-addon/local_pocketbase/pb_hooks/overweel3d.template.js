@@ -126,13 +126,43 @@ function authSupabaseId(e) {
 }
 
 function generateOrderNumber() {
-  var records = $app.findRecordsByFilter("orders", "order_number != ''", "-created", 500, 0);
+  var records = $app.findRecordsByFilter("orders", "order_number != ''", "-order_number", 500, 0, {});
   var highest = 0;
   records.forEach(function (record) {
     var match = /^OW3D-(\d+)$/.exec(record.getString("order_number"));
     if (match) highest = Math.max(highest, parseInt(match[1], 10));
   });
-  return "OW3D-" + String(highest + 1).padStart(5, "0");
+  var sequence = String(highest + 1);
+  while (sequence.length < 5) sequence = "0" + sequence;
+  return "OW3D-" + sequence;
+}
+
+function orderDefaultValues(values) {
+  var result = values || {};
+  var now = new Date().toISOString();
+  if (!result.order_number) result.order_number = generateOrderNumber();
+  if (!result.customer_order_token) result.customer_order_token = $security.randomString(48);
+  if (!result.status) result.status = "submitted";
+  if (!result.submitted_at) result.submitted_at = now;
+  if (!result.created_at) result.created_at = now;
+  if (!result.updated_at) result.updated_at = now;
+  return result;
+}
+
+// PocketBase text/date fields don't support the PostgreSQL defaults that the
+// original ordering flow relied on. Apply them for every server-side or API
+// record creation, not just for the public checkout RPC.
+function applyOrderDefaults(record) {
+  var defaults = orderDefaultValues({
+    order_number: record.getString("order_number"),
+    customer_order_token: record.getString("customer_order_token"),
+    status: record.getString("status"),
+    submitted_at: record.getString("submitted_at"),
+    created_at: record.getString("created_at"),
+    updated_at: record.getString("updated_at")
+  });
+  Object.keys(defaults).forEach(function (key) { record.set(key, defaults[key]); });
+  return record;
 }
 
 function discountResult(code, email, subtotal) {
@@ -172,7 +202,7 @@ function route0(e) {
     requireAdmin(e);
     var socialStatus = socialSetting();
     return json(e, {
-      hook_version: "1.19.1",
+      hook_version: "1.19.8",
       publisher_last_seen_at: socialStatus.getString("publisher_last_seen_at"),
       publisher_version: socialStatus.getString("publisher_version")
     });
@@ -309,16 +339,18 @@ function route0(e) {
   if (name === "create_guest_order") {
     var order = p.p_order || {};
     if (!order.customer_name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(order.customer_email || ""))) fail("Ongeldige klantgegevens.");
-    var token = $security.randomString(48);
-    var allowed = ["order_number", "customer_email", "customer_name", "phone", "company_name", "billing_address", "shipping_address", "postal_code", "city", "country", "material", "color", "quantity", "notes", "print_preferences", "instant_quote_price", "file_links", "order_method", "catalog_items"];
-    var values = { customer_order_token: token, status: "submitted" };
+    var allowed = ["order_number", "customer_email", "customer_name", "phone", "company_name", "billing_address", "shipping_address", "postal_code", "city", "country", "material", "color", "quantity", "notes", "print_preferences", "instant_quote_price", "file_links", "order_method", "catalog_items", "applied_discount_code", "gift_card_code", "gift_card_amount"];
+    var values = {};
+    // Never trust a user_id supplied by the browser. For authenticated
+    // customers it is derived from the verified PocketBase session.
+    if (e.auth) values.user_id = e.auth.getString("supabase_id") || e.auth.id;
     allowed.forEach(function (key) { if (order[key] !== undefined) values[key] = order[key]; });
-    if (!values.order_number) values.order_number = generateOrderNumber();
+    values = orderDefaultValues(values);
     var created = save("orders", values);
-    return json(e, [{ id: created.getString("supabase_id"), customer_order_token: token }]);
+    return json(e, [{ id: created.getString("supabase_id"), customer_order_token: created.getString("customer_order_token") }]);
   }
 
-  if (name === "check_discount_code") return json(e, discountResult(p.code_text, p.email_text, p.order_total));
+  if (name === "check_discount_code") return json(e, discountResult(p.code_text, p.email_text, p.order_amount !== undefined ? p.order_amount : p.order_total));
 
   if (name === "check_gift_card") {
     var gift = one("gift_cards", "code", String(p.code_text || "").trim().toUpperCase());
@@ -463,7 +495,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.1" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.8" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -482,18 +514,62 @@ function escapeHtml(value) {
   return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-function orderPayload(order) {
+function pickedRecord(record, fields) {
+  var exported = cleanRecord(record) || {};
+  var result = {};
+  fields.forEach(function (field) { result[field] = exported[field]; });
+  return result;
+}
+
+function customerFileUrl(path, e) {
+  if (!path) return null;
+  var stored = storedFileForPath(path);
+  if (!stored) return null;
+  var filename = stored.getString("file");
+  if (!filename) return null;
+  var token = $app.settings().fileToken.secret;
+  return publicBaseUrl(e) + "/api/files/" + stored.collection().id + "/" + stored.id + "/" + filename + "?token=" + token;
+}
+
+function orderPayload(order, e) {
   var id = order.getString("supabase_id") || order.id;
-  function related(collection, sort) {
-    return $app.findRecordsByFilter(collection, "order_id = {:id}", sort || "created", 500, 0, { id: id }).map(cleanRecord);
+  function related(collection, extraFilter, sort, fields) {
+    var filter = "order_id = {:id}" + (extraFilter ? " && " + extraFilter : "");
+    return $app.findRecordsByFilter(collection, filter, sort || "created_at", 500, 0, { id: id }).map(function (record) {
+      return pickedRecord(record, fields);
+    });
   }
+  var customerOrderFields = [
+    "id", "order_number", "customer_email", "customer_name",
+    "material", "color", "quantity", "notes", "instant_quote_price",
+    "final_price", "applied_discount_code", "tikkie_link", "status", "customer_visible_notes",
+    "customer_order_token", "submitted_at", "approved_at", "rejected_at",
+    "billing_address", "shipping_address", "postal_code", "city", "country",
+    "order_method", "file_links", "total_products", "total_plates",
+    "plate_print_statuses", "plate_runs_required_per_plate", "plate_runs_completed",
+    "shipping_carrier", "tracking_code", "shipping_cost",
+    "customer_upload_requested", "customer_upload_request_note"
+  ];
+  var customerOrder = pickedRecord(order, customerOrderFields);
+  var ownerId = order.getString("user_id");
+  var currentUserId = e.auth ? (e.auth.getString("supabase_id") || e.auth.id) : "";
+  customerOrder.linked_to_account = !!ownerId;
+  customerOrder.linked_to_current_user = !!ownerId && ownerId === currentUserId;
+  var plateRows = $app.findRecordsByFilter("order_3mf_plate_mappings", "order_id = {:id} && active = true", "logical_plate_number", 500, 0, { id: id });
   return {
-    order: cleanRecord(order),
-    files: related("order_files"),
-    events: related("order_events"),
-    messages: related("order_messages"),
-    appointments: related("delivery_appointments"),
-    selectedPlates: related("order_3mf_plate_mappings", "plate_index")
+    order: customerOrder,
+    files: related("order_files", "customer_visible = true", "created_at", ["id", "storage_path", "original_filename", "file_size"]),
+    events: related("order_events", "visible_to_customer = true", "-created_at", ["id", "event_type", "event_description", "visible_to_customer", "created_at"]),
+    messages: related("order_messages", "", "created_at", ["id", "sender_type", "message", "created_at", "read"]),
+    appointments: related("delivery_appointments", "", "-created_at", ["id", "proposed_date", "proposed_time_slot", "status", "proposed_by", "customer_notes", "admin_notes", "created_at"]),
+    selectedPlates: plateRows.map(function (plate) {
+      var colors = jsonFieldValue(plate.get("colors"));
+      return {
+        logicalPlateNumber: plate.getInt("logical_plate_number"),
+        previewUrl: customerFileUrl(plate.getString("preview_storage_path"), e),
+        colors: Array.isArray(colors) ? colors : []
+      };
+    })
   };
 }
 
@@ -967,31 +1043,73 @@ function route2(e) {
   if (name === "get-order-by-token") {
     var order = orderByToken(p.token);
     if (!order) throw new NotFoundError("Bestelling niet gevonden.");
+    var orderPublicId = order.getString("supabase_id") || order.id;
+    if (p.action === "send_message") {
+      var customerMessage = String(p.message || "").trim();
+      if (!customerMessage || customerMessage.length > 4000) fail("Bericht moet tussen 1 en 4000 tekens zijn.");
+      save("order_messages", {
+        order_id: orderPublicId,
+        sender_type: "customer",
+        sender_id: order.getString("user_id") || null,
+        message: customerMessage,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+      try { sendMail("gijsoverweel@gmail.com", "Nieuw bericht bij bestelling " + order.getString("order_number"), "<p>Er staat een nieuw klantbericht klaar bij bestelling " + escapeHtml(order.getString("order_number")) + ".</p>"); } catch (mailError) { console.error("Chatmelding versturen mislukt:", mailError); }
+      return e.json(200, { success: true });
+    }
+    if (p.action === "propose_delivery") {
+      var appointment = p.appointmentData || {};
+      var proposedDate = String(appointment.date || "");
+      var proposedTimeSlot = String(appointment.timeSlot || "Overdag").trim() || "Overdag";
+      var customerNotes = String(appointment.notes || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(proposedDate) || proposedTimeSlot.length > 100 || customerNotes.length > 2000) fail("Ongeldig bezorgvoorstel.");
+      save("delivery_appointments", {
+        order_id: orderPublicId,
+        proposed_date: proposedDate,
+        proposed_time_slot: proposedTimeSlot,
+        status: "pending",
+        proposed_by: "customer",
+        customer_notes: customerNotes,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      return e.json(200, { success: true });
+    }
     if (p.action === "update_shipping_address") {
       var address = p.addressData || {};
       if (!address.shipping_address || !address.postal_code || !address.city) fail("Vul het volledige verzendadres in.");
+      if (String(address.shipping_address).length > 500 || String(address.postal_code).length > 32 || String(address.city).length > 120 || String(address.country || "Nederland").length > 120) fail("Vul een geldig verzendadres in.");
       order.set("shipping_address", String(address.shipping_address).slice(0, 500));
-      order.set("postal_code", String(address.postal_code).slice(0, 30));
-      order.set("city", String(address.city).slice(0, 100));
-      order.set("country", String(address.country || "Nederland").slice(0, 100));
+      order.set("billing_address", "");
+      order.set("postal_code", String(address.postal_code).trim().toUpperCase().slice(0, 32));
+      order.set("city", String(address.city).trim().slice(0, 120));
+      order.set("country", String(address.country || "Nederland").trim().slice(0, 120));
       $app.save(order);
+      save("order_events", { order_id: orderPublicId, event_type: "shipping_address_added", event_description: "De klant heeft het ontbrekende verzendadres ingevuld.", visible_to_customer: true, created_at: new Date().toISOString() });
       return e.json(200, { success: true });
     }
     if (p.action === "get_file_url") {
       var file = byId("order_files", p.fileId);
-      if (!file || file.getString("order_id") !== (order.getString("supabase_id") || order.id)) throw new NotFoundError("Bestand niet gevonden.");
+      if (!file || file.getString("order_id") !== orderPublicId || !file.getBool("customer_visible")) throw new NotFoundError("Bestand niet gevonden.");
       var path = file.getString("storage_path");
       var stored = one("storage_files", "path", path);
       if (!stored) throw new NotFoundError("Bestand is nog niet naar PocketBase gemigreerd.");
       var token = $app.settings().fileToken.secret;
       var filename = stored.getString("file");
-      return e.json(200, { signedUrl: "/api/files/" + stored.collection().id + "/" + stored.id + "/" + filename + "?token=" + token });
+      return e.json(200, { signedUrl: publicBaseUrl(e) + "/api/files/" + stored.collection().id + "/" + stored.id + "/" + filename + "?token=" + token });
     }
-    if (p.registerVisit) {
-      order.set("link_last_viewed_at", new Date().toISOString());
-      $app.save(order);
+    if (p.action) return e.json(400, { error: "Onbekende bestelactie: " + String(p.action) });
+    try {
+      if (p.registerVisit) {
+        order.set("link_last_viewed_at", new Date().toISOString());
+        $app.save(order);
+      }
+      return e.json(200, orderPayload(order, e));
+    } catch (error) {
+      var detail = error && error.message ? error.message : String(error);
+      return e.json(500, { error: "Bestelling gevonden, maar de bestelgegevens konden niet volledig worden geladen: " + detail });
     }
-    return e.json(200, orderPayload(order));
   }
 
   if (name === "update-order-status") {
@@ -2097,7 +2215,7 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.1" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.8" });
   }
   if (action === "poll") {
     var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -2116,9 +2234,9 @@ function route8(e) {
         next_due: diagnosticNext ? diagnosticNext.due : false,
         next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
         next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
-      }, version: "1.19.1" });
+      }, version: "1.19.8" });
     }
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.1" });
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.8" });
   }
   if (action === "resolve_media") {
     var sourcePath = String(p.path || "").trim();
@@ -2299,10 +2417,10 @@ function route11(e) {
   if (!published) throw new NotFoundError("Productmedia niet gevonden.");
   var stored = storedFileForPath(path);
   if (!stored || stored.getString("bucket") !== "orders" || !stored.getString("file")) throw new NotFoundError("Productmedia niet gevonden.");
-  var mediaUrl = publicBaseUrl(e) + "/api/overweel3d/catalog/media?path=" + encodeURIComponent(path);
+  var mediaUrl = publicBaseUrl(e) + "/api/files/" + encodeURIComponent(stored.collection().id) + "/" + encodeURIComponent(stored.id) + "/" + encodeURIComponent(stored.getString("file"));
   e.response.header().set("Cache-Control", "public, max-age=300");
   if (e.request.url.query().get("resolve") === "1") return e.json(200, { url: mediaUrl });
-  return e.fileFS($os.dirFS(stored.baseFilesPath()), stored.getString("file"));
+  return e.redirect(302, mediaUrl);
 }
 
 function socialCleanupJobs(nowMs) {
@@ -2347,4 +2465,4 @@ function socialCleanupJobs(nowMs) {
 }
 
 
-module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, route11, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };
+module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, route11, applyOrderDefaults, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };

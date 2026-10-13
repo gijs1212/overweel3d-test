@@ -46,7 +46,13 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
         resolve(xhr.response as RecordModel);
         return;
       }
-      const message = xhr.response?.message || xhr.response?.data?.file?.message || `Upload mislukt (${xhr.status}).`;
+      const genericMessage = String(xhr.response?.message || "");
+      const details = errorDetails(xhr.response?.data);
+      const routeHint = xhr.status === 404 || /something went wrong while processing/i.test(genericMessage)
+        ? "De PocketBase-opslagroute is niet bereikbaar. Controleer of api.gijsoverweel.nl naar PocketBase verwijst."
+        : "";
+      const reason = [genericMessage, ...details].filter(Boolean).join(" — ");
+      const message = `Upload van ${file.name} naar ${path} mislukt (${xhr.status || "geen HTTP-status"})${reason ? `: ${reason}` : ""}${routeHint ? ` — ${routeHint}` : ""}`;
       emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error: message });
       reject(new Error(message));
     };
@@ -65,8 +71,29 @@ const relationTables: Record<string, string[]> = {
   portfolio_projects: ["portfolio_project_media"],
 };
 
+function errorDetails(value: unknown): string[] {
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value as Record<string, unknown>).flatMap(([field, detail]) => {
+    if (detail && typeof detail === "object" && "message" in detail) {
+      return [`${field}: ${String((detail as { message?: unknown }).message || "Onbekende fout")}`];
+    }
+    return errorDetails(detail).map((message) => `${field}.${message}`);
+  });
+}
+
+function responseError(response: Response, payload: any, operation: string): Error {
+  const details = errorDetails(payload?.data);
+  const message = String(payload?.message || payload?.error || `${operation} mislukt`);
+  const suffix = details.length ? ` — ${details.join("; ")}` : "";
+  return new Error(`${operation} (${response.status} ${response.statusText || "HTTP-fout"}): ${message}${suffix}`);
+}
+
 function asError(error: unknown): Error {
-  if (error instanceof ClientResponseError) return new Error(error.response?.message || error.message);
+  if (error instanceof ClientResponseError) {
+    const details = errorDetails(error.response?.data);
+    const message = error.response?.message || error.message;
+    return new Error(`${message}${details.length ? ` — ${details.join("; ")}` : ""}`);
+  }
   return error instanceof Error ? error : new Error(String(error));
 }
 
@@ -200,6 +227,14 @@ class PocketQuery implements PromiseLike<Result<any>> {
   private body(row: Record<string, any>) {
     const result = { ...row }; delete result.id; delete result._pocketbase_id; delete result.created; delete result.updated;
     result.supabase_id = row.id || row.supabase_id || createClientId();
+    if (this.table === "orders") {
+      const now = new Date().toISOString();
+      result.customer_order_token ||= `${createClientId()}${createClientId()}`.replace(/-/g, "");
+      result.status ||= "submitted";
+      result.submitted_at ||= now;
+      result.created_at ||= now;
+      result.updated_at ||= now;
+    }
     return result;
   }
   private async relations(rows: Record<string, any>[]) {
@@ -259,8 +294,8 @@ export const supabase = {
     updateUser: async ({ password }: any) => { try { const id=pocketbase.authStore.record?.id; if(!id) throw new Error("Niet ingelogd"); const record=await pocketbase.collection("users").update(id,{password,passwordConfirm:password}); return {data:{user:userShape(record)},error:null}; } catch(e){return {data:{user:null},error:asError(e)}} },
     onAuthStateChange: (callback: any) => { const unsub=pocketbase.authStore.onChange(()=>callback(pocketbase.authStore.isValid?"SIGNED_IN":"SIGNED_OUT",sessionShape()),false); return {data:{subscription:{unsubscribe:unsub}}}; },
   },
-  rpc: async (name: string, body: any = {}): Promise<any> => { try { const response=await fetch(`${POCKETBASE_URL}/api/overweel3d/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json",...(pocketbase.authStore.token?{Authorization:pocketbase.authStore.token}: {})},body:JSON.stringify(body)}); const data=await response.json(); if(!response.ok) throw new Error(data?.message||data?.error||`RPC ${name} mislukt`); return {data:data?.data ?? data,error:null}; } catch(e){return {data:null,error:asError(e)}} },
-  functions: { invoke: async (name: string,{body}:any={}) => { try { const response=await fetch(`${POCKETBASE_URL}/api/overweel3d/functions/${name}`,{method:"POST",headers:{"Content-Type":"application/json",...(pocketbase.authStore.token?{Authorization:pocketbase.authStore.token}:{})},body:JSON.stringify(body||{})}); const data=await response.json(); if(response.status===404) throw new Error("De Overweel3D-serverfunctie ontbreekt op PocketBase. Installeer of herlaad de PocketBase-hook."); if(!response.ok) throw new Error(data?.message||data?.error||`${name} mislukt`); return {data,error:null}; }catch(e){return {data:null,error:asError(e)}} } },
+  rpc: async (name: string, body: any = {}): Promise<any> => { try { const response=await fetch(`${POCKETBASE_URL}/api/overweel3d/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json",...(pocketbase.authStore.token?{Authorization:pocketbase.authStore.token}: {})},body:JSON.stringify(body)}); const data=await response.json().catch(()=>null); if(!response.ok) throw responseError(response,data,`RPC ${name}`); return {data:data?.data ?? data,error:null}; } catch(e){return {data:null,error:asError(e)}} },
+  functions: { invoke: async (name: string,{body}:any={}) => { try { const response=await fetch(`${POCKETBASE_URL}/api/overweel3d/functions/${name}`,{method:"POST",headers:{"Content-Type":"application/json",...(pocketbase.authStore.token?{Authorization:pocketbase.authStore.token}:{})},body:JSON.stringify(body||{})}); const data=await response.json().catch(()=>null); if(!response.ok) throw responseError(response,data,`Serverfunctie ${name}`); return {data,error:null}; }catch(e){return {data:null,error:asError(e)}} } },
   channel: (_name:string) => ({ on(..._args:any[]){return this;}, subscribe(..._args:any[]){return this;}, unsubscribe(..._args:any[]){return Promise.resolve("ok");} }),
   removeChannel: async (..._args:any[]) => "ok",
   storage: { from: (bucket:string) => ({
