@@ -16,11 +16,11 @@ export function Logo({ size = "md", surface = "light" }: LogoProps) {
   };
 
   return (
-    <div className={`${sizes[size]} flex shrink-0 items-center justify-center overflow-visible`}>
+    <div className={`${sizes[size]} flex shrink-0 items-center justify-center overflow-hidden`}>
       <img
         src={surface === "dark" ? logoLight : logoDark}
         alt="Overweel3D"
-        className={`h-full w-full scale-[2] object-contain ${surface === "dark" ? "-translate-y-1" : "translate-y-4"}`}
+        className={`h-full w-full scale-[2] object-contain ${surface === "dark" ? "translate-y-1" : "translate-y-3"}`}
       />
     </div>
   );

@@ -16,6 +16,14 @@ class MetaApiError(RuntimeError):
     pass
 
 
+class MetaRateLimitError(MetaApiError):
+    """Meta temporarily blocked this app/business from making requests."""
+
+    def __init__(self, message: str, retry_after_seconds: int = 3600) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = max(900, min(int(retry_after_seconds), 86400))
+
+
 class UncertainPublication(MetaApiError):
     """A write may have succeeded; an automatic retry could duplicate a post."""
 
@@ -75,6 +83,15 @@ class MetaGraphClient:
                 f"Meta Graph HTTP {response.status_code}: "
                 f"{str(error.get('message') or 'onbekende fout')[:300]}{suffix}"
             )
+            if code in {4, 17, 32, 613} or subcode == 2207051 or response.status_code == 429:
+                retry_after = 3600
+                raw_retry_after = response.headers.get("retry-after", "").strip()
+                if raw_retry_after.isdigit():
+                    retry_after = max(retry_after, int(raw_retry_after))
+                raise MetaRateLimitError(
+                    error_text + " Meta heeft de aanvraaglimiet bereikt; de taak blijft wachten en wordt later hervat.",
+                    retry_after,
+                )
             if uncertain_on_transport and response.status_code >= 500:
                 raise UncertainPublication(error_text + " Publicatie mogelijk al uitgevoerd; controleer het kanaal handmatig.")
             raise MetaApiError(error_text)
@@ -117,6 +134,18 @@ class MetaGraphClient:
             await asyncio.sleep(3)
         raise MetaApiError("Instagram-mediacontainer was niet op tijd klaar.")
 
+    async def _facebook_feed_result(self, post_id: str) -> str:
+        """Controleer dat Meta het nieuwe paginabericht werkelijk publiceerde."""
+        details = await self.request(
+            "GET",
+            post_id,
+            params={"fields": "id,is_published,permalink_url"},
+            page_auth=True,
+        )
+        if details.get("is_published") is False:
+            raise MetaApiError("Facebook heeft een bericht-ID teruggegeven, maar het paginabericht staat niet gepubliceerd.")
+        return str(details.get("permalink_url") or f"https://www.facebook.com/{post_id}")
+
     async def publish(self, platform: str, text: str, image_urls: list[str | dict[str, str]], dry_run: bool,
                       *, on_post=None, posted_media: dict[str, str] | None = None,
                       facebook_media_mode: str = "separate") -> MetaResult:
@@ -129,8 +158,8 @@ class MetaGraphClient:
         if platform == "facebook":
             page_id = settings.meta_page_id
             if not media:
-                post = await self.request("POST", f"{page_id}/feed", data={"message": text}, uncertain_on_transport=True, page_auth=True)
-                return MetaResult("published", f"https://www.facebook.com/{post['id']}")
+                post = await self.request("POST", f"{page_id}/feed", data={"message": text, "published": "true"}, uncertain_on_transport=True, page_auth=True)
+                return MetaResult("published", await self._facebook_feed_result(str(post["id"])))
             completed = posted_media or {}
             first_url = ""
             if facebook_media_mode == "combined":
@@ -147,10 +176,10 @@ class MetaGraphClient:
                         staged_ids.append(str(staged["id"]))
                     post = await self.request(
                         "POST", f"{page_id}/feed",
-                        data={"message": text, "attached_media": json.dumps([{"media_fbid": media_id} for media_id in staged_ids])},
+                        data={"message": text, "attached_media": json.dumps([{"media_fbid": media_id} for media_id in staged_ids]), "published": "true"},
                         uncertain_on_transport=True, page_auth=True,
                     )
-                    first_url = f"https://www.facebook.com/{post['id']}"
+                    first_url = await self._facebook_feed_result(str(post["id"]))
                     for index, _ in photos:
                         if on_post:
                             try:

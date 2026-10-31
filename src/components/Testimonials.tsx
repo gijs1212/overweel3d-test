@@ -30,7 +30,7 @@ export function Testimonials() {
     <section className="py-24 bg-background overflow-hidden">
       <div className="container mx-auto px-4">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="text-center mb-16"
@@ -47,7 +47,7 @@ export function Testimonials() {
           {testimonials.map((testimonial, index) => (
             <motion.div
               key={testimonial.name}
-              initial={{ opacity: 0, y: 30 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}

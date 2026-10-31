@@ -70,6 +70,7 @@ type PrebuiltLine = {
   quantity: number;
   price: number; // total for this line
   unitPrice: number;
+priceOnRequest: boolean;
   categoryId: string | null;
   variantId: string | null;
   variantName: string | null;
@@ -182,7 +183,9 @@ export default function NewOrder() {
           ...product,
           product_images: [...(product.product_images || [])].sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order),
           product_options: [...(product.product_options || [])].sort((a, b) => a.sort_order - b.sort_order),
-          colors: productAvailability.length ? productAvailability.filter((row) => row.available).map((row) => row.color_id) : product.colors,
+          colors: product.colors_configured === false
+            ? []
+            : productAvailability.length ? productAvailability.filter((row) => row.available).map((row) => row.color_id) : product.colors,
         };
       }));
       setCatalogColors((colorResult.data || []) as unknown as FilamentColor[]);
@@ -242,12 +245,13 @@ export default function NewOrder() {
         const addonPrice = (product.product_options || [])
           .filter((option) => option.active && option.is_addon && selectedAnswerIds.has(option.id))
           .reduce((total, option) => total + Number(option.price_adjustment || 0), 0);
-        const currentUnitPrice = Number(product.price) + Number(variant?.price_adjustment || 0) + addonPrice;
+        const priceOnRequest = Number(product.price) <= 0;
+        const currentUnitPrice = priceOnRequest ? 0 : Number(product.price) + Number(variant?.price_adjustment || 0) + addonPrice;
         return [{
           kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
           materialId: MATERIALS.find((material) => material.name === item.material)?.id || item.material.toLowerCase(),
           material: item.material, color: item.colors.map((color) => color.name).join(" · "), colors: item.colors.map((color) => ({ ...color, hex: color.hex || "#808080" })),
-          quantity: item.quantity, unitPrice: currentUnitPrice, price: currentUnitPrice * item.quantity,
+          quantity: item.quantity, unitPrice: currentUnitPrice, price: currentUnitPrice * item.quantity, priceOnRequest,
           categoryId: product.category_id, variantId: item.variantId || null, variantName: item.variantName || null,
           optionAnswers: item.answers || [], optionFiles: [],
         }];
@@ -403,13 +407,15 @@ export default function NewOrder() {
 
   // ===== Prebuilt =====
   const addPrebuiltToCart = (product: ProductItem, options: PrebuiltOptions) => {
+    const priceOnRequest = Number(product.price) <= 0;
+    const unitPrice = priceOnRequest ? 0 : options.unitPrice;
     const color = options.colors.length
       ? options.colors.map((item) => item.slotLabel ? `${item.slotLabel}: ${item.name}` : item.name).join(" · ")
       : "Geen kleurkeuze";
     setCart((c) => [...c, {
       kind: "prebuilt", id: uid(), productId: product.id, name: product.name,
       materialId: options.materialId, material: options.material, color, colors: options.colors,
-      quantity: options.quantity, unitPrice: options.unitPrice, price: options.unitPrice * options.quantity,
+      quantity: options.quantity, unitPrice, price: unitPrice * options.quantity, priceOnRequest,
       categoryId: product.category_id,
       variantId: options.variantId,
       variantName: options.variantName,
@@ -471,7 +477,7 @@ export default function NewOrder() {
 
   const giftCardAmount = giftCardApplied ? Math.min(giftCardApplied.balance, Math.max(0, estimatedSubtotal - discountAmount)) : 0;
   const estimatedTotal = Math.max(0, estimatedSubtotal - discountAmount - giftCardAmount);
-  const hasQuoteItems = cart.some((line) => line.kind !== "prebuilt");
+  const hasQuoteItems = cart.some((line) => line.kind !== "prebuilt" || line.priceOnRequest);
   const applicablePublicDiscounts = publicDiscounts.filter((discount) => {
     if (discount.starts_at && new Date(discount.starts_at) > new Date()) return false;
     if (discount.expires_at && new Date(discount.expires_at) <= new Date()) return false;
@@ -696,7 +702,7 @@ export default function NewOrder() {
       }
       if (prebuiltLines.length) {
         sections.push("KANT-EN-KLARE ARTIKELEN:\n" + prebuiltLines.map((p) =>
-          `- ${p.name}${p.variantName ? ` (${p.variantName})` : ""} x${p.quantity} – ${p.material} ${p.color} – €${p.price.toFixed(2)}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${String(answer.value)}`).join(" · ")}` : ""}`
+          `- ${p.name}${p.variantName ? ` (${p.variantName})` : ""} x${p.quantity} – ${p.material} ${p.color} – ${p.priceOnRequest ? "prijs op aanvraag" : `€${p.price.toFixed(2)}`}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${String(answer.value)}`).join(" · ")}` : ""}`
         ).join("\n"));
       }
       if (customSections.length) sections.push(customSections.join("\n\n"));
@@ -846,7 +852,7 @@ export default function NewOrder() {
   };
 
   const cartLinePrice = (line: CartLine): string => {
-    if (line.kind === "prebuilt") return `€${line.price.toFixed(2)}`;
+    if (line.kind === "prebuilt") return line.priceOnRequest ? "Op aanvraag" : `€${line.price.toFixed(2)}`;
     return "Op offerte";
   };
 

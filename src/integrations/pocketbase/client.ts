@@ -241,7 +241,16 @@ class PocketQuery implements PromiseLike<Result<any>> {
     const requested = relationTables[this.table]?.filter((name) => this.selected.includes(name)) || [];
     for (const relation of requested) {
       const related = await allRecords(relation);
-      for (const row of rows) row[relation] = related.filter((candidate) => candidate[`${this.table.slice(0, -1)}_id`] === row.id || candidate.product_id === row.id || candidate.order_id === row.id || candidate.project_id === row.id || candidate.print_job_id === row.id);
+      for (const row of rows) {
+        if (this.table === "products" && relation === "product_categories") {
+          row[relation] = related.find((candidate) => (
+            candidate.id === row.category_id
+            || candidate._pocketbase_id === row.category_id
+          )) || null;
+          continue;
+        }
+        row[relation] = related.filter((candidate) => candidate[`${this.table.slice(0, -1)}_id`] === row.id || candidate.product_id === row.id || candidate.order_id === row.id || candidate.project_id === row.id || candidate.print_job_id === row.id);
+      }
     }
     return rows;
   }

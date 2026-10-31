@@ -3,10 +3,10 @@ import { Clock, ShieldCheck, Cpu, Layers } from "lucide-react";
 
 export function WhyBento() {
   return (
-    <section className="bg-background py-24 text-foreground">
-      <div className="container mx-auto px-6 max-w-7xl">
+    <section className="overflow-hidden bg-background py-16 text-foreground sm:py-24">
+      <div className="container mx-auto max-w-7xl px-5 sm:px-6">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="mb-12 max-w-2xl"
@@ -17,20 +17,20 @@ export function WhyBento() {
           <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
             Precisie, service en persoonlijke aandacht.
           </h2>
-          <p className="text-navy-ice/70">
+          <p className="text-black/55">
             Wij combineren technische expertise met heldere communicatie voor elk detail van uw printopdracht.
           </p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6">
-          <div className="md:col-span-2 lg:col-span-3 flex flex-col justify-between rounded-2xl border border-black/10 bg-white p-8 shadow-overweel-card">
+          <div className="flex flex-col justify-between rounded-2xl border border-black/10 bg-white p-6 shadow-overweel-card sm:p-8 md:col-span-2 lg:col-span-3">
             <div>
               <h3 className="font-display text-2xl font-bold mb-3">Persoonlijke begeleiding</h3>
               <p className="mb-8 leading-relaxed text-black/55">
                 U krijgt direct contact met de printer zelf. Wij denken met u mee — van bestand tot afwerking.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-black p-2 text-white"><Clock className="w-5 h-5" /></div>
                 <span className="text-sm font-semibold">Snelle reactie</span>
@@ -42,7 +42,7 @@ export function WhyBento() {
             </div>
           </div>
 
-          <div className="group relative overflow-hidden rounded-2xl bg-black p-8 text-white md:col-span-2 lg:col-span-3">
+          <div className="group relative overflow-hidden rounded-2xl bg-black p-6 text-white sm:p-8 md:col-span-2 lg:col-span-3">
             <div className="relative z-10">
               <div className="mb-6 w-fit rounded-xl border border-white/15 p-3">
                 <Cpu className="w-6 h-6 text-white" />

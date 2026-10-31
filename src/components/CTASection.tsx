@@ -8,7 +8,7 @@ export function CTASection() {
     <section className="bg-background py-24">
       <div className="container mx-auto px-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-black p-12 text-center md:p-16"

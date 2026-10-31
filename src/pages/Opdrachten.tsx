@@ -10,6 +10,7 @@ import roosKnop from "@/assets/opdrachten/roos-knop.jpeg";
 import bakjeMooist from "@/assets/opdrachten/bakje-studio-mooist.jpeg";
 import bakjeZijkant from "@/assets/opdrachten/bakje-zijkant.jpeg";
 import bakjeBoven from "@/assets/opdrachten/bakje-boven.jpeg";
+import { getProductPhotoUrl } from "@/lib/productPhotos";
 
 interface Product {
   id: string;
@@ -51,16 +52,15 @@ export default function Opdrachten() {
       if (error || !data?.length) return;
       const projects = data as unknown as Array<{ id: string; title: string; description: string; portfolio_project_media: Array<{ storage_path: string; mime_type: string; is_cover: boolean; sort_order: number }> }>;
       const paths = projects.flatMap((project) => project.portfolio_project_media.map((item) => item.storage_path));
-      const { data: signedMedia, error: signedMediaError } = await supabase.storage.from("orders").createSignedUrls(paths, 60 * 60);
-      if (signedMediaError) return;
-      const signedUrls = new Map(paths.map((path, index) => [path, signedMedia?.[index]?.signedUrl || ""]));
+      const resolvedUrls = await Promise.all(paths.map((path) => getProductPhotoUrl(path)));
+      const publicUrls = new Map(paths.map((path, index) => [path, resolvedUrls[index] || ""]));
       const loaded = projects.map((project) => {
         const sorted = [...project.portfolio_project_media].sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: project.id,
           title: project.title,
           description: project.description,
-          media: sorted.map((item) => ({ url: signedUrls.get(item.storage_path) || "", mimeType: item.mime_type })).filter((item) => item.url),
+          media: sorted.map((item) => ({ url: publicUrls.get(item.storage_path) || "", mimeType: item.mime_type })).filter((item) => item.url),
           coverIndex: Math.max(0, sorted.findIndex((item) => item.is_cover)),
         };
       }).filter((project) => project.media.length > 0);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClientId } from "@/lib/clientId";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, Video, X } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Eye, EyeOff, FileArchive, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, Video, X } from "lucide-react";
 
 import { Footer } from "@/components/Footer";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -36,6 +36,7 @@ import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPh
 
 type ProductForm = Omit<CatalogProduct, "id" | "product_categories" | "product_images" | "product_options" | "product_variants">;
 type PendingImage = { key: string; file: File; previewUrl: string; media_type: "image" | "video" };
+type ProductAdminSource = { id: string; product_id: string; makerworld_url: string; three_mf_path: string; three_mf_filename: string };
 type DeleteTarget = { type: "product"; value: CatalogProduct } | { type: "category"; value: ProductCategory };
 
 const optionTypes: Array<{ value: ProductOptionType; label: string }> = [
@@ -91,7 +92,16 @@ export default function AdminProducts() {
   const [primaryKey, setPrimaryKey] = useState("");
   const [options, setOptions] = useState<ProductOption[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variantTotals, setVariantTotals] = useState<Record<string, number>>({});
   const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
+  const [allCompatibleColors, setAllCompatibleColors] = useState(false);
+  const [priceOnRequest, setPriceOnRequest] = useState(false);
+  const [adminSourceId, setAdminSourceId] = useState("");
+  const [makerworldUrl, setMakerworldUrl] = useState("");
+  const [threeMfPath, setThreeMfPath] = useState("");
+  const [threeMfFilename, setThreeMfFilename] = useState("");
+  const [pendingThreeMf, setPendingThreeMf] = useState<File | null>(null);
+  const [removeExistingThreeMf, setRemoveExistingThreeMf] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [categorySortOrder, setCategorySortOrder] = useState(0);
@@ -118,9 +128,11 @@ export default function AdminProducts() {
         product_images: orderedProductImages(product),
         product_options: [...(product.product_options || [])].sort((a, b) => a.sort_order - b.sort_order),
         product_variants: [...(product.product_variants || [])].sort((a, b) => a.sort_order - b.sort_order),
-        colors: productAvailability.length
-          ? productAvailability.filter((row) => row.available).map((row) => row.color_id)
-          : product.colors,
+        colors: product.colors_configured === false
+          ? []
+          : productAvailability.length
+            ? productAvailability.filter((row) => row.available).map((row) => row.color_id)
+            : product.colors,
       };
     }));
     setCategories((categoryResult.data || []) as unknown as ProductCategory[]);
@@ -135,7 +147,8 @@ export default function AdminProducts() {
   const resetEditor = () => {
     pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     setEditingId(null); setForm({ ...emptyForm, materials: [], colors: [], photos: [] }); setImages([]);
-    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setVariants([]); setSelectedColorIds([]); setMediaError(""); setShowEditor(false);
+    setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setVariants([]); setVariantTotals({}); setSelectedColorIds([]); setAllCompatibleColors(false); setPriceOnRequest(false);
+    setAdminSourceId(""); setMakerworldUrl(""); setThreeMfPath(""); setThreeMfFilename(""); setPendingThreeMf(null); setRemoveExistingThreeMf(false); setMediaError(""); setShowEditor(false);
   };
   const openNew = () => { resetEditor(); setShowEditor(true); };
   const openEdit = (product: CatalogProduct) => {
@@ -152,7 +165,22 @@ export default function AdminProducts() {
     } as ProductForm);
     setImages(productImages); setPendingImages([]); setRemovedPaths([]);
     setPrimaryKey(productImages.find((image) => image.is_primary)?.id || productImages[0]?.id || "");
-    setOptions([...(product.product_options || [])]); setVariants([...(product.product_variants || [])]); setSelectedColorIds([...(product.colors || [])]); setShowEditor(true);
+    setOptions([...(product.product_options || [])]); setVariants([...(product.product_variants || [])]);
+    setVariantTotals(Object.fromEntries((product.product_variants || []).map((variant) => [variant.id, Number(product.price) + Number(variant.price_adjustment || 0)])));
+    setSelectedColorIds([...(product.colors || [])]);
+    setAllCompatibleColors(product.colors_configured === false); setPriceOnRequest(Number(product.price) <= 0); setShowEditor(true);
+    setAdminSourceId(""); setMakerworldUrl(""); setThreeMfPath(""); setThreeMfFilename(""); setPendingThreeMf(null); setRemoveExistingThreeMf(false);
+    void supabase.from("product_admin_sources").select("*").eq("product_id", product.id).maybeSingle().then(({ data, error }) => {
+      if (error) {
+        toast({ title: "Interne productbron laden mislukt", description: error.message, variant: "destructive" });
+        return;
+      }
+      const source = data as ProductAdminSource | null;
+      setAdminSourceId(source?.id || "");
+      setMakerworldUrl(source?.makerworld_url || "");
+      setThreeMfPath(source?.three_mf_path || "");
+      setThreeMfFilename(source?.three_mf_filename || "");
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -177,6 +205,30 @@ export default function AdminProducts() {
   }));
   const toggleColor = (colorId: string) => setSelectedColorIds((current) => current.includes(colorId)
     ? current.filter((id) => id !== colorId) : [...current, colorId]);
+
+  const selectThreeMf = (file: File | undefined) => {
+    if (!file) return;
+    if (!/\.3mf$/i.test(file.name)) {
+      toast({ title: "Kies een 3MF-bestand", description: "Alleen bestanden met de extensie .3mf worden ondersteund.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 250 * 1024 * 1024) {
+      toast({ title: "3MF-bestand is te groot", description: "De maximale bestandsgrootte is 250 MB.", variant: "destructive" });
+      return;
+    }
+    setPendingThreeMf(file);
+    setRemoveExistingThreeMf(false);
+  };
+
+  const downloadInternalThreeMf = async () => {
+    if (!threeMfPath) return;
+    const { data, error } = await supabase.storage.from("orders").createSignedUrl(threeMfPath, 300);
+    if (error || !data?.signedUrl) {
+      toast({ title: "3MF openen mislukt", description: error?.message || "Er kon geen tijdelijke downloadlink worden gemaakt.", variant: "destructive" });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
 
   const handleImageInput = async (files: File[]) => {
     if (!files.length) return;
@@ -227,24 +279,37 @@ export default function AdminProducts() {
     choices: [], max_length: 100, sort_order: current.length, active: true,
     is_addon: false, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
   }]);
-  const addAddon = () => setOptions((current) => [...current, {
-    id: createClientId(), product_id: editingId || "", type: "text", label: "Nieuwe add-on", description: "", required: false,
+  const addExtra = () => setOptions((current) => [...current, {
+    id: createClientId(), product_id: editingId || "", type: "text", label: "Nieuwe extra", description: "", required: false,
     choices: [], max_length: 100, sort_order: current.length, active: true, is_addon: true, price_adjustment: 0, color_slots: 1, color_slot_labels: ["Kleur add-on"],
   }]);
   const updateOption = (id: string, patch: Partial<ProductOption>) => setOptions((current) => current.map((option) => option.id === id ? { ...option, ...patch } : option));
-  const addVariant = () => setVariants((current) => [...current, {
-    id: createClientId(), product_id: editingId || "", name: "", sku: null, size_label: null,
-    material_id: null, price_adjustment: 0, active: true, sort_order: current.length,
-  }]);
+  const addVariant = () => {
+    const id = createClientId();
+    setVariants((current) => [...current, {
+      id, product_id: editingId || "", name: "", sku: null, size_label: null,
+      material_id: null, price_adjustment: 0, active: true, sort_order: current.length,
+    }]);
+    setVariantTotals((current) => ({ ...current, [id]: Number(form.price) || 0 }));
+  };
   const updateVariant = (id: string, patch: Partial<ProductVariant>) => setVariants((current) => current.map((variant) => variant.id === id ? { ...variant, ...patch } : variant));
 
   const validateProduct = () => {
     if (!form.name.trim()) return "Vul een productnaam in.";
-    if (!Number.isFinite(form.price) || form.price <= 0) return "Vul een geldige prijs groter dan €0 in.";
+    if (!priceOnRequest && (!Number.isFinite(form.price) || form.price <= 0)) return "Vul een geldige prijs groter dan €0 in of kies ‘Op aanvraag’.";
     if (form.material_mode !== "all" && form.materials.length === 0) return "Selecteer minimaal één materiaal.";
     if (form.material_mode === "fixed" && form.materials.length !== 1) return "Kies precies één vast materiaal.";
-    if (form.color_required && selectedColorIds.length === 0) return "Selecteer minimaal één beschikbare kleur.";
-    if (selectedColorIds.some((id) => !availableColors.some((color) => color.id === id))) return "Een geselecteerde kleur past niet bij de gekozen materialen.";
+    if (form.color_required && !allCompatibleColors && selectedColorIds.length === 0) return "Selecteer minimaal één beschikbare kleur of kies alle passende kleuren.";
+    if (!allCompatibleColors && selectedColorIds.some((id) => !availableColors.some((color) => color.id === id))) return "Een geselecteerde kleur past niet bij de gekozen materialen.";
+    if (allCompatibleColors && availableColors.length === 0) return "Er zijn geen actieve kleuren voor de gekozen materialen.";
+    if (makerworldUrl.trim()) {
+      try {
+        const sourceUrl = new URL(makerworldUrl.trim());
+        if (sourceUrl.protocol !== "https:" || !/(^|\.)makerworld\.com$/i.test(sourceUrl.hostname)) return "Vul een geldige HTTPS-link van MakerWorld in.";
+      } catch (_) {
+        return "Vul een geldige MakerWorld-link in.";
+      }
+    }
     if (form.color_selection_mode === "multiple" && (form.max_colors < 2 || form.max_colors > 12)) return "Het maximum aantal kleuren moet tussen 2 en 12 liggen.";
     for (const option of options) {
       if (!option.label.trim()) return "Iedere extra optie heeft een label nodig.";
@@ -253,6 +318,7 @@ export default function AdminProducts() {
       if (option.is_addon && Array.from({ length: option.color_slots }).some((_, index) => !option.color_slot_labels[index]?.trim())) return `Geef ieder kleurvak van add-on “${option.label}” een naam.`;
     }
     if (variants.some((variant) => !variant.name.trim())) return "Iedere productvariant heeft een naam nodig.";
+    if (!priceOnRequest && variants.some((variant) => !Number.isFinite(variantTotals[variant.id]) || variantTotals[variant.id] <= 0)) return "Iedere productvariant heeft een geldige totaalprijs groter dan €0 nodig.";
     if (new Set(variants.map((variant) => variant.name.trim().toLowerCase())).size !== variants.length) return "Variantnamen moeten uniek zijn.";
     return null;
   };
@@ -263,14 +329,14 @@ export default function AdminProducts() {
     setSaving(true);
     setMediaError("");
     setSaveStatus("Productgegevens opslaan…");
-    let productId = editingId; let createdProduct = false; let imagesCommitted = false; const uploadedPaths: string[] = [];
+    let productId = editingId; let createdProduct = false; let imagesCommitted = false; let uploadedInternalPath = ""; let internalSourceCommitted = false; const uploadedPaths: string[] = [];
     try {
       const payload = {
-        name: form.name.trim(), description: form.description.trim(), price: form.price, category_id: form.category_id,
-        materials: form.material_mode === "all" ? [] : form.materials, colors: selectedColorIds,
+        name: form.name.trim(), description: form.description.trim(), price: priceOnRequest ? 0 : form.price, category_id: form.category_id,
+        materials: form.material_mode === "all" ? [] : form.materials, colors: allCompatibleColors ? [] : selectedColorIds,
         material_mode: form.material_mode, material_fixed: form.material_mode === "fixed",
         color_selection_mode: form.color_selection_mode, color_required: form.color_required,
-        colors_configured: true,
+        colors_configured: !allCompatibleColors,
         max_colors: form.color_selection_mode === "single" ? 1 : form.max_colors,
         color_slot_labels: form.color_selection_mode === "multiple"
           ? Array.from({ length: form.max_colors }, (_, index) => (form.color_slot_labels[index] || "").trim())
@@ -323,14 +389,47 @@ export default function AdminProducts() {
         const { error } = await supabase.from("product_variants").insert(variants.map((variant, index) => ({
           product_id: productId!, name: variant.name.trim(), sku: variant.sku?.trim() || null,
           size_label: variant.size_label?.trim() || null, material_id: variant.material_id || null,
-          price_adjustment: Number(variant.price_adjustment) || 0, active: variant.active, sort_order: index,
+          price_adjustment: priceOnRequest ? 0 : Number(variantTotals[variant.id] ?? form.price) - Number(form.price), active: variant.active, sort_order: index,
         })));
         if (error) throw error;
       }
       const { error: deleteAvailabilityError } = await supabase.from("product_color_availability").delete().eq("product_id", productId); if (deleteAvailabilityError) throw deleteAvailabilityError;
-      if (selectedColorIds.length) {
+      if (!allCompatibleColors && selectedColorIds.length) {
         const { error } = await supabase.from("product_color_availability").insert(selectedColorIds.map((colorId) => ({ product_id: productId!, color_id: colorId, available: true })));
         if (error) throw error;
+      }
+      let savedThreeMfPath = removeExistingThreeMf ? "" : threeMfPath;
+      let savedThreeMfFilename = removeExistingThreeMf ? "" : threeMfFilename;
+      if (pendingThreeMf) {
+        setSaveStatus(`${pendingThreeMf.name} uploaden…`);
+        const internalPath = `product-admin/${productId}/${createClientId()}-${sanitizeFilename(pendingThreeMf.name)}`;
+        const { error } = await supabase.storage.from("orders").upload(internalPath, pendingThreeMf, { cacheControl: "3600", upsert: false });
+        if (error) throw new Error(`Interne 3MF-upload mislukt: ${error.message}`);
+        uploadedInternalPath = internalPath;
+        savedThreeMfPath = internalPath;
+        savedThreeMfFilename = pendingThreeMf.name;
+      }
+      const sourcePayload = {
+        product_id: productId!,
+        makerworld_url: makerworldUrl.trim(),
+        three_mf_path: savedThreeMfPath,
+        three_mf_filename: savedThreeMfFilename,
+      };
+      const hasInternalSource = Boolean(sourcePayload.makerworld_url || sourcePayload.three_mf_path);
+      if (adminSourceId && hasInternalSource) {
+        const { error } = await supabase.from("product_admin_sources").update(sourcePayload).eq("id", adminSourceId);
+        if (error) throw error;
+      } else if (!adminSourceId && hasInternalSource) {
+        const { error } = await supabase.from("product_admin_sources").insert(sourcePayload);
+        if (error) throw error;
+      } else if (adminSourceId) {
+        const { error } = await supabase.from("product_admin_sources").delete().eq("id", adminSourceId);
+        if (error) throw error;
+      }
+      internalSourceCommitted = true;
+      if ((pendingThreeMf || removeExistingThreeMf) && threeMfPath && threeMfPath !== savedThreeMfPath) {
+        const { error } = await supabase.storage.from("orders").remove([threeMfPath]);
+        if (error) toast({ title: "Productbron opgeslagen", description: `Het oude interne 3MF-bestand kon niet worden opgeruimd: ${error.message}`, variant: "destructive" });
       }
       const managedRemovedPaths = removedPaths.map(normalizeProductStoragePath).filter(Boolean) as string[];
       if (managedRemovedPaths.length) {
@@ -347,7 +446,11 @@ export default function AdminProducts() {
       resetEditor(); await fetchCatalog();
     } catch (error) {
       if (uploadedPaths.length && (createdProduct || !imagesCommitted)) await supabase.storage.from("orders").remove(uploadedPaths);
-      if (createdProduct && productId) await supabase.from("products").delete().eq("id", productId);
+      if (uploadedInternalPath && (!internalSourceCommitted || createdProduct)) await supabase.storage.from("orders").remove([uploadedInternalPath]);
+      if (createdProduct && productId) {
+        await supabase.from("product_admin_sources").delete().eq("product_id", productId);
+        await supabase.from("products").delete().eq("id", productId);
+      }
       const message = error instanceof Error ? error.message : "Onbekende databasefout.";
       setMediaError(message);
       toast({ title: "Opslaan mislukt", description: message, variant: "destructive" });
@@ -356,8 +459,11 @@ export default function AdminProducts() {
 
   const handleDeleteProduct = async (product: CatalogProduct) => {
     const paths = orderedProductImages(product).map((image) => normalizeProductStoragePath(image.storage_path)).filter(Boolean) as string[];
+    const { data: sourceData } = await supabase.from("product_admin_sources").select("id,three_mf_path").eq("product_id", product.id).maybeSingle();
     const { error } = await supabase.from("products").delete().eq("id", product.id);
     if (error) { toast({ title: "Verwijderen mislukt", description: error.message, variant: "destructive" }); return; }
+    if (sourceData?.id) await supabase.from("product_admin_sources").delete().eq("id", sourceData.id);
+    if (sourceData?.three_mf_path) await supabase.storage.from("orders").remove([sourceData.three_mf_path]);
     if (paths.length) {
       const { error: storageError } = await supabase.storage.from("orders").remove(paths);
       if (storageError) toast({ title: "Product verwijderd", description: "Enkele opslagbestanden konden niet worden verwijderd.", variant: "destructive" });
@@ -428,7 +534,7 @@ export default function AdminProducts() {
       {showEditor && <section className="bg-card rounded-2xl border border-border/60 p-6 mb-8 space-y-7">
         <div className="flex items-center justify-between"><h2 className="font-bold text-primary">{editingId ? "Product bewerken" : "Nieuw product"}</h2><Button variant="ghost" size="sm" onClick={resetEditor}><X className="w-4 h-4" /> Sluiten</Button></div>
         <div className="grid md:grid-cols-2 gap-4">
-          <div><Label>Naam *</Label><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></div><div><Label>Prijs (€) *</Label><Input type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></div>
+          <div><Label>Naam *</Label><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><Label>Prijs</Label><label className="flex items-center gap-2 text-sm"><Switch checked={priceOnRequest} onCheckedChange={setPriceOnRequest} /> Op aanvraag</label></div><Input type="number" min="0" step="0.01" value={priceOnRequest ? "" : form.price} disabled={priceOnRequest} placeholder={priceOnRequest ? "Prijs wordt op aanvraag bepaald" : "0,00"} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></div>
           <div className="md:col-span-2"><Label>Beschrijving</Label><Textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></div>
           <div><Label>Categorie</Label><Select value={form.category_id || "none"} onValueChange={(value) => setForm({ ...form, category_id: value === "none" ? null : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Geen categorie</SelectItem>{categories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}{!category.active ? " (inactief)" : ""}</SelectItem>)}</SelectContent></Select></div>
           <div className="flex items-end gap-2 pb-2"><Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /><Label>Zichtbaar voor klanten</Label></div>
@@ -439,6 +545,14 @@ export default function AdminProducts() {
           {pendingImages.map((image) => <div key={image.key} className={`relative w-28 overflow-hidden rounded-xl border-2 bg-card ${primaryKey === image.key ? "border-accent" : "border-border"}`}><div className="relative h-24 overflow-hidden">{image.media_type === "video" ? <video src={image.previewUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={image.previewUrl} alt={image.file.name} className="w-full h-full object-cover" />}<button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{image.media_type === "video" && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div><p className="truncate px-2 py-1 text-[10px]" title={image.file.name}>{image.file.name}</p></div>)}
           <label className={`relative w-28 h-28 overflow-hidden rounded-xl border-2 border-dashed flex flex-col items-center justify-center hover:border-accent/60 ${processingMedia ? "cursor-wait opacity-60" : "cursor-pointer"}`}><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">{processingMedia ? "Verwerken…" : "Media kiezen"}</span><input type="file" multiple disabled={processingMedia || saving} accept="image/*,video/*,.heic,.heif,.mov,.m4v" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Productmedia kiezen" onChange={(event) => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; void handleImageInput(selected); }} /></label>
         </div>{mediaError && <div role="alert" className="mt-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"><p className="font-semibold">Media verwerken of uploaden mislukt</p><p className="mt-1 break-words">{mediaError}</p></div>}</div>
+
+        <div className="rounded-2xl border border-dashed bg-muted/20 p-5">
+          <div className="mb-4 flex items-start gap-3"><FileArchive className="mt-0.5 h-5 w-5 text-accent" /><div><Label>Interne printbron</Label><p className="text-xs text-muted-foreground">Alleen admins kunnen deze MakerWorld-link en het 3MF-bestand zien of downloaden. Ze worden nooit in de klantcatalogus of bestelling getoond.</p></div></div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div><Label htmlFor="makerworld-url">MakerWorld-link</Label><div className="mt-1 flex gap-2"><Input id="makerworld-url" type="url" value={makerworldUrl} onChange={(event) => setMakerworldUrl(event.target.value)} placeholder="https://makerworld.com/..." />{/^https:\/\/(?:[^/]+\.)?makerworld\.com(?:\/|$)/i.test(makerworldUrl.trim()) && <Button type="button" variant="outline" size="icon" asChild><a href={makerworldUrl.trim()} target="_blank" rel="noreferrer" aria-label="MakerWorld-link openen"><ExternalLink className="h-4 w-4" /></a></Button>}</div></div>
+            <div><Label>Intern 3MF-bestand</Label><div className="mt-1 flex flex-wrap gap-2"><label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-background px-4 text-sm font-medium hover:bg-muted"><FileArchive className="h-4 w-4" />{pendingThreeMf ? "Ander bestand kiezen" : "3MF kiezen"}<input type="file" accept=".3mf,application/octet-stream" className="sr-only" onChange={(event) => { selectThreeMf(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label>{threeMfPath && !removeExistingThreeMf && !pendingThreeMf && <Button type="button" variant="outline" onClick={() => void downloadInternalThreeMf()}><Download className="h-4 w-4" /> Download</Button>}{(threeMfPath || pendingThreeMf) && <Button type="button" variant="ghost" onClick={() => { setPendingThreeMf(null); setRemoveExistingThreeMf(Boolean(threeMfPath)); }}><Trash2 className="h-4 w-4 text-destructive" /> Verwijderen</Button>}</div><p className="mt-2 text-xs text-muted-foreground">{pendingThreeMf ? `${pendingThreeMf.name} · wordt geüpload bij opslaan` : threeMfPath && !removeExistingThreeMf ? threeMfFilename || "Intern 3MF-bestand opgeslagen" : "Geen intern 3MF-bestand gekozen"}</p></div>
+          </div>
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-6 border-t pt-6">
           <div><Label>Materiaalkeuze</Label><Select value={form.material_mode} onValueChange={(value) => setMaterialMode(value as MaterialMode)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Vast materiaal</SelectItem><SelectItem value="selected">Klant kiest uit geselecteerde materialen</SelectItem><SelectItem value="all">Klant kiest uit alle materialen</SelectItem></SelectContent></Select>{form.material_mode !== "all" && <div className="flex flex-wrap gap-2 mt-3">{MATERIALS.map((material) => <button type="button" key={material.id} onClick={() => toggleMaterial(material.id)} className={`px-3 py-1.5 text-sm rounded-full border ${form.materials.includes(material.id) ? "bg-accent text-accent-foreground border-accent" : ""}`}>{material.name}</button>)}</div>}{form.material_mode === "fixed" && <p className="text-xs text-muted-foreground mt-2">De klant ziet het gekozen materiaal, maar kan dit niet aanpassen.</p>}</div>
@@ -465,15 +579,15 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        <div><Label>Beschikbare kleuren *</Label><p className="text-xs text-muted-foreground mb-3">Kleuren komen uit Kleurenbeheer en worden per product opgeslagen.</p>{availableColors.length === 0 ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p> : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{availableColors.map((color) => <label key={color.id} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="text-sm truncate">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}</div>
+        <div><Label>Beschikbare kleuren *</Label><p className="text-xs text-muted-foreground mb-3">Kleuren komen uit Kleurenbeheer en worden per product opgeslagen.</p><label className="mb-3 flex items-start gap-3 rounded-xl border bg-muted/30 p-3"><Switch checked={allCompatibleColors} onCheckedChange={setAllCompatibleColors} /><span><span className="block text-sm font-medium">Alle passende kleuren</span><span className="block text-xs text-muted-foreground">Ook nieuwe actieve kleuren worden automatisch beschikbaar zodra ze bij het gekozen materiaal passen.</span></span></label>{availableColors.length === 0 ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p> : allCompatibleColors ? <p className="text-sm text-muted-foreground">{availableColors.length} huidige passende kleuren; toekomstige passende kleuren worden automatisch meegenomen.</p> : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{availableColors.map((color) => <label key={color.id} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="text-sm truncate">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}</div>
 
-        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Productvarianten</Label><p className="text-xs text-muted-foreground">Formaten, uitvoeringen, materiaal en prijsverschil per variant.</p></div><Button type="button" variant="outline" size="sm" className="ml-auto" onClick={addVariant}><Plus className="w-4 h-4" /> Variant toevoegen</Button></div><div className="space-y-3">
-          {variants.map((variant, index) => <div key={variant.id} className="rounded-xl border p-4 grid md:grid-cols-5 gap-3"><div><Label>Naam *</Label><Input value={variant.name} onChange={(event) => updateVariant(variant.id, { name: event.target.value })} placeholder="Bijv. Groot" /></div><div><Label>Formaat</Label><Input value={variant.size_label || ""} onChange={(event) => updateVariant(variant.id, { size_label: event.target.value })} placeholder="20 × 20 cm" /></div><div><Label>Materiaal</Label><Select value={variant.material_id || "default"} onValueChange={(value) => updateVariant(variant.id, { material_id: value === "default" ? null : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="default">Productkeuze</SelectItem>{MATERIALS.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Prijsverschil (€)</Label><Input type="number" step="0.01" value={variant.price_adjustment} onChange={(event) => updateVariant(variant.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div className="flex items-end gap-2"><Switch checked={variant.active} onCheckedChange={(active) => updateVariant(variant.id, { active })} /><Label>Actief</Label><Button type="button" variant="ghost" size="sm" onClick={() => setVariants((current) => current.filter((item) => item.id !== variant.id))}><Trash2 className="w-4 h-4 text-destructive" /></Button></div><div className="md:col-span-5 text-xs text-muted-foreground">Variant {index + 1}</div></div>)}
+        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Productvarianten</Label><p className="text-xs text-muted-foreground">Formaten, uitvoeringen, materiaal en de volledige verkoopprijs per variant.</p></div><Button type="button" variant="outline" size="sm" className="ml-auto" onClick={addVariant}><Plus className="w-4 h-4" /> Variant toevoegen</Button></div><div className="space-y-3">
+          {variants.map((variant, index) => <div key={variant.id} className="rounded-xl border p-4 grid md:grid-cols-5 gap-3"><div><Label>Naam *</Label><Input value={variant.name} onChange={(event) => updateVariant(variant.id, { name: event.target.value })} placeholder="Bijv. Groot" /></div><div><Label>Formaat</Label><Input value={variant.size_label || ""} onChange={(event) => updateVariant(variant.id, { size_label: event.target.value })} placeholder="20 × 20 cm" /></div><div><Label>Materiaal</Label><Select value={variant.material_id || "default"} onValueChange={(value) => updateVariant(variant.id, { material_id: value === "default" ? null : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="default">Productkeuze</SelectItem>{MATERIALS.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Totale variantprijs (€)</Label><Input type="number" min={0} step="0.01" value={priceOnRequest ? "" : variantTotals[variant.id] ?? form.price} disabled={priceOnRequest} placeholder={priceOnRequest ? "Op aanvraag" : "0,00"} onChange={(event) => setVariantTotals((current) => ({ ...current, [variant.id]: Number(event.target.value) }))} /></div><div className="flex items-end gap-2"><Switch checked={variant.active} onCheckedChange={(active) => updateVariant(variant.id, { active })} /><Label>Actief</Label><Button type="button" variant="ghost" size="sm" onClick={() => setVariants((current) => current.filter((item) => item.id !== variant.id))}><Trash2 className="w-4 h-4 text-destructive" /></Button></div><div className="md:col-span-5 text-xs text-muted-foreground">Variant {index + 1}</div></div>)}
           {variants.length === 0 && <p className="text-sm text-muted-foreground">Geen varianten: het product gebruikt de standaardprijs.</p>}
         </div></div>
 
-        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Extra keuzes, personalisatie en add-ons</Label><p className="text-xs text-muted-foreground">Een add-on begint voor de klant altijd met een directe ja/nee-keuze.</p></div><div className="ml-auto flex gap-2"><Button type="button" variant="outline" size="sm" onClick={addOption}><Plus className="w-4 h-4" /> Optie</Button><Button type="button" size="sm" onClick={addAddon}><Plus className="w-4 h-4" /> Add-on</Button></div></div><div className="space-y-4">
-          {options.filter((option) => option.is_addon).map((option) => <div key={`addon-${option.id}`} className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 grid md:grid-cols-3 gap-3"><div><Label>Add-onprijs (€)</Label><Input type="number" min={0} step="0.01" value={option.price_adjustment} onChange={(event) => updateOption(option.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div><Label>Verplichte kleurvakken</Label><Input type="number" min={0} max={12} value={option.color_slots} onChange={(event) => { const color_slots = Math.min(12, Math.max(0, Number(event.target.value) || 0)); updateOption(option.id, { color_slots, color_slot_labels: Array.from({ length: color_slots }, (_, index) => option.color_slot_labels[index] || `Kleur ${index + 1}`) }); }} /></div><div className="md:col-span-3 grid sm:grid-cols-2 gap-2">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label>Naam kleurvak {index + 1} *</Label><Input value={option.color_slot_labels[index] || ""} onChange={(event) => { const color_slot_labels = [...option.color_slot_labels]; color_slot_labels[index] = event.target.value; updateOption(option.id, { color_slot_labels }); }} /></div>)}</div></div>)}
+        <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Extra’s en informatievragen</Label><p className="text-xs text-muted-foreground">Extra’s verhogen de prijs en beginnen met een ja/nee-keuze. Informatievragen verzamelen alleen de gegevens die nodig zijn voor het product.</p></div><div className="ml-auto flex gap-2"><Button type="button" variant="outline" size="sm" onClick={addOption}><Plus className="w-4 h-4" /> Informatievraag</Button><Button type="button" size="sm" onClick={addExtra}><Plus className="w-4 h-4" /> Betaalde extra</Button></div></div><div className="space-y-4">
+          {options.filter((option) => option.is_addon).map((option) => <div key={`addon-${option.id}`} className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 grid md:grid-cols-3 gap-3"><div><Label>Bedrag dat erbij komt (€)</Label><Input type="number" min={0} step="0.01" value={option.price_adjustment} onChange={(event) => updateOption(option.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div><Label>Kleurinformatie voor deze extra</Label><Input type="number" min={0} max={12} value={option.color_slots} onChange={(event) => { const color_slots = Math.min(12, Math.max(0, Number(event.target.value) || 0)); updateOption(option.id, { color_slots, color_slot_labels: Array.from({ length: color_slots }, (_, index) => option.color_slot_labels[index] || `Kleur ${index + 1}`) }); }} /></div><div className="md:col-span-3 grid sm:grid-cols-2 gap-2">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label>Vraag over kleur {index + 1} *</Label><Input value={option.color_slot_labels[index] || ""} onChange={(event) => { const color_slot_labels = [...option.color_slot_labels]; color_slot_labels[index] = event.target.value; updateOption(option.id, { color_slot_labels }); }} /></div>)}</div></div>)}
           {options.map((option, index) => <div key={option.id} className="rounded-xl border p-4 grid md:grid-cols-2 gap-3"><div><Label>Type</Label><Select value={option.type} onValueChange={(type) => updateOption(option.id, { type: type as ProductOptionType, choices: ["select", "radio"].includes(type) ? option.choices : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{optionTypes.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent></Select></div><div><Label>Label *</Label><Input value={option.label} onChange={(event) => updateOption(option.id, { label: event.target.value })} placeholder="Bijv. Tekst op voorkant" /></div><div className="md:col-span-2"><Label>Uitleg voor de klant</Label><Input value={option.description} onChange={(event) => updateOption(option.id, { description: event.target.value })} placeholder="Bijv. Welke tekst moet op de voorkant?" /></div>{["select", "radio"].includes(option.type) && <div className="md:col-span-2"><Label>Keuzes (één per regel)</Label><Textarea rows={3} value={option.choices.join("\n")} onChange={(event) => updateOption(option.id, { choices: event.target.value.split("\n") })} placeholder={"Klein\nMiddel\nGroot"} /></div>}{["text", "textarea"].includes(option.type) && <div><Label>Maximaal tekens</Label><Input type="number" min={1} max={5000} value={option.max_length || ""} onChange={(event) => updateOption(option.id, { max_length: Number(event.target.value) || null })} /></div>}<div className="flex items-end gap-2"><Switch checked={option.required} onCheckedChange={(required) => updateOption(option.id, { required })} /><Label>Verplicht</Label></div><div className="md:col-span-2 flex justify-between items-center"><span className="text-xs text-muted-foreground">Optie {index + 1}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOptions((current) => current.filter((item) => item.id !== option.id))}><Trash2 className="w-4 h-4 text-destructive" /> Verwijderen</Button></div></div>)}
           {options.length === 0 && <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">Geen extra opties. Klanten kiezen alleen materiaal, kleur en aantal.</p>}
         </div></div>
@@ -481,7 +595,7 @@ export default function AdminProducts() {
         <div><div className="flex gap-3"><Button onClick={handleSave} disabled={saving || processingMedia}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingId ? "Product bijwerken" : "Product aanmaken"}</Button><Button variant="outline" onClick={resetEditor} disabled={saving || processingMedia}>Annuleren</Button></div>{saveStatus && <p className="mt-2 text-sm text-muted-foreground" role="status">{saveStatus}</p>}</div>
       </section>}
 
-      {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></div> : products.length === 0 ? <p className="text-center text-muted-foreground py-12">Nog geen producten.</p> : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{products.map((product) => { const mainImage = orderedProductImages(product)[0]; return <article key={product.id} className={`bg-card rounded-2xl border overflow-hidden ${product.active ? "" : "opacity-60"}`}><div className="aspect-[4/3] bg-muted">{mainImage ? <SignedMedia path={mainImage.storage_path} mediaType={mainImage.media_type} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">Geen media</div>}</div><div className="p-4"><div className="flex gap-2 items-start"><div className="min-w-0 flex-1"><h3 className="font-bold text-primary truncate">{product.name}</h3><p className="text-accent font-semibold">€{Number(product.price).toFixed(2)}</p></div><Button variant="ghost" size="sm" onClick={() => toggleProductActive(product)} aria-label={product.active ? "Verbergen" : "Tonen"}>{product.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</Button></div><p className="text-xs text-muted-foreground mt-2">{product.product_categories?.name || "Zonder categorie"} · {product.product_options?.length || 0} extra opties · {product.colors.length} kleuren</p><div className="flex gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => openEdit(product)}><Pencil className="w-4 h-4" /> Bewerken</Button><Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ type: "product", value: product })}><Trash2 className="w-4 h-4 text-destructive" /></Button></div></div></article>; })}</div>}
+      {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-7 h-7 animate-spin" /></div> : products.length === 0 ? <p className="text-center text-muted-foreground py-12">Nog geen producten.</p> : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{products.map((product) => { const mainImage = orderedProductImages(product)[0]; return <article key={product.id} className={`bg-card rounded-2xl border overflow-hidden ${product.active ? "" : "opacity-60"}`}><div className="aspect-[4/3] bg-muted">{mainImage ? <SignedMedia path={mainImage.storage_path} mediaType={mainImage.media_type} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">Geen media</div>}</div><div className="p-4"><div className="flex gap-2 items-start"><div className="min-w-0 flex-1"><h3 className="font-bold text-primary truncate">{product.name}</h3><p className="text-accent font-semibold">{Number(product.price) > 0 ? `€${Number(product.price).toFixed(2)}` : "Op aanvraag"}</p></div><Button variant="ghost" size="sm" onClick={() => toggleProductActive(product)} aria-label={product.active ? "Verbergen" : "Tonen"}>{product.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</Button></div><p className="text-xs text-muted-foreground mt-2">{product.product_categories?.name || "Zonder categorie"} · {product.product_options?.length || 0} extra opties · {product.colors_configured === false ? "alle passende kleuren" : `${product.colors.length} kleuren`}</p><div className="flex gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => openEdit(product)}><Pencil className="w-4 h-4" /> Bewerken</Button><Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ type: "product", value: product })}><Trash2 className="w-4 h-4 text-destructive" /></Button></div></div></article>; })}</div>}
     </div></main><Footer />
       <ConfirmActionDialog
         open={deleteTarget !== null}

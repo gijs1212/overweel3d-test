@@ -90,7 +90,7 @@ export default function CookieBanner() {
               </h2>
               <p id={descriptionId} className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                 We gebruiken noodzakelijke cookies om de website goed te laten werken. Met uw toestemming mogen we
-                ook optionele cookies gebruiken om de website te verbeteren. U kunt uw keuze later via de
+                ook marketingcookies gebruiken, waaronder de Meta Pixel voor paginabezoeken en advertentiemeting. U kunt uw keuze later via de
                 cookie-instellingen in de footer aanpassen.
               </p>
               {choice !== null && (

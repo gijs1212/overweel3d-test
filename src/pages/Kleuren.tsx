@@ -118,7 +118,7 @@ export default function Kleuren() {
                         <motion.div
                           key={c.id}
                           id={`kleur-${c.id}`}
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={false}
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: true }}
                           transition={{ duration: 0.4 }}

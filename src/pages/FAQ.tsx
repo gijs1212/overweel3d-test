@@ -129,7 +129,7 @@ export default function FAQ() {
         <section className="py-16 bg-secondary/50">
           <div className="container mx-auto px-4">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               className="max-w-3xl mx-auto text-center"
             >
@@ -187,7 +187,7 @@ export default function FAQ() {
 
             {/* Still have questions */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               className="max-w-2xl mx-auto mt-16 text-center"

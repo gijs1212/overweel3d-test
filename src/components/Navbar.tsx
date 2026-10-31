@@ -42,7 +42,7 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-7">
+          <div className="hidden lg:flex items-center gap-7">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -63,7 +63,7 @@ export function Navbar() {
           </div>
 
           {/* Account */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2">
             {user ? (
               <div className="flex items-center gap-2">
                 <Link to="/dashboard">
@@ -90,7 +90,7 @@ export function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden rounded-lg border border-black/10 p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Menu openen of sluiten">
+          <button className="lg:hidden rounded-lg border border-black/10 p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Menu openen of sluiten">
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -101,7 +101,7 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-black/10 py-5"
+            className="max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-black/10 py-5 lg:hidden supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]"
           >
             <div className="flex flex-col gap-4">
               {navLinks.map((link) => (
@@ -124,7 +124,7 @@ export function Navbar() {
                     </Link>
                     {isAdmin && (
                       <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium py-2">
-                        🔒 Admin
+                        Admin
                       </Link>
                     )}
                     <button onClick={() => { handleSignOut(); setMobileMenuOpen(false); }} className="text-sm font-medium py-2 text-left text-destructive">

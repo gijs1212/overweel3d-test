@@ -7,7 +7,10 @@ function isTrustedProductMediaUrl(value: string): boolean {
   try {
     const url = new URL(value);
     const base = new URL(POCKETBASE_URL);
-    return url.origin === base.origin && url.pathname.startsWith("/api/files/");
+    return url.origin === base.origin && (
+      url.pathname.startsWith("/api/files/")
+      || url.pathname === "/api/overweel3d/catalog/media"
+    );
   } catch {
     return false;
   }
@@ -42,6 +45,18 @@ export async function getProductPhotoUrl(path: string): Promise<string> {
   const cached = cache.get(normalizedPath);
   if (cached && cached.expiresAt > now + 60_000) return cached.url;
 
+  // Catalogue, portfolio, colour and review media are deliberately public.
+  // Use the validated catalogue route directly so an anonymous browser never
+  // needs an auth token, a signed URL, or a CORS preflight before media loads.
+  const isProductMedia = normalizedPath.startsWith("products/");
+  const isOtherPublicMedia = ["portfolio/", "colors/", "reviews/"]
+    .some((prefix) => normalizedPath.startsWith(prefix));
+  if (isProductMedia) {
+    const publicUrl = `${POCKETBASE_URL}/api/overweel3d/catalog/media?path=${encodeURIComponent(normalizedPath)}`;
+    cache.set(normalizedPath, { url: publicUrl, expiresAt: now + 5 * 60 * 1000 });
+    return publicUrl;
+  }
+
   try {
     const response = await fetch(`${POCKETBASE_URL}/api/overweel3d/catalog/media?path=${encodeURIComponent(normalizedPath)}&resolve=1`);
     if (response.ok) {
@@ -52,6 +67,23 @@ export async function getProductPhotoUrl(path: string): Promise<string> {
       }
     }
   } catch { /* An authenticated admin can still use the legacy fallback. */ }
+
+  // Older PocketBase hook versions only recognize product paths. Public
+  // portfolio, colour and approved-review records can still be resolved
+  // anonymously through the public storage_files list rule.
+  if (isOtherPublicMedia) {
+    try {
+      const stored = await pocketbase.collection("storage_files").getFirstListItem(
+        pocketbase.filter("path = {:path} && public = true", { path: normalizedPath }),
+        { requestKey: null },
+      );
+      const publicUrl = pocketbase.files.getURL(stored, stored.file);
+      if (publicUrl && isTrustedProductMediaUrl(publicUrl)) {
+        cache.set(normalizedPath, { url: publicUrl, expiresAt: now + 5 * 60 * 1000 });
+        return publicUrl;
+      }
+    } catch { /* Keep the media hidden when no explicitly public record exists. */ }
+  }
 
   if (!pocketbase.authStore.token) return "";
   let { data, error } = await supabase.storage.from("orders").createSignedUrl(normalizedPath, 60 * 60);

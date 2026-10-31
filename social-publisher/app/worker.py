@@ -9,10 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from .config import settings
-from .meta_api import MetaApiError, MetaGraphClient, UncertainPublication
+from .meta_api import MetaApiError, MetaGraphClient, MetaRateLimitError, UncertainPublication
 from .pocketbase import PocketBaseSocialClient
 from .policy import media_limit
-from .publishers import BrowserManager, ManualAttention, check_meta_accounts, publish_meta
 
 log = logging.getLogger("overweel3d.social")
 
@@ -29,7 +28,6 @@ def version_at_least(actual: str, minimum: str) -> bool:
 class SocialWorker:
     def __init__(self) -> None:
         self.pb = PocketBaseSocialClient()
-        self.browsers = BrowserManager()
         self.meta = MetaGraphClient()
         self.stop_event = asyncio.Event()
         self.wake_event = asyncio.Event()
@@ -57,7 +55,7 @@ class SocialWorker:
             return False
         async with self._heartbeat_lock:
             try:
-                response = await self.pb.action("heartbeat", {"version": "2.8.0"})
+                response = await self.pb.action("heartbeat", {"version": "3.0.1"})
                 if not isinstance(response, dict) or response.get("connected") is not True:
                     raise RuntimeError("PocketBase heeft de heartbeat niet bevestigd.")
                 if not version_at_least(response.get("hook_version"), "1.19.1"):
@@ -141,6 +139,13 @@ class SocialWorker:
                 "job_id": job["id"], "platform": platform, "status": result.status,
                 "post_url": result.post_url,
             })
+        except MetaRateLimitError as exc:
+            log.warning("Meta-rate-limit voor %s; minimaal %s seconden wachten: %s", platform, exc.retry_after_seconds, exc)
+            await self.pb.action("session", {"platform": platform, "status": "rate_limited", "error": str(exc), "screenshot_path": ""})
+            await self.pb.action("report", {
+                "job_id": job["id"], "platform": platform, "status": "rate_limited",
+                "error": str(exc), "retry_after_seconds": exc.retry_after_seconds,
+            })
         except (UncertainPublication, MetaApiError) as exc:
             status = "manual_attention" if isinstance(exc, UncertainPublication) or not self.meta.configured else "failed"
             await self.pb.action("session", {"platform": platform, "status": "manual_attention", "error": str(exc), "screenshot_path": ""})
@@ -152,7 +157,7 @@ class SocialWorker:
     async def tick(self) -> None:
         if not self.pb.paired or not self.hook_ready:
             return
-        response = await self.pb.action("poll", {"version": "2.8.0", "meta_ready": self.meta.configured})
+        response = await self.pb.action("poll", {"version": "3.0.1", "meta_ready": self.meta.configured})
         job = response.get("job") if isinstance(response, dict) else None
         if not job:
             return

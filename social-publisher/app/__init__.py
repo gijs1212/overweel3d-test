@@ -1,1 +1,1 @@
-"""Overweel3D Social Publisher 2.8.0."""
+"""Overweel3D Social Publisher 3.0.1: official Meta Graph API only."""

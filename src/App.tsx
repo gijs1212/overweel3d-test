@@ -46,6 +46,7 @@ import CookieBanner from "./components/CookieBanner";
 import NewsletterPopup from "./components/NewsletterPopup";
 import UploadProgressCenter from "./components/UploadProgressCenter";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { MetaPixel } from "./components/MetaPixel";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ScrollToTop />
+        <MetaPixel />
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />

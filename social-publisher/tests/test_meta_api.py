@@ -7,7 +7,7 @@ import pytest
 os.environ.setdefault("CONTROL_PASSWORD", "test-dashboard-password")
 
 from app.config import settings
-from app.meta_api import MetaGraphClient, MetaApiError, UncertainPublication
+from app.meta_api import MetaGraphClient, MetaApiError, MetaRateLimitError, UncertainPublication
 
 
 def configure(monkeypatch):
@@ -58,6 +58,24 @@ def test_uncertain_final_post_is_not_safe_to_retry(monkeypatch):
     client = MetaGraphClient(httpx.MockTransport(reply))
     with pytest.raises(UncertainPublication):
         asyncio.run(client.publish("facebook", "Tekst", [], False))
+    asyncio.run(client.close())
+
+
+def test_meta_application_limit_gets_long_cooldown(monkeypatch):
+    configure(monkeypatch)
+
+    def reply(request):
+        return httpx.Response(403, json={"error": {
+            "message": "Application request limit reached",
+            "code": 4,
+            "error_subcode": 2207051,
+        }})
+
+    client = MetaGraphClient(httpx.MockTransport(reply))
+    with pytest.raises(MetaRateLimitError) as captured:
+        asyncio.run(client.check_accounts())
+    assert captured.value.retry_after_seconds >= 3600
+    assert "aanvraaglimiet" in str(captured.value)
     asyncio.run(client.close())
 
 
@@ -130,6 +148,8 @@ def test_facebook_combines_photos_in_one_feed_post(monkeypatch):
             return httpx.Response(200, json={"id": "123", "access_token": "page-token", "instagram_business_account": {"id": "456"}})
         if request.url.path.endswith("/456"):
             return httpx.Response(200, json={"id": "456", "username": "overweel3d"})
+        if request.method == "GET" and request.url.path.endswith("/123_3"):
+            return httpx.Response(200, json={"id": "123_3", "is_published": True, "permalink_url": "https://www.facebook.com/123/posts/3"})
         writes.append((request.url.path, str(request.content)))
         return httpx.Response(200, json={"id": f"123_{len(writes)}"})
 
@@ -141,7 +161,8 @@ def test_facebook_combines_photos_in_one_feed_post(monkeypatch):
                                         on_post=record, facebook_media_mode="combined"))
     assert [path for path, _ in writes] == ["/v26.0/123/photos", "/v26.0/123/photos", "/v26.0/123/feed"]
     assert all("published=false" in body for _, body in writes[:2])
-    assert "%22media_fbid%22" in writes[2][1]
+    assert "%22media_fbid%22" in writes[2][1] and "published=true" in writes[2][1]
+    assert result.post_url == "https://www.facebook.com/123/posts/3"
     assert recorded == [(0, result.post_url), (1, result.post_url)]
     asyncio.run(client.close())
 
@@ -175,6 +196,8 @@ def test_facebook_combined_keeps_video_as_separate_post(monkeypatch):
             return httpx.Response(200, json={"id": "123", "access_token": "page-token", "instagram_business_account": {"id": "456"}})
         if request.url.path.endswith("/456"):
             return httpx.Response(200, json={"id": "456", "username": "overweel3d"})
+        if request.method == "GET" and request.url.path.endswith("/123_3"):
+            return httpx.Response(200, json={"id": "123_3", "is_published": True, "permalink_url": "https://www.facebook.com/123/posts/3"})
         writes.append(request.url.path)
         return httpx.Response(200, json={"id": f"123_{len(writes)}"})
 
@@ -187,6 +210,27 @@ def test_facebook_combined_keeps_video_as_separate_post(monkeypatch):
     result = asyncio.run(client.publish("facebook", "Product", media, False, facebook_media_mode="combined"))
     assert result.status == "published"
     assert writes == ["/v26.0/123/photos", "/v26.0/123/photos", "/v26.0/123/feed", "/v26.0/123/videos"]
+    asyncio.run(client.close())
+
+
+def test_facebook_combined_rejects_unpublished_feed_post(monkeypatch):
+    configure(monkeypatch)
+
+    def reply(request):
+        if request.url.path.endswith("/123"):
+            return httpx.Response(200, json={"id": "123", "access_token": "page-token", "instagram_business_account": {"id": "456"}})
+        if request.url.path.endswith("/456"):
+            return httpx.Response(200, json={"id": "456", "username": "overweel3d"})
+        if request.method == "GET":
+            return httpx.Response(200, json={"id": "123_3", "is_published": False})
+        if request.url.path.endswith("/123/feed"):
+            return httpx.Response(200, json={"id": "123_3"})
+        return httpx.Response(200, json={"id": "photo-id"})
+
+    client = MetaGraphClient(httpx.MockTransport(reply))
+    with pytest.raises(MetaApiError, match="niet gepubliceerd"):
+        asyncio.run(client.publish("facebook", "Product", ["https://example.com/one.jpg", "https://example.com/two.jpg"], False,
+                                   facebook_media_mode="combined"))
     asyncio.run(client.close())
 
 
@@ -248,12 +292,15 @@ def test_user_token_resolves_page_token_before_facebook_post(monkeypatch):
             return httpx.Response(200, json={"data": [{"id": "123", "access_token": "derived-page-token"}]})
         if path.endswith("/456"):
             return httpx.Response(200, json={"id": "456", "username": "overweel3d"})
+        if request.method == "GET" and path.endswith("/post-1"):
+            used.append(request.headers["Authorization"])
+            return httpx.Response(200, json={"id": "post-1", "is_published": True, "permalink_url": "https://www.facebook.com/123/posts/1"})
         used.append(request.headers["Authorization"])
         return httpx.Response(200, json={"id": "post-1"})
 
     client = MetaGraphClient(httpx.MockTransport(reply))
     asyncio.run(client.publish("facebook", "Tekst", [], False))
-    assert used == ["Bearer derived-page-token"]
+    assert used == ["Bearer derived-page-token", "Bearer derived-page-token"]
     asyncio.run(client.close())
 
 

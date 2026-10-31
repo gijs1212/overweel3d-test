@@ -14,7 +14,7 @@ export function Steps() {
     <section className="border-y border-black/10 bg-white py-24 text-foreground">
       <div className="container mx-auto px-6">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="text-center mb-16 max-w-2xl mx-auto"
@@ -28,7 +28,7 @@ export function Steps() {
           {steps.map((step, index) => (
             <motion.div
               key={step.title}
-              initial={{ opacity: 0, y: 24 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.08, duration: 0.35 }}

@@ -181,7 +181,7 @@ export default function Voorwaarden() {
         <section className="bg-hero-gradient py-20">
           <div className="container mx-auto px-4">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               className="max-w-3xl mx-auto text-center"
             >
@@ -205,7 +205,7 @@ export default function Voorwaarden() {
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto">
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
@@ -213,7 +213,7 @@ export default function Voorwaarden() {
                   {voorwaardenData.map((item, index) => (
                     <motion.div
                       key={item.id}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={false}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 * index }}
                     >
@@ -245,7 +245,7 @@ export default function Voorwaarden() {
 
                 {/* CTA */}
                 <motion.div
-                  initial={{ opacity: 0 }}
+                  initial={false}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5 }}
                   className="mt-12 text-center"

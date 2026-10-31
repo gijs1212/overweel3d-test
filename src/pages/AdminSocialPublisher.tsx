@@ -16,6 +16,7 @@ import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { createClientId } from "@/lib/clientId";
 import { isVersionAtLeast } from "@/lib/compatibleVersion";
+import { isSocialPublisherConnected, parsePocketBaseTimestamp } from "@/lib/socialPublisherStatus";
 
 type Platform = "facebook" | "instagram";
 type FacebookMediaMode = "combined" | "separate";
@@ -85,6 +86,7 @@ interface SessionRecord {
 interface PublisherHeartbeat {
   lastSeen: string;
   version: string;
+  connected: boolean;
   readFailed: boolean;
 }
 
@@ -160,11 +162,12 @@ export default function AdminSocialPublisher() {
   const [clearingQueue, setClearingQueue] = useState(false);
   const [publishingJobId, setPublishingJobId] = useState("");
   const [updatingFacebookModeJobId, setUpdatingFacebookModeJobId] = useState("");
+  const [retryingFacebookJobId, setRetryingFacebookJobId] = useState("");
   const [targetPlatforms, setTargetPlatforms] = useState<Platform[]>(["facebook", "instagram"]);
   const [placing, setPlacing] = useState(false);
   const [testingAccounts, setTestingAccounts] = useState(false);
   const [accountTestSteps, setAccountTestSteps] = useState<string[]>([]);
-  const [publisherHeartbeat, setPublisherHeartbeat] = useState<PublisherHeartbeat>({ lastSeen: "", version: "", readFailed: false });
+  const [publisherHeartbeat, setPublisherHeartbeat] = useState<PublisherHeartbeat>({ lastSeen: "", version: "", connected: false, readFailed: false });
   const [pairingCode, setPairingCode] = useState("");
   const [pairingContainer, setPairingContainer] = useState(false);
 
@@ -176,12 +179,14 @@ export default function AdminSocialPublisher() {
     }
     const lastSeen = String(result.data?.publisher_last_seen_at || "");
     const version = String(result.data?.publisher_version || "");
+    const connected = isSocialPublisherConnected(result.data || {});
     setPublisherHeartbeat({
       lastSeen,
       version,
+      connected,
       readFailed: false,
     });
-    return { lastSeen, version };
+    return { lastSeen, version, connected };
   }, []);
 
   const refreshNextPublication = useCallback(async () => {
@@ -230,6 +235,7 @@ export default function AdminSocialPublisher() {
     setPublisherHeartbeat({
       lastSeen: String(current?.publisher_last_seen_at || ""),
       version: String(current?.publisher_version || ""),
+      connected: isSocialPublisherConnected({ publisher_last_seen_at: current?.publisher_last_seen_at }),
       readFailed: false,
     });
     setJobs((jobsResult.data || []) as JobRecord[]);
@@ -239,8 +245,9 @@ export default function AdminSocialPublisher() {
     setSessions(((sessionsResult.data || []) as SessionRecord[]).filter((session) => session.platform === "facebook" || session.platform === "instagram"));
     if (current?.discount_image_path) setPreviewUrl(await getProductPhotoUrl(current.discount_image_path));
     else setPreviewUrl("");
+    void refreshPublisherHeartbeat();
     setLoading(false);
-  }, [toast]);
+  }, [refreshPublisherHeartbeat, toast]);
 
   useEffect(() => { if (isAdmin) void load(); }, [isAdmin, load]);
   useEffect(() => {
@@ -428,8 +435,37 @@ export default function AdminSocialPublisher() {
   };
 
   const resetJob = async (job: JobRecord) => {
-    const { error } = await supabase.from("social_post_jobs").update({ status: "queued", attempts: 0, last_error: "", platform_state: { facebook: "pending", instagram: "pending" } }).eq("id", job.id);
+    const currentState = job.platform_state || { facebook: "pending", instagram: "pending" };
+    const platform_state = {
+      facebook: currentState.facebook === "published" ? "published" : "pending",
+      instagram: currentState.instagram === "published" ? "published" : "pending",
+    };
+    const { error } = await supabase.from("social_post_jobs").update({ status: "queued", attempts: 0, last_error: "", platform_state }).eq("id", job.id);
     if (error) toast({ title: "Opnieuw proberen mislukt", description: error.message, variant: "destructive" }); else void load();
+  };
+
+  const retryFacebook = async (job: JobRecord) => {
+    setRetryingFacebookJobId(job.id);
+    try {
+      const payload = {
+        ...(job.payload || {}),
+        target_platforms: ["facebook" as Platform],
+        social_platform_posts: { ...(job.payload?.social_platform_posts || {}), facebook: {} },
+      };
+      const platform_state = { ...(job.platform_state || {}), facebook: "pending" };
+      const { error } = await supabase.from("social_post_jobs").update({
+        status: "queued", attempts: 0, last_error: "", next_retry_at: "", payload, platform_state,
+      }).eq("id", job.id);
+      if (error) throw error;
+      const publishResult = await supabase.rpc("publish_social_job_now", { p_job_id: job.id });
+      if (publishResult.error) throw publishResult.error;
+      toast({ title: "Facebook-herpublicatie gestart", description: "De eerdere registratie is gewist. De publisher controleert nu of het nieuwe paginabericht werkelijk online staat." });
+      await load();
+    } catch (error) {
+      toast({ title: "Facebook opnieuw plaatsen mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+    } finally {
+      setRetryingFacebookJobId("");
+    }
   };
 
   const setQueuedFacebookMode = async (job: JobRecord, mode: FacebookMediaMode) => {
@@ -662,7 +698,11 @@ export default function AdminSocialPublisher() {
 
   const attentionCount = useMemo(() => jobs.filter((job) => ["manual_attention", "waiting_for_media", "failed"].includes(job.status)).length, [jobs]);
   const visibleActivity = useMemo(() => activity.filter((item) => `${item.source_name} ${item.source_type} ${item.platform} ${item.status} ${item.error}`.toLocaleLowerCase("nl-NL").includes(activitySearch.toLocaleLowerCase("nl-NL"))), [activity, activitySearch]);
-  const publisherConnected = Boolean(publisherHeartbeat.lastSeen) && Date.now() - new Date(publisherHeartbeat.lastSeen).getTime() <= 75_000;
+  const publisherConnected = publisherHeartbeat.connected;
+  const publisherLastSeenMs = parsePocketBaseTimestamp(publisherHeartbeat.lastSeen);
+  const publisherLastSeenLabel = Number.isFinite(publisherLastSeenMs)
+    ? new Date(publisherLastSeenMs).toLocaleString("nl-NL")
+    : publisherHeartbeat.lastSeen;
 
   if (authLoading || loading) return <div className="min-h-screen"><Navbar /><main className="flex min-h-[60vh] items-center justify-center pt-20"><Loader2 className="h-8 w-8 animate-spin" /></main><Footer /></div>;
   if (!isAdmin || !settings) return <div className="min-h-screen"><Navbar /><main className="pt-32 text-center">Geen toegang.</main><Footer /></div>;
@@ -678,12 +718,17 @@ export default function AdminSocialPublisher() {
       <div className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wider text-black/45">Modus</p><p className="mt-2 text-xl font-semibold">{settings.dry_run ? "Droogloop" : "Live"}</p><Switch className="mt-4" checked={settings.dry_run} onCheckedChange={(dry_run) => setSettings({ ...settings, dry_run })} /></div>
       <div className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wider text-black/45">Aandacht nodig</p><p className="mt-2 text-xl font-semibold">{attentionCount}</p></div>
       <div className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wider text-black/45">Volgende uitlichting</p><p className="mt-2 text-sm font-semibold">{settings.spotlight_next_at ? new Date(settings.spotlight_next_at).toLocaleString("nl-NL") : "Na eerste containerpoll"}</p><Switch className="mt-4" checked={settings.spotlight_enabled} onCheckedChange={(spotlight_enabled) => setSettings({ ...settings, spotlight_enabled })} /></div>
-      <div className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wider text-black/45">Docker-container</p><div className="mt-2 flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${publisherConnected ? "bg-emerald-500" : "bg-red-500"}`} /><p className="text-xl font-semibold">{publisherHeartbeat.readFailed ? "Status onbekend" : publisherConnected ? "Verbonden" : "Geen verbinding"}</p></div><p className="mt-2 text-xs text-black/45">{publisherHeartbeat.lastSeen ? `Laatste contact: ${new Date(publisherHeartbeat.lastSeen).toLocaleString("nl-NL")}` : "Nog geen heartbeat ontvangen"}{publisherHeartbeat.version ? ` · v${publisherHeartbeat.version}` : ""}</p>{settings.enabled && !publisherConnected && <p className="mt-3 text-xs text-amber-700">Automatisering blijft actief en probeert over maximaal 30 seconden opnieuw.</p>}</div>
+      <div className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wider text-black/45">Docker-container</p><div className="mt-2 flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${publisherConnected ? "bg-emerald-500" : "bg-red-500"}`} /><p className="text-xl font-semibold">{publisherHeartbeat.readFailed ? "Status onbekend" : publisherConnected ? "Verbonden" : "Geen verbinding"}</p></div><p className="mt-2 text-xs text-black/45">{publisherHeartbeat.lastSeen ? `Laatste contact: ${publisherLastSeenLabel}` : "Nog geen heartbeat ontvangen"}{publisherHeartbeat.version ? ` · v${publisherHeartbeat.version}` : ""}</p>{settings.enabled && !publisherConnected && <p className="mt-3 text-xs text-amber-700">Automatisering blijft actief en probeert over maximaal 30 seconden opnieuw.</p>}</div>
     </div>
+
+    <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+      <h2 className="font-semibold text-emerald-950">Meta-conforme publicatiemodus</h2>
+      <p className="mt-1 text-sm text-emerald-900/75">De publisher gebruikt uitsluitend de officiële Meta Graph API. Wachtrijtaken en planningen publiceren nooit zelfstandig: controleer ieder bericht en klik zelf op <strong>Nu online zetten</strong>. Browserautomatisering, noVNC en het nabootsen van menselijke handelingen zijn uitgeschakeld.</p>
+    </section>
 
     <section className="mb-6 rounded-2xl border bg-white p-5">
       <h2 className="font-semibold">Standaardindeling voor Facebook</h2>
-      <p className="mt-1 text-sm text-black/55">Voor nieuwe automatische product-, kleur- en uitlichtingsberichten. Sla de instelling rechtsboven op; bestaande wachtrijtaken behouden hun eigen keuze.</p>
+      <p className="mt-1 text-sm text-black/55">Voor nieuwe product-, kleur- en uitlichtingsberichten die een admin vóór publicatie controleert. Bestaande wachtrijtaken behouden hun eigen keuze.</p>
       <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Standaardindeling Facebookmedia">
         <Button type="button" variant={settings.facebook_media_mode === "combined" ? "default" : "outline"} onClick={() => setSettings({ ...settings, facebook_media_mode: "combined" })}>Foto's in één bericht</Button>
         <Button type="button" variant={settings.facebook_media_mode === "separate" ? "default" : "outline"} onClick={() => setSettings({ ...settings, facebook_media_mode: "separate" })}>Losse berichten</Button>
@@ -718,6 +763,7 @@ export default function AdminSocialPublisher() {
         {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => {
           const facebookTargeted = !job.payload?.target_platforms?.length || job.payload.target_platforms.includes("facebook");
           const facebookPosted = job.platform_state?.facebook === "published" || Boolean(Object.keys(job.payload?.social_platform_posts?.facebook || {}).length);
+          const canRetryFacebook = facebookTargeted && facebookPosted && job.source_type !== "session_check";
           const canChangeMode = facebookTargeted && !facebookPosted && ["queued", "waiting_for_media", "failed"].includes(job.status) && job.source_type !== "session_check";
           const currentMode = job.payload?.facebook_media_mode === "combined" ? "combined" : "separate";
           return <article key={job.id} className="rounded-2xl border bg-white p-5">
@@ -728,7 +774,7 @@ export default function AdminSocialPublisher() {
                 {job.last_error && <p className="mt-3 max-w-3xl text-sm text-red-700">{job.last_error}</p>}
                 <div className="mt-3 flex gap-2">{(["facebook", "instagram"] as Platform[]).map((platform) => <span key={platform} className="rounded-lg border px-2 py-1 text-xs">{platform}: {job.platform_state?.[platform] || "pending"}</span>)}</div>
               </div>
-              <div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run || updatingFacebookModeJobId === job.id}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div>
+              <div className="flex flex-wrap gap-2">{["queued", "failed"].includes(job.status) && <Button size="sm" onClick={() => void publishJobNow(job)} disabled={Boolean(publishingJobId) || !settings.enabled || settings.dry_run || updatingFacebookModeJobId === job.id}>{publishingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu online zetten</Button>}{canRetryFacebook && <Button variant="outline" size="sm" onClick={() => void retryFacebook(job)} disabled={Boolean(retryingFacebookJobId) || Boolean(publishingJobId)}>{retryingFacebookJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Facebook opnieuw plaatsen</Button>}<Button variant="outline" size="sm" onClick={() => void resetJob(job)}><RotateCcw className="h-4 w-4" /> Opnieuw</Button><Button variant="ghost" size="sm" onClick={() => void cancelJob(job)}><XCircle className="h-4 w-4" /> Annuleren</Button></div>
             </div>
             {canChangeMode && <div className="mt-4 border-t pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-black/45">Facebookindeling voor deze taak</p><div className="mt-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant={currentMode === "combined" ? "default" : "outline"} disabled={Boolean(updatingFacebookModeJobId) || Boolean(publishingJobId)} onClick={() => void setQueuedFacebookMode(job, "combined")}>Foto's in één bericht</Button><Button type="button" size="sm" variant={currentMode === "separate" ? "default" : "outline"} disabled={Boolean(updatingFacebookModeJobId) || Boolean(publishingJobId)} onClick={() => void setQueuedFacebookMode(job, "separate")}>Losse berichten</Button></div></div>}
           </article>;

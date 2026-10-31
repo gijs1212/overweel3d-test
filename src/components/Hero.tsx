@@ -12,9 +12,9 @@ const badges = [
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-black pb-20 pt-32 text-white md:pb-28 md:pt-40">
+    <section className="relative overflow-hidden bg-black pb-16 pt-28 text-white sm:pb-20 sm:pt-32 md:pb-28 md:pt-40">
       <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:72px_72px]" />
-      <div className="container relative z-10 mx-auto px-6">
+      <div className="container relative z-10 mx-auto px-5 sm:px-6">
         <div className="grid items-end gap-14 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="max-w-4xl">
           <motion.span
@@ -31,7 +31,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.05 }}
-            className="mb-8 font-display text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-[88px]"
+            className="mb-7 font-display text-[42px] font-semibold leading-[0.98] tracking-[-0.045em] sm:mb-8 sm:text-6xl sm:tracking-[-0.055em] lg:text-[88px]"
           >
             Uw ontwerp.<br /><span className="text-white/45">Perfect uitgevoerd.</span>
           </motion.h1>
@@ -50,7 +50,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.25 }}
-            className="flex flex-wrap gap-4"
+            className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4 [&_a]:w-full sm:[&_a]:w-auto [&_button]:w-full sm:[&_button]:w-auto"
           >
             <Link to="/bestellen">
               <Button size="xl" variant="hero">

@@ -7,8 +7,8 @@ import { NewsletterSignupForm } from "./NewsletterSignupForm";
 export function Footer() {
   return (
     <footer className="border-t border-white/10 bg-black text-white">
-      <div className="container mx-auto px-6 py-20">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+      <div className="container mx-auto px-5 py-14 sm:px-6 sm:py-20">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-12">
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="mb-4">
@@ -74,9 +74,9 @@ export function Footer() {
           <div>
             <h4 className="mb-5 text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Contact</h4>
             <ul className="space-y-3">
-              <li className="flex items-center gap-3 text-white/65">
-                <Mail className="w-4 h-4 text-white/40" />
-                <span>gijsoverweel@gmail.com</span>
+              <li className="flex min-w-0 items-center gap-3 text-white/65">
+                <Mail className="h-4 w-4 shrink-0 text-white/40" />
+                <a className="min-w-0 break-all transition-colors hover:text-white" href="mailto:gijsoverweel@gmail.com">gijsoverweel@gmail.com</a>
               </li>
               <li className="flex items-center gap-3 text-white/65">
                 <MapPin className="w-4 h-4 text-white/40" />
@@ -91,7 +91,7 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 md:flex-row">
+        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 lg:flex-row">
           <p className="text-sm text-white/40">
             © 2026 Overweel3D. Alle rechten voorbehouden.
           </p>

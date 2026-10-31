@@ -53,7 +53,7 @@ export function ProductTile({ product, onClick }: ProductTileProps) {
       {product.product_categories?.name && (
         <span className="text-[11px] text-muted-foreground mt-0.5">{product.product_categories.name}</span>
       )}
-      <span className="text-sm text-muted-foreground mt-0.5">€{Number(product.price).toFixed(2)}</span>
+      <span className="text-sm text-muted-foreground mt-0.5">{Number(product.price) > 0 ? `€${Number(product.price).toFixed(2)}` : "Op aanvraag"}</span>
     </div>
   );
 }

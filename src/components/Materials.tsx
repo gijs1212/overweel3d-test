@@ -30,7 +30,7 @@ export function Materials() {
     <section id="materialen" className="bg-background py-24 text-foreground">
       <div className="container mx-auto px-6">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="max-w-2xl mb-16"
@@ -51,7 +51,7 @@ export function Materials() {
           {materials.map((material, index) => (
             <motion.div
               key={material.name}
-              initial={{ opacity: 0, y: 24 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.08, duration: 0.35 }}
@@ -81,7 +81,7 @@ export function Materials() {
         </div>
 
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={false}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           className="mx-auto mt-12 max-w-2xl text-center text-muted-foreground"

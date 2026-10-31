@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
@@ -18,7 +18,7 @@ from .meta_config import load_meta_config, save_meta_config
 from .pairing import pairing_store
 from .worker import SocialWorker
 
-VERSION = "2.8.0"
+VERSION = "3.0.1"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("overweel3d.social")
 
@@ -81,7 +81,6 @@ async def lifespan(_: FastAPI):
         worker.stop_event.set()
         worker.request_immediate_poll()
         await worker_task
-        await worker.browsers.close()
         await worker.meta.close()
         await worker.pb.close()
 
@@ -171,32 +170,6 @@ async def dashboard_script(_: str = Depends(authorized)):
         media_type="text/javascript",
         headers={"Cache-Control": "private, no-store"},
     )
-
-
-@app.post("/open/meta")
-async def open_meta(_: str = Depends(authorized)):
-    await worker.browsers.page("meta", "https://business.facebook.com/latest/home")
-    return RedirectResponse("/", status_code=303)
-
-
-@app.post("/reset-logins")
-async def reset_logins(_: str = Depends(authorized)):
-    await worker.browsers.reset_login_profiles()
-    for platform in ("facebook", "instagram"):
-        try:
-            await worker.pb.action(
-                "session",
-                {
-                    "platform": platform,
-                    "status": "disconnected",
-                    "error": "Meta-login handmatig gewist; opnieuw aanmelden vereist.",
-                    "screenshot_path": "",
-                },
-            )
-        except Exception:
-            log.exception("Sessiestatus voor %s kon niet worden bijgewerkt", platform)
-    log.info("Opgeslagen Meta-login gewist.")
-    return RedirectResponse("/?reset=1", status_code=303)
 
 
 @app.get("/failures/{name}")

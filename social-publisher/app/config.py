@@ -7,10 +7,8 @@ class Settings(BaseSettings):
     pocketbase_url: str = "https://api.gijsoverweel.nl"
     social_publisher_token: str = ""
     control_password: str
-    novnc_password: str = ""
     poll_seconds: int = 30
     data_dir: Path = Path("/data")
-    chromium_path: str = "/usr/bin/chromium"
     facebook_page_name: str = "Overweel3D"
     facebook_page_url: str = "https://www.facebook.com/Overweel3D"
     instagram_account_url: str = "https://www.instagram.com/overweel3d/"
