@@ -399,7 +399,7 @@ test("public catalog resolves only media attached to active products without log
   sandbox.$os = { getenv: () => "https://api.example.test", dirFS: (directory) => directory };
   const product = record({ id: "product-pb", supabase_id: "product-public", active: true });
   const photo = record({ product_id: "product-public", storage_path: "products/product-public/photo.jpg" });
-  const stored = record({ id: "file-pb", path: "products/product-public/photo.jpg", bucket: "orders", file: "actual.jpg" });
+  const stored = record({ id: "file-pb", path: "products/product-public/photo.jpg", bucket: "orders", file: "actual.jpg", public: true });
   stored.collection = () => ({ id: "pbc_storage" });
   stored.baseFilesPath = () => "C:/pocketbase/files/file-pb";
   sandbox.$app = {
@@ -417,14 +417,14 @@ test("public catalog resolves only media attached to active products without log
     json: (status, payload) => ({ status, ...payload }),
     redirect: (status, url) => ({ status, url }),
   };
-  assert.equal(route11(event).url, "https://api.example.test/api/files/pbc_storage/file-pb/actual.jpg");
+  assert.equal(route11(event).url, "https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct-public%2Fphoto.jpg");
   resolve = false;
   assert.deepEqual(JSON.parse(JSON.stringify(route11(event))), { status: 302, url: "https://api.example.test/api/files/pbc_storage/file-pb/actual.jpg" });
   product.set("active", false);
-  assert.throws(() => route11(event), /Productmedia niet gevonden/);
+  assert.throws(() => route11(event), /media niet gevonden/);
   product.set("active", true);
   const privateEvent = { ...event, request: { url: { query: () => ({ get: () => "orders/private-file.3mf" }) } } };
-  assert.throws(() => route11(privateEvent), /Productmedia niet gevonden/);
+  assert.throws(() => route11(privateEvent), /media niet gevonden/);
   delete sandbox.$app; delete sandbox.$os; delete sandbox.NotFoundError;
 });
 

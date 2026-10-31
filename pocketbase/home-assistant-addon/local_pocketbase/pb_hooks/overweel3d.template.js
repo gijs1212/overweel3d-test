@@ -205,7 +205,7 @@ function route0(e) {
     var publisherLastSeenMs = publisherLastSeenAt ? new Date(publisherLastSeenAt).getTime() : NaN;
     var publisherAgeSeconds = isFinite(publisherLastSeenMs) ? Math.max(0, (Date.now() - publisherLastSeenMs) / 1000) : null;
     return json(e, {
-      hook_version: "1.19.11",
+      hook_version: "1.19.12",
       publisher_last_seen_at: publisherLastSeenAt,
       publisher_connected: publisherAgeSeconds !== null && publisherAgeSeconds <= 90,
       publisher_age_seconds: publisherAgeSeconds,
@@ -500,7 +500,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.11" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.12" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -2230,7 +2230,7 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.11" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.12" });
   }
   if (action === "poll") {
     var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -2249,9 +2249,9 @@ function route8(e) {
         next_due: diagnosticNext ? diagnosticNext.due : false,
         next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
         next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
-      }, version: "1.19.11" });
+      }, version: "1.19.12" });
     }
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.11" });
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.12" });
   }
   if (action === "resolve_media") {
     var sourcePath = String(p.path || "").trim();
@@ -2453,7 +2453,9 @@ function route11(e) {
   if (!stored || !stored.getBool("public") || stored.getString("bucket") !== "orders" || !stored.getString("file")) throw new NotFoundError("Openbare media niet gevonden.");
   var mediaUrl = publicBaseUrl(e) + "/api/files/" + encodeURIComponent(stored.collection().id) + "/" + encodeURIComponent(stored.id) + "/" + encodeURIComponent(stored.getString("file"));
   e.response.header().set("Cache-Control", "public, max-age=300");
-  if (e.request.url.query().get("resolve") === "1") return e.json(200, { url: mediaUrl });
+  if (e.request.url.query().get("resolve") === "1") {
+    return e.json(200, { url: publicBaseUrl(e) + "/api/overweel3d/catalog/media?path=" + encodeURIComponent(path) });
+  }
   return e.redirect(302, mediaUrl);
 }
 
