@@ -20,7 +20,9 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
     xhr.open(existingId ? "PATCH" : "POST", `${POCKETBASE_URL}/api/collections/storage_files/records${existingId ? `/${existingId}` : ""}`);
     xhr.timeout = 180_000;
     if (pocketbase.authStore.token) xhr.setRequestHeader("Authorization", pocketbase.authStore.token);
-    xhr.responseType = "json";
+    // Safari occasionally returns a null `response` for multipart uploads when
+    // responseType=json is used. Read text and parse it ourselves instead.
+    xhr.responseType = "text";
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
       emitUploadProgress({ id, name: file.name, path, percent: Math.min(99, Math.round(event.loaded / event.total * 100)), status: "uploading" });
@@ -41,13 +43,21 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
       reject(new Error(error));
     };
     xhr.onload = () => {
+      let payload: Record<string, unknown> = {};
+      try { payload = xhr.responseText ? JSON.parse(xhr.responseText) as Record<string, unknown> : {}; } catch { /* handled below */ }
       if (xhr.status >= 200 && xhr.status < 300) {
+        if (!payload.id) {
+          const error = `Upload van ${file.name} is ontvangen, maar PocketBase gaf geen geldig bestandsrecord terug.`;
+          emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error });
+          reject(new Error(error));
+          return;
+        }
         emitUploadProgress({ id, name: file.name, path, percent: 100, status: "completed" });
-        resolve(xhr.response as RecordModel);
+        resolve(payload as RecordModel);
         return;
       }
-      const genericMessage = String(xhr.response?.message || "");
-      const details = errorDetails(xhr.response?.data);
+      const genericMessage = String(payload.message || "");
+      const details = errorDetails(payload.data);
       const routeHint = xhr.status === 404 || /something went wrong while processing/i.test(genericMessage)
         ? "De PocketBase-opslagroute is niet bereikbaar. Controleer of api.gijsoverweel.nl naar PocketBase verwijst."
         : "";

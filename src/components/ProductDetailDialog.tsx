@@ -25,6 +25,7 @@ import {
 import { isHeicFile } from "@/lib/imageUploads";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
 import { ProductReviews } from "@/components/ProductReviews";
+import { LocalMediaPreview } from "@/components/LocalMediaPreview";
 import { useMaterials } from "@/hooks/useMaterials";
 
 export interface PrebuiltOptions {
@@ -210,7 +211,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
 
   const renderOption = (option: ProductOption) => {
     if (option.type === "photo") return <div className="flex flex-wrap gap-2 mt-1">
-      {(files[option.id] || []).map((file, index) => <div key={`${file.name}-${index}`} className="relative w-16 h-16 rounded-md overflow-hidden border"><img src={URL.createObjectURL(file)} alt="Uploadvoorbeeld" className="w-full h-full object-cover" /><button type="button" onClick={() => setFiles((current) => ({ ...current, [option.id]: current[option.id].filter((_, fileIndex) => fileIndex !== index) }))} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}
+      {(files[option.id] || []).map((file, index) => <div key={`${file.name}-${index}`} className="relative w-16 h-16 rounded-md overflow-hidden border"><LocalMediaPreview file={file} alt="Uploadvoorbeeld" className="h-full w-full object-cover" /><button type="button" onClick={() => setFiles((current) => ({ ...current, [option.id]: current[option.id].filter((_, fileIndex) => fileIndex !== index) }))} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}
       <label className="relative w-16 h-16 overflow-hidden rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer"><Upload className="w-4 h-4 text-muted-foreground" /><input type="file" accept="image/*" multiple className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(event) => { addFiles(option.id, Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
     </div>;
     if (option.type === "textarea") return <Textarea rows={3} maxLength={option.max_length || undefined} value={String(values[option.id] || "")} onChange={(event) => setValues((current) => ({ ...current, [option.id]: event.target.value }))} />;

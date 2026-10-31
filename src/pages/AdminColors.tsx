@@ -17,7 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMaterials } from "@/hooks/useMaterials";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { materialLabel, normalizeMaterialId } from "@/lib/productCatalog";
-import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { LocalMediaPreview } from "@/components/LocalMediaPreview";
+import { validateMediaSelection } from "@/lib/mediaFiles";
 import { sendAutomaticNewsletters, type AutomaticNewsletterEvent } from "@/lib/automaticNewsletter";
 
 function SignedImg({ path, className }: { path: string; className?: string }) {
@@ -209,15 +211,9 @@ export default function AdminColors() {
 
   const handlePhotoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const accepted: File[] = [];
-    for (const f of files) {
-      if (isHeicFile(f) || f.type.startsWith("image/")) {
-        accepted.push(f);
-      } else {
-        toast({ title: `${f.name} overgeslagen`, description: "Alleen afbeeldingen.", variant: "destructive" });
-      }
-    }
-    if (accepted.length) setNewPhotoFiles((prev) => [...prev, ...accepted]);
+    const selection = validateMediaSelection(files, { allowVideos: false, maxFiles: 12 });
+    if (selection.accepted.length) setNewPhotoFiles((prev) => [...prev, ...selection.accepted.map(({ file }) => file)].slice(0, 12));
+    if (selection.errors.length) toast({ title: "Enkele foto's zijn overgeslagen", description: selection.errors[0], variant: "destructive" });
     e.target.value = "";
   };
 
@@ -463,7 +459,7 @@ export default function AdminColors() {
                   ))}
                   {newPhotoFiles.map((f, i) => (
                     <div key={i} className="relative w-24 h-24 rounded-xl overflow-hidden border border-border bg-muted">
-                      <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                      <LocalMediaPreview file={f} alt={f.name} className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setNewPhotoFiles((prev) => prev.filter((_, idx) => idx !== i))}

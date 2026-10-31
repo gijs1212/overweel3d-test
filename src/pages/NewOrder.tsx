@@ -18,9 +18,11 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { useMaterials } from "@/hooks/useMaterials";
-import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { parse3DFile, estimatePrintWeight } from "@/lib/stlParser";
 import { ProductTile } from "@/components/ProductTile";
+import { LocalMediaPreview } from "@/components/LocalMediaPreview";
+import { validateMediaSelection } from "@/lib/mediaFiles";
 import { PrebuiltOptions, ProductDetailDialog } from "@/components/ProductDetailDialog";
 import { OrderAuthGate } from "@/components/OrderAuthGate";
 import { ModelViewer } from "@/components/ModelViewer";
@@ -427,9 +429,10 @@ export default function NewOrder() {
 
   // ===== Custom draft =====
   const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const incoming = Array.from(e.target.files || []).filter((file) => file.type.startsWith("image/") || isHeicFile(file));
+    const selection = validateMediaSelection(Array.from(e.target.files || []), { allowVideos: false, maxFiles: 5 });
     e.target.value = "";
-    setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...incoming].slice(0, 5) }));
+    setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...selection.accepted.map(({ file }) => file)].slice(0, 5) }));
+    if (selection.errors.length) toast({ title: "Enkele foto's zijn overgeslagen", description: selection.errors[0], variant: "destructive" });
   };
 
   const addCustomToCart = () => {
@@ -1088,7 +1091,7 @@ export default function NewOrder() {
                                 <div className="flex flex-wrap gap-3 mb-2">
                                   {draftCustom.photos.map((photo, index) => (
                                     <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
-                                      <img src={URL.createObjectURL(photo)} alt="" className="w-full h-full object-cover" />
+                                      <LocalMediaPreview file={photo} alt={photo.name} className="h-full w-full object-cover" />
                                       <button
                                         onClick={() => setDraftCustom((p) => ({ ...p, photos: p.photos.filter((_, i) => i !== index) }))}
                                         className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"

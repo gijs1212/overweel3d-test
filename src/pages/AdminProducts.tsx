@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClientId } from "@/lib/clientId";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, ExternalLink, Eye, EyeOff, FileArchive, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, Video, X } from "lucide-react";
+import { ArrowLeft, Check, Download, ExternalLink, Eye, EyeOff, FileArchive, ImagePlus, Loader2, Pencil, Plus, Save, Star, Trash2, Video, X } from "lucide-react";
 
 import { Footer } from "@/components/Footer";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
-import { isHeicFile, uploadFileWithHeicConversion } from "@/lib/imageUploads";
+import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMaterials } from "@/hooks/useMaterials";
@@ -33,9 +33,11 @@ import {
   ProductVariant,
 } from "@/lib/productCatalog";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
+import { LocalMediaPreview } from "@/components/LocalMediaPreview";
+import { validateMediaSelection } from "@/lib/mediaFiles";
 
 type ProductForm = Omit<CatalogProduct, "id" | "product_categories" | "product_images" | "product_options" | "product_variants">;
-type PendingImage = { key: string; file: File; previewUrl: string; media_type: "image" | "video" };
+type PendingImage = { key: string; file: File; media_type: "image" | "video" };
 type ProductAdminSource = { id: string; product_id: string; makerworld_url: string; three_mf_path: string; three_mf_filename: string };
 type DeleteTarget = { type: "product"; value: CatalogProduct } | { type: "category"; value: ProductCategory };
 
@@ -145,14 +147,12 @@ export default function AdminProducts() {
   }, [authLoading, fetchCatalog, isAdmin]);
 
   const resetEditor = () => {
-    pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     setEditingId(null); setForm({ ...emptyForm, materials: [], colors: [], photos: [] }); setImages([]);
     setPendingImages([]); setRemovedPaths([]); setPrimaryKey(""); setOptions([]); setVariants([]); setVariantTotals({}); setSelectedColorIds([]); setAllCompatibleColors(false); setPriceOnRequest(false);
     setAdminSourceId(""); setMakerworldUrl(""); setThreeMfPath(""); setThreeMfFilename(""); setPendingThreeMf(null); setRemoveExistingThreeMf(false); setMediaError(""); setShowEditor(false);
   };
   const openNew = () => { resetEditor(); setShowEditor(true); };
   const openEdit = (product: CatalogProduct) => {
-    pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     const productImages = orderedProductImages(product);
     setEditingId(product.id);
     setForm({
@@ -234,20 +234,16 @@ export default function AdminProducts() {
     if (!files.length) return;
     setProcessingMedia(true);
     setMediaError("");
-    const converted: File[] = [];
     try {
-      for (const file of files) {
-        const isHeic = isHeicFile(file);
-        const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
-        if (!isHeic && !file.type.startsWith("image/") && !isVideo) { toast({ title: `${file.name} is geen afbeelding of video`, variant: "destructive" }); continue; }
-        const maxBytes = isVideo ? 50 * 1024 * 1024 : 12 * 1024 * 1024;
-        if (file.size > maxBytes) { toast({ title: `${file.name} is te groot`, description: isVideo ? "Maximaal 50 MB per video." : "Maximaal 12 MB per afbeelding.", variant: "destructive" }); continue; }
-        converted.push(file);
-      }
-      const additions = converted.map((file) => ({
-        key: createClientId(), file, previewUrl: URL.createObjectURL(file),
-        media_type: file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v)$/i.test(file.name) ? "video" as const : "image" as const,
+      const selection = validateMediaSelection(files, { allowVideos: true, maxFiles: 20 });
+      const additions = selection.accepted.map(({ file, kind }) => ({
+        key: createClientId(), file,
+        media_type: kind,
       }));
+      if (selection.errors.length) {
+        setMediaError(selection.errors.join(" · "));
+        toast({ title: "Enkele mediabestanden zijn overgeslagen", description: selection.errors[0], variant: "destructive" });
+      }
       setPendingImages((current) => [...current, ...additions]);
       setPrimaryKey((current) => current || additions[0]?.key || "");
       if (additions.length) toast({
@@ -269,7 +265,6 @@ export default function AdminProducts() {
     if (primaryKey === image.id) setPrimaryKey(remaining[0]?.id || pendingImages[0]?.key || "");
   };
   const removePendingImage = (key: string) => {
-    const target = pendingImages.find((image) => image.key === key); if (target) URL.revokeObjectURL(target.previewUrl);
     const remaining = pendingImages.filter((image) => image.key !== key); setPendingImages(remaining);
     if (primaryKey === key) setPrimaryKey(images[0]?.id || remaining[0]?.key || "");
   };
@@ -542,7 +537,7 @@ export default function AdminProducts() {
 
         <div><Label>Productmedia</Label><p className="text-xs text-muted-foreground mb-3">Kies afbeeldingen of video's. Ze worden geüpload wanneer u het product opslaat; klik op de ster om de hoofdmedia te kiezen.</p><div className="flex flex-wrap gap-3">
           {images.map((image) => <div key={image.id} className={`relative w-28 h-28 rounded-xl overflow-hidden border-2 ${primaryKey === image.id ? "border-accent" : "border-border"}`}><SignedMedia path={image.storage_path} mediaType={image.media_type} alt={form.name} className="w-full h-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.id)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.id ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removeExistingImage(image)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{isVideoProductMedia(image.storage_path, image.media_type) && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div>)}
-          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 overflow-hidden rounded-xl border-2 bg-card ${primaryKey === image.key ? "border-accent" : "border-border"}`}><div className="relative h-24 overflow-hidden">{image.media_type === "video" ? <video src={image.previewUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={image.previewUrl} alt={image.file.name} className="w-full h-full object-cover" />}<button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{image.media_type === "video" && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div><p className="truncate px-2 py-1 text-[10px]" title={image.file.name}>{image.file.name}</p></div>)}
+          {pendingImages.map((image) => <div key={image.key} className={`relative w-28 overflow-hidden rounded-xl border-2 bg-card ${primaryKey === image.key ? "border-accent" : "border-border"}`}><div className="relative h-24 overflow-hidden"><LocalMediaPreview file={image.file} kind={image.media_type} alt={image.file.name} className="h-full w-full object-cover" /><button type="button" onClick={() => setPrimaryKey(image.key)} className="absolute left-1 top-1 rounded-full bg-card/95 p-1" aria-label="Instellen als hoofdmedia"><Star className={`w-4 h-4 ${primaryKey === image.key ? "fill-accent text-accent" : ""}`} /></button><button type="button" onClick={() => removePendingImage(image.key)} className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground" aria-label="Media verwijderen"><X className="w-4 h-4" /></button>{image.media_type === "video" && <Video className="absolute bottom-1 left-1 w-4 h-4 text-white drop-shadow" />}</div><p className="truncate px-2 py-1 text-[10px]" title={image.file.name}>{image.file.name}</p></div>)}
           <label className={`relative w-28 h-28 overflow-hidden rounded-xl border-2 border-dashed flex flex-col items-center justify-center hover:border-accent/60 ${processingMedia ? "cursor-wait opacity-60" : "cursor-pointer"}`}><ImagePlus className="w-5 h-5" /><span className="text-xs mt-1">{processingMedia ? "Verwerken…" : "Media kiezen"}</span><input type="file" multiple disabled={processingMedia || saving} accept="image/*,video/*,.heic,.heif,.mov,.m4v" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Productmedia kiezen" onChange={(event) => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; void handleImageInput(selected); }} /></label>
         </div>{mediaError && <div role="alert" className="mt-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"><p className="font-semibold">Media verwerken of uploaden mislukt</p><p className="mt-1 break-words">{mediaError}</p></div>}</div>
 
@@ -579,7 +574,35 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        <div><Label>Beschikbare kleuren *</Label><p className="text-xs text-muted-foreground mb-3">Kleuren komen uit Kleurenbeheer en worden per product opgeslagen.</p><label className="mb-3 flex items-start gap-3 rounded-xl border bg-muted/30 p-3"><Switch checked={allCompatibleColors} onCheckedChange={setAllCompatibleColors} /><span><span className="block text-sm font-medium">Alle passende kleuren</span><span className="block text-xs text-muted-foreground">Ook nieuwe actieve kleuren worden automatisch beschikbaar zodra ze bij het gekozen materiaal passen.</span></span></label>{availableColors.length === 0 ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p> : allCompatibleColors ? <p className="text-sm text-muted-foreground">{availableColors.length} huidige passende kleuren; toekomstige passende kleuren worden automatisch meegenomen.</p> : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{availableColors.map((color) => <label key={color.id} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="text-sm truncate">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}</div>
+        <div>
+          <Label>Beschikbare kleuren *</Label>
+          <p className="mb-3 text-xs text-muted-foreground">Kies alle passende kleuren automatisch of stel de lijst zelf samen.</p>
+          <div className="mb-4 grid gap-2 sm:grid-cols-2" role="group" aria-label="Kleurtoewijzing voor product">
+            <Button
+              type="button"
+              variant={allCompatibleColors ? "default" : "outline"}
+              className="h-auto min-h-14 justify-start whitespace-normal px-4 py-3 text-left"
+              onClick={() => { setAllCompatibleColors(true); setSelectedColorIds([]); }}
+            >
+              <Check className="h-4 w-4 shrink-0" />
+              <span><span className="block font-semibold">Alle kleuren automatisch</span><span className="block text-xs font-normal opacity-70">Nu en later alle actieve kleuren voor het gekozen materiaal</span></span>
+            </Button>
+            <Button
+              type="button"
+              variant={!allCompatibleColors ? "default" : "outline"}
+              className="h-auto min-h-14 justify-start whitespace-normal px-4 py-3 text-left"
+              onClick={() => setAllCompatibleColors(false)}
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
+              <span><span className="block font-semibold">Zelf kleuren kiezen</span><span className="block text-xs font-normal opacity-70">Alleen de hieronder aangevinkte kleuren</span></span>
+            </Button>
+          </div>
+          {availableColors.length === 0
+            ? <p className="text-sm text-destructive">Geen actieve kleuren beschikbaar voor de gekozen materialen. Voeg eerst kleuren toe via Kleurenbeheer.</p>
+            : allCompatibleColors
+              ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"><strong>{availableColors.length} kleuren beschikbaar.</strong> Nieuwe actieve kleuren voor dit materiaal worden vanzelf toegevoegd.</div>
+              : <div className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">{availableColors.map((color) => <label key={color.id} className="flex cursor-pointer items-center gap-2 rounded-lg border p-2"><Checkbox checked={selectedColorIds.includes(color.id)} onCheckedChange={() => toggleColor(color.id)} /><span className="h-4 w-4 rounded-full border" style={{ backgroundColor: color.hex }} /><span className="truncate text-sm">{color.name} <span className="text-muted-foreground">({color.material})</span></span></label>)}</div>}
+        </div>
 
         <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Productvarianten</Label><p className="text-xs text-muted-foreground">Formaten, uitvoeringen, materiaal en de volledige verkoopprijs per variant.</p></div><Button type="button" variant="outline" size="sm" className="ml-auto" onClick={addVariant}><Plus className="w-4 h-4" /> Variant toevoegen</Button></div><div className="space-y-3">
           {variants.map((variant, index) => <div key={variant.id} className="rounded-xl border p-4 grid md:grid-cols-5 gap-3"><div><Label>Naam *</Label><Input value={variant.name} onChange={(event) => updateVariant(variant.id, { name: event.target.value })} placeholder="Bijv. Groot" /></div><div><Label>Formaat</Label><Input value={variant.size_label || ""} onChange={(event) => updateVariant(variant.id, { size_label: event.target.value })} placeholder="20 × 20 cm" /></div><div><Label>Materiaal</Label><Select value={variant.material_id || "default"} onValueChange={(value) => updateVariant(variant.id, { material_id: value === "default" ? null : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="default">Productkeuze</SelectItem>{MATERIALS.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Totale variantprijs (€)</Label><Input type="number" min={0} step="0.01" value={priceOnRequest ? "" : variantTotals[variant.id] ?? form.price} disabled={priceOnRequest} placeholder={priceOnRequest ? "Op aanvraag" : "0,00"} onChange={(event) => setVariantTotals((current) => ({ ...current, [variant.id]: Number(event.target.value) }))} /></div><div className="flex items-end gap-2"><Switch checked={variant.active} onCheckedChange={(active) => updateVariant(variant.id, { active })} /><Label>Actief</Label><Button type="button" variant="ghost" size="sm" onClick={() => setVariants((current) => current.filter((item) => item.id !== variant.id))}><Trash2 className="w-4 h-4 text-destructive" /></Button></div><div className="md:col-span-5 text-xs text-muted-foreground">Variant {index + 1}</div></div>)}
