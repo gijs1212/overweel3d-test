@@ -246,7 +246,7 @@ export default function NewOrder() {
         const selectedAnswerIds = new Set((item.answers || []).map((answer) => answer.optionId));
         const addonPrice = (product.product_options || [])
           .filter((option) => option.active && option.is_addon && selectedAnswerIds.has(option.id))
-          .reduce((total, option) => total + Number(option.price_adjustment || 0), 0);
+          .reduce((total, option) => total + Number(option.price_adjustment || 0) * (item.answers?.find((answer) => answer.optionId === option.id && answer.addonQuantity)?.addonQuantity || 1), 0);
         const priceOnRequest = Number(product.price) <= 0;
         const currentUnitPrice = priceOnRequest ? 0 : Number(product.price) + Number(variant?.price_adjustment || 0) + addonPrice;
         return [{
@@ -370,7 +370,6 @@ export default function NewOrder() {
         setDraftFiles((prev) => prev.map((d) => d.id === nl.id ? { ...d, parsing: false, estimatedGrams: Math.max(10, Math.round(nl.file.size / 1024)) } : d));
       });
     });
-    e.target.value = "";
   };
 
   const updateDraftFile = <K extends keyof FileLine>(id: string, field: K, value: FileLine[K]) => {
@@ -430,7 +429,6 @@ export default function NewOrder() {
   // ===== Custom draft =====
   const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selection = validateMediaSelection(Array.from(e.target.files || []), { allowVideos: false, maxFiles: 5 });
-    e.target.value = "";
     setDraftCustom((p) => ({ ...p, photos: [...p.photos, ...selection.accepted.map(({ file }) => file)].slice(0, 5) }));
     if (selection.errors.length) toast({ title: "Enkele foto's zijn overgeslagen", description: selection.errors[0], variant: "destructive" });
   };
@@ -705,7 +703,7 @@ export default function NewOrder() {
       }
       if (prebuiltLines.length) {
         sections.push("KANT-EN-KLARE ARTIKELEN:\n" + prebuiltLines.map((p) =>
-          `- ${p.name}${p.variantName ? ` (${p.variantName})` : ""} x${p.quantity} – ${p.material} ${p.color} – ${p.priceOnRequest ? "prijs op aanvraag" : `€${p.price.toFixed(2)}`}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${String(answer.value)}`).join(" · ")}` : ""}`
+          `- ${p.name}${p.variantName ? ` (${p.variantName})` : ""} x${p.quantity} – ${p.material} ${p.color} – ${p.priceOnRequest ? "prijs op aanvraag" : `€${p.price.toFixed(2)}`}${p.optionAnswers.length ? `\n  ${p.optionAnswers.map((answer) => `${answer.label}: ${answer.addonQuantity ? `${answer.addonQuantity * p.quantity}×` : String(answer.value)}`).join(" · ")}` : ""}`
         ).join("\n"));
       }
       if (customSections.length) sections.push(customSections.join("\n\n"));
@@ -1272,7 +1270,7 @@ export default function NewOrder() {
                                 {line.kind === "prebuilt" && (line.optionAnswers.length > 0 || line.optionFiles.length > 0) && (
                                   <div className="mt-1 space-y-0.5">
                                     {line.optionAnswers.map((answer) => (
-                                      <p key={answer.optionId} className="text-[11px] text-muted-foreground truncate">{answer.label}: {typeof answer.value === "boolean" ? (answer.value ? "Ja" : "Nee") : answer.value}</p>
+                                      <p key={answer.optionId} className="text-[11px] text-muted-foreground truncate">{answer.label}: {answer.addonQuantity ? `${answer.addonQuantity * line.quantity}× totaal` : typeof answer.value === "boolean" ? (answer.value ? "Ja" : "Nee") : answer.value}</p>
                                     ))}
                                     {line.optionFiles.map((upload) => (
                                       <p key={upload.optionId} className="text-[11px] text-muted-foreground">{upload.label}: {upload.files.length} foto{upload.files.length === 1 ? "" : "'s"}</p>

@@ -4,9 +4,11 @@ import {
   availableFilamentColorsForMaterial,
   availableMaterialsForProduct,
   buildProductOptionAnswers,
+  catalogProductPriceLabel,
   colorMatchesMaterial,
   normalizeMaterialId,
   isVideoProductMedia,
+  lowestProductPrice,
   orderedProductImages,
   productColorSlotTitle,
   validateCatalogColorSelection,
@@ -81,5 +83,20 @@ describe("productCatalog", () => {
       { optionId: "size", label: "Formaat", type: "select", value: "Groot" },
       { optionId: "gift", label: "Cadeauverpakking", type: "checkbox", value: true },
     ]);
+  });
+
+  it("toont bij meerdere varianten vanaf de laagste totale variantprijs", () => {
+    const product = {
+      price: 20,
+      product_variants: [
+        { active: true, price_adjustment: 5 },
+        { active: true, price_adjustment: -2 },
+        { active: false, price_adjustment: -10 },
+      ],
+    } as CatalogProduct;
+    expect(lowestProductPrice(product)).toBe(18);
+    expect(catalogProductPriceLabel(product)).toBe("Vanaf €18.00");
+    expect(catalogProductPriceLabel({ ...product, product_variants: [product.product_variants![0]] })).toBe("€25.00");
+    expect(catalogProductPriceLabel({ ...product, price: 0 })).toBe("Op aanvraag");
   });
 });

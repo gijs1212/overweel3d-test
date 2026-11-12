@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, ExternalLink, ImagePlus, Loader2, Pause, Play, RefreshCw, RotateCcw, Save, Send, Shuffle, Trash2, X, XCircle } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, ExternalLink, ImagePlus, Loader2, Pause, Play, RefreshCw, RotateCcw, Save, Send, Shuffle, Trash2, X, XCircle } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,17 @@ import { isSocialPublisherConnected, parsePocketBaseTimestamp } from "@/lib/soci
 
 type Platform = "facebook" | "instagram";
 type FacebookMediaMode = "combined" | "separate";
-type PostType = "product" | "color" | "discount" | "spotlight";
+type PostType = "product" | "product_update" | "color" | "discount" | "spotlight";
 type Templates = Record<PostType, Record<Platform, string>>;
 
 const DEFAULT_TEMPLATES: Templates = {
   product: {
     facebook: "{direct_url}\n\nNieuw bij Overweel3D: {name} ✨\n\nBekijk dit nieuwe product en stel het samen.\n\n#Overweel3D #3Dprinten #Nieuw\n\nhttps://overweel3d.gijsoverweel.nl/",
     instagram: "{direct_url}\n\nNieuw bij Overweel3D: {name} ✨\n\nBekijk dit nieuwe product en stel het samen.\n\n#Overweel3D #3Dprinten #Nieuw\n\nhttps://overweel3d.gijsoverweel.nl/",
+  },
+  product_update: {
+    facebook: "{direct_url}\n\n{name} is vernieuwd bij Overweel3D ✨\n\n{change_label}. Bekijk de actuele uitvoeringen en prijs in de catalogus.\n\n#Overweel3D #3Dprinten #Productupdate\n\nhttps://overweel3d.gijsoverweel.nl/",
+    instagram: "{direct_url}\n\n{name} is vernieuwd bij Overweel3D ✨\n\n{change_label}. Bekijk de actuele uitvoeringen en prijs in de catalogus.\n\n#Overweel3D #3Dprinten #Productupdate\n\nhttps://overweel3d.gijsoverweel.nl/",
   },
   color: {
     facebook: "{direct_url}\n\nNieuwe kleur bij Overweel3D: {name} ({material}) 🎨\n\nBekijk de kleur in ons assortiment.\n\n#Overweel3D #3Dprinten #NieuweKleur\n\nhttps://overweel3d.gijsoverweel.nl/",
@@ -56,6 +60,16 @@ interface SettingsRecord {
   spotlight_next_at?: string | null;
   publisher_last_seen_at?: string | null;
   publisher_version?: string;
+  spotlight_recent_product_ids?: string[];
+}
+
+interface PublisherProduct {
+  id: string;
+  name: string;
+  price: number;
+  photos?: string[];
+  active: boolean;
+  product_images?: Array<{ storage_path: string; media_type?: "image" | "video"; is_primary?: boolean; sort_order?: number }>;
 }
 
 interface JobRecord {
@@ -125,6 +139,16 @@ interface UploadedCustomImage {
   isVideo: boolean;
 }
 
+function publisherProductMedia(product: PublisherProduct): string[] {
+  const related = [...(product.product_images || [])]
+    .sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || Number(a.sort_order || 0) - Number(b.sort_order || 0))
+    .map((image) => image.storage_path);
+  const legacy = Array.isArray(product.photos) ? product.photos : [];
+  return [...new Set([...related, ...legacy]
+    .map((path) => normalizeProductStoragePath(String(path || "")))
+    .filter((path): path is string => Boolean(path)))].slice(0, 10);
+}
+
 const statusStyle: Record<string, string> = {
   completed: "bg-emerald-100 text-emerald-900", published: "bg-emerald-100 text-emerald-900",
   queued: "bg-blue-100 text-blue-900", processing: "bg-blue-100 text-blue-900", waiting_for_media: "bg-amber-100 text-amber-900",
@@ -170,6 +194,10 @@ export default function AdminSocialPublisher() {
   const [publisherHeartbeat, setPublisherHeartbeat] = useState<PublisherHeartbeat>({ lastSeen: "", version: "", connected: false, readFailed: false });
   const [pairingCode, setPairingCode] = useState("");
   const [pairingContainer, setPairingContainer] = useState(false);
+  const [products, setProducts] = useState<PublisherProduct[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [productScheduleAt, setProductScheduleAt] = useState<Record<string, string>>({});
+  const [productActionId, setProductActionId] = useState("");
 
   const refreshPublisherHeartbeat = useCallback(async () => {
     const result = await supabase.rpc("social_publisher_status");
@@ -204,14 +232,15 @@ export default function AdminSocialPublisher() {
   }, []);
 
   const load = useCallback(async () => {
-    const [settingsResult, jobsResult, sessionsResult, nextResult, activityResult] = await Promise.all([
+    const [settingsResult, jobsResult, sessionsResult, nextResult, activityResult, productsResult] = await Promise.all([
       supabase.rpc("get_social_publisher_settings"),
       supabase.from("social_post_jobs").select("*").order("scheduled_at", { ascending: false }).limit(100),
       supabase.from("social_publisher_sessions").select("*").order("platform"),
       supabase.rpc("social_publisher_next_post"),
       supabase.rpc("social_publisher_activity"),
+      supabase.from("products").select("id,name,price,photos,active,product_images(*)").eq("active", true).order("name"),
     ]);
-    const error = settingsResult.error || jobsResult.error || sessionsResult.error;
+    const error = settingsResult.error || jobsResult.error || sessionsResult.error || productsResult.error;
     if (error) {
       toast({ title: "Social Publisher laden mislukt", description: error.message, variant: "destructive" });
       setLoading(false);
@@ -243,6 +272,7 @@ export default function AdminSocialPublisher() {
     if (activityResult.error) setActivityError(activityResult.error.message);
     else { setActivity((activityResult.data || []) as ActivityRecord[]); setActivityError(""); }
     setSessions(((sessionsResult.data || []) as SessionRecord[]).filter((session) => session.platform === "facebook" || session.platform === "instagram"));
+    setProducts((productsResult.data || []) as unknown as PublisherProduct[]);
     if (current?.discount_image_path) setPreviewUrl(await getProductPhotoUrl(current.discount_image_path));
     else setPreviewUrl("");
     void refreshPublisherHeartbeat();
@@ -547,6 +577,80 @@ export default function AdminSocialPublisher() {
     }
   };
 
+  const queueSelectedProduct = async (product: PublisherProduct, publishImmediately: boolean) => {
+    if (!settings?.enabled) {
+      toast({ title: "Automatisering staat uit", description: "Schakel de Social Publisher eerst in.", variant: "destructive" });
+      return;
+    }
+    const mediaPaths = publisherProductMedia(product);
+    if (!mediaPaths.length) {
+      toast({ title: "Product heeft geen media", description: "Voeg eerst minimaal één foto of video aan het product toe.", variant: "destructive" });
+      return;
+    }
+    const activePlatforms = (["facebook", "instagram"] as Platform[]).filter((platform) => !settings.paused_platforms.includes(platform));
+    if (!activePlatforms.length) {
+      toast({ title: "Alle platformen zijn gepauzeerd", variant: "destructive" });
+      return;
+    }
+    let scheduledAt = new Date();
+    if (!publishImmediately) {
+      const selectedTime = productScheduleAt[product.id];
+      if (!selectedTime) {
+        toast({ title: "Kies eerst een datum en tijd", variant: "destructive" });
+        return;
+      }
+      scheduledAt = new Date(selectedTime);
+      if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+        toast({ title: "Kies een toekomstig tijdstip", variant: "destructive" });
+        return;
+      }
+    } else if (!window.confirm(`"${product.name}" nu publiceren?`)) return;
+
+    const actionKey = `${product.id}:${publishImmediately ? "now" : "schedule"}`;
+    setProductActionId(actionKey);
+    try {
+      const eventId = createClientId();
+      const states = {
+        facebook: activePlatforms.includes("facebook") ? "pending" : "skipped",
+        instagram: activePlatforms.includes("instagram") ? "pending" : "skipped",
+      };
+      const { data, error } = await supabase.from("social_post_jobs").insert({
+        event_key: `planned:spotlight:${product.id}:${eventId}`,
+        source_type: "spotlight",
+        source_id: product.id,
+        source_name: product.name,
+        status: "queued",
+        priority: publishImmediately ? 200 : 50,
+        scheduled_at: scheduledAt.toISOString(),
+        media_paths: mediaPaths,
+        payload: {
+          name: product.name,
+          direct_url: `https://overweel3d.gijsoverweel.nl/bestellen?product=${encodeURIComponent(product.id)}`,
+          target_platforms: activePlatforms,
+          facebook_media_mode: settings.facebook_media_mode,
+        },
+        platform_state: states,
+        attempts: 0,
+        is_backfill: false,
+      }).select("*").single();
+      if (error || !data?.id) throw error || new Error("De producttaak is niet opgeslagen.");
+      if (publishImmediately) {
+        const publish = await supabase.rpc("publish_social_job_now", { p_job_id: data.id });
+        if (publish.error) throw publish.error;
+      }
+      toast({
+        title: publishImmediately ? "Publicatie gestart" : "Product ingepland",
+        description: publishImmediately ? `${product.name} wordt nu verwerkt.` : `${product.name} staat gepland voor ${scheduledAt.toLocaleString("nl-NL")}.`,
+      });
+      setProductScheduleAt((current) => ({ ...current, [product.id]: "" }));
+      await load();
+    } catch (error) {
+      toast({ title: publishImmediately ? "Direct publiceren mislukt" : "Inplannen mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+    } finally {
+      setProductActionId("");
+    }
+  };
+
   const toggleTargetPlatform = (platform: Platform) => {
     setTargetPlatforms((current) => current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform]);
   };
@@ -644,18 +748,23 @@ export default function AdminSocialPublisher() {
         const data = productsResult.data;
         const imageRows = imagesResult.data || [];
         const eligible = (data || []).map((product) => {
-          const related = imageRows.filter((image) => image.product_id === product.id && String(image.media_type || "").toLowerCase() !== "video")
+          const related = imageRows.filter((image) => image.product_id === product.id)
             .sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || Number(a.sort_order) - Number(b.sort_order))
             .map((image) => image.storage_path).filter(Boolean);
-          const legacy = Array.isArray(product.photos) ? product.photos.filter((path) => !/\.(mp4|webm|mov|m4v)$/i.test(String(path))) : [];
+          const legacy = Array.isArray(product.photos) ? product.photos : [];
           return { product, media: [...new Set([...related, ...legacy].map((path) => normalizeProductStoragePath(String(path || ""))).filter(Boolean))].slice(0, 10) as string[] };
         }).filter((entry) => entry.media.length);
         if (!eligible.length) throw new Error("Er is geen actief product met een productfoto beschikbaar.");
-        const start = Math.floor(Math.random() * eligible.length);
+        const recentIds = settings.spotlight_recent_product_ids || [];
+        const exclusionCount = Math.min(3, Math.max(0, eligible.length - 1));
+        const excluded = recentIds.slice(-exclusionCount);
+        const rotationEligible = eligible.filter((entry) => !excluded.includes(entry.product.id));
+        const selectionPool = rotationEligible.length ? rotationEligible : eligible;
+        const start = Math.floor(Math.random() * selectionPool.length);
         let selected: typeof eligible[number] | undefined;
         let selectedMedia: string[] = [];
-        for (let offset = 0; offset < eligible.length; offset += 1) {
-          const candidate = eligible[(start + offset) % eligible.length];
+        for (let offset = 0; offset < selectionPool.length; offset += 1) {
+          const candidate = selectionPool[(start + offset) % selectionPool.length];
           const urls = await Promise.all(candidate.media.map((path) => getProductPhotoUrl(path)));
           const valid = candidate.media.filter((_, index) => Boolean(urls[index]));
           if (valid.length) { selected = candidate; selectedMedia = valid; break; }
@@ -679,25 +788,28 @@ export default function AdminSocialPublisher() {
       }
 
       const states = { facebook: targetPlatforms.includes("facebook") ? "pending" : "skipped", instagram: targetPlatforms.includes("instagram") ? "pending" : "skipped" };
-      const { error } = await supabase.from("social_post_jobs").insert({
+      const { data, error } = await supabase.from("social_post_jobs").insert({
         event_key: `manual:${eventId}`, source_type: sourceType, source_id: sourceId, source_name: sourceName,
         status: "queued", priority: 200, scheduled_at: new Date().toISOString(), media_paths: mediaPaths,
         payload, platform_state: states, attempts: 0, is_backfill: false,
-      });
-      if (error) throw error;
+      }).select("*").single();
+      if (error || !data?.id) throw error || new Error("Het bericht is niet opgeslagen.");
+      const publish = await supabase.rpc("publish_social_job_now", { p_job_id: data.id });
+      if (publish.error) throw publish.error;
       if (postMode === "custom") {
         customImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
         setCustomText(""); setCustomImages([]); setCustomUploadStatus("");
       }
-      toast({ title: settings.dry_run ? "Droogloop staat klaar" : "Bericht staat klaar om nu te plaatsen", description: postMode === "random" ? `${sourceName} is willekeurig gekozen.` : "Het eigen bericht staat bovenaan de wachtrij." });
+      toast({ title: settings.dry_run ? "Droogloop gestart" : "Publicatie gestart", description: postMode === "random" ? `${sourceName} is willekeurig gekozen en wordt nu verwerkt.` : "Het eigen bericht wordt nu door de Social Publisher verwerkt." });
       await load();
     } catch (error) {
-      toast({ title: "Bericht klaarzetten mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
+      toast({ title: "Direct publiceren mislukt", description: error instanceof Error ? error.message : "Onbekende fout.", variant: "destructive" });
     } finally { setPlacing(false); }
   };
 
   const attentionCount = useMemo(() => jobs.filter((job) => ["manual_attention", "waiting_for_media", "failed"].includes(job.status)).length, [jobs]);
   const visibleActivity = useMemo(() => activity.filter((item) => `${item.source_name} ${item.source_type} ${item.platform} ${item.status} ${item.error}`.toLocaleLowerCase("nl-NL").includes(activitySearch.toLocaleLowerCase("nl-NL"))), [activity, activitySearch]);
+  const visibleProducts = useMemo(() => products.filter((product) => product.name.toLocaleLowerCase("nl-NL").includes(productSearch.trim().toLocaleLowerCase("nl-NL"))), [productSearch, products]);
   const publisherConnected = publisherHeartbeat.connected;
   const publisherLastSeenMs = parsePocketBaseTimestamp(publisherHeartbeat.lastSeen);
   const publisherLastSeenLabel = Number.isFinite(publisherLastSeenMs)
@@ -723,7 +835,7 @@ export default function AdminSocialPublisher() {
 
     <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
       <h2 className="font-semibold text-emerald-950">Meta-conforme publicatiemodus</h2>
-      <p className="mt-1 text-sm text-emerald-900/75">De publisher gebruikt uitsluitend de officiële Meta Graph API. Wachtrijtaken en planningen publiceren nooit zelfstandig: controleer ieder bericht en klik zelf op <strong>Nu online zetten</strong>. Browserautomatisering, noVNC en het nabootsen van menselijke handelingen zijn uitgeschakeld.</p>
+      <p className="mt-1 text-sm text-emerald-900/75">De publisher gebruikt uitsluitend de officiële Meta Graph API. Nieuwe producten, prijs- en variantwijzigingen en ingeplande uitlichtingen worden automatisch verwerkt. Zelf geschreven berichten vereisen altijd de knop <strong>Nu online zetten</strong>. Browserautomatisering, noVNC en het nabootsen van menselijke handelingen zijn uitgeschakeld.</p>
     </section>
 
     <section className="mb-6 rounded-2xl border bg-white p-5">
@@ -760,6 +872,7 @@ export default function AdminSocialPublisher() {
       </section></TabsContent>
       <TabsContent value="queue" className="space-y-3">
         <section className="flex flex-col gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">Bestaande producten en kleuren</h2><p className="text-sm text-black/55">Zet alle actieve items één keer in de wachtrij. Actieve taken blijven staan tot ze zijn afgerond. Geannuleerde taken verdwijnen na 5 minuten en afgeronde taken na 1 uur. De volgende productuitlichting staat altijd alvast ingepland.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="destructive" onClick={() => void clearQueue()} disabled={clearingQueue || backfilling || jobs.length === 0}>{clearingQueue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Alles annuleren en verwijderen</Button><Button type="button" onClick={() => void enqueueBackfill()} disabled={backfilling || clearingQueue}>{backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />} Bestaande catalogus inplannen</Button></div></section>
+        <section className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-semibold">Product kiezen</h2><p className="mt-1 text-sm text-black/55">Plan ieder actief product afzonderlijk in of publiceer het meteen. Na een publicatie worden eerst minimaal drie andere producten gekozen voordat hetzelfde product terugkomt.</p></div><Input className="sm:max-w-xs" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Zoek product…" aria-label="Zoek product om te publiceren" /></div><div className="mt-4 grid gap-3 lg:grid-cols-2">{visibleProducts.map((product) => { const mediaCount = publisherProductMedia(product).length; return <article key={product.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{product.name}</h3><p className="mt-1 text-xs text-black/45">{mediaCount} mediabestand{mediaCount === 1 ? "" : "en"} · {Number(product.price) > 0 ? `€${Number(product.price).toFixed(2)}` : "op aanvraag"}</p></div><Button size="sm" onClick={() => void queueSelectedProduct(product, true)} disabled={Boolean(productActionId) || !mediaCount || settings.dry_run}>{productActionId === `${product.id}:now` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Nu publiceren</Button></div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><Input type="datetime-local" value={productScheduleAt[product.id] || ""} onChange={(event) => setProductScheduleAt((current) => ({ ...current, [product.id]: event.target.value }))} aria-label={`Publicatietijd voor ${product.name}`} /><Button type="button" variant="outline" onClick={() => void queueSelectedProduct(product, false)} disabled={Boolean(productActionId) || !mediaCount}>{productActionId === `${product.id}:schedule` ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />} Inplannen</Button></div>{!mediaCount && <p className="mt-2 text-xs text-red-700">Voeg eerst een productfoto of -video toe.</p>}</article>; })}</div>{visibleProducts.length === 0 && <p className="mt-4 rounded-xl bg-neutral-50 p-6 text-center text-sm text-black/45">Geen actieve producten gevonden.</p>}</section>
         {jobs.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-black/45">De wachtrij wordt gevuld zodra de container voor het eerst synchroniseert.</div> : jobs.map((job) => {
           const facebookTargeted = !job.payload?.target_platforms?.length || job.payload.target_platforms.includes("facebook");
           const facebookPosted = job.platform_state?.facebook === "published" || Boolean(Object.keys(job.payload?.social_platform_posts?.facebook || {}).length);

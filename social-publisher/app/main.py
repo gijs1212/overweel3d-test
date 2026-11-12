@@ -18,7 +18,7 @@ from .meta_config import load_meta_config, save_meta_config
 from .pairing import pairing_store
 from .worker import SocialWorker
 
-VERSION = "3.0.1"
+VERSION = "3.0.2"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("overweel3d.social")
 

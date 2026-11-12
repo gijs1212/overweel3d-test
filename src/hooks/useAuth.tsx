@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getFunctionErrorMessage } from "@/lib/functionErrors";
@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const currentUserId = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applySession = useCallback(async (nextSession: Session | null) => {
     const nextUser = nextSession?.user ?? null;
+    currentUserId.current = nextUser?.id ?? null;
     setSession(nextSession);
     setUser(nextUser);
     if (!nextUser) {
@@ -87,7 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, nextSession) => {
         const currentValidation = ++validationId;
-        setLoading(true);
+        // Returning from a file picker and starting an upload both refresh the
+        // token. Keep the mounted form (and its file input) for the same user.
+        if ((nextSession?.user.id ?? null) !== currentUserId.current) setLoading(true);
         await applySession(nextSession);
         if (active && currentValidation === validationId) setLoading(false);
       }

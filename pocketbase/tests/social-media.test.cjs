@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const zlib = require("node:zlib");
 const sandbox = { module: { exports: {} }, console };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../pb_hooks/overweel3d-core.js"), "utf8"), sandbox);
-const { applyOrderDefaults, socialColorPng, socialColorMedia, socialImagesForProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route2, route8, route9, route10, route11 } = sandbox.module.exports;
+const { applyOrderDefaults, socialColorPng, socialColorMedia, socialImagesForProduct, socialSyncCatalog, socialProductFingerprint, socialSpotlightProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs, route0, route2, route8, route9, route10, route11 } = sandbox.module.exports;
 
 function record(data) {
   return {
@@ -220,7 +220,39 @@ test("authenticated source route serves a generated color without a storage reco
   delete sandbox.$security;
 });
 
-test("prepared media returns a direct PocketBase file URL and makes the copy public", () => {
+test("authenticated source route reads real bytes from PocketBase local storage", () => {
+  const setting = record({ integration_token: "local-token" });
+  const stored = { getString: (name) => name === "file" ? "upload.png" : "", baseFilesPath: () => "collection-id/record-id" };
+  const source = [137, 80, 78, 71];
+  const expectedPath = "C:/pb_data/storage/collection-id/record-id/upload.png";
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (a, b) => a === b };
+  sandbox.$filepath = { join: (...parts) => parts.join("/") };
+  sandbox.$os = {
+    stat: (path) => { assert.equal(path, expectedPath); return { size: () => source.length }; },
+    readFile: (path) => { assert.equal(path, expectedPath); return source; },
+  };
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "social_publisher_settings" ? [setting] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "storage_files" && params.value === "social/manual/id/1.png" ? stored : null,
+    dataDir: () => "C:/pb_data",
+  };
+  const event = {
+    requestInfo: () => ({ headers: { x_overweel_social_token: "local-token" } }),
+    request: { url: { query: () => ({ get: () => "social/manual/id/1.png" }) } },
+    response: { header: () => ({ set: () => {} }) },
+    blob: (status, mime, bytes) => ({ status, mime, bytes }),
+  };
+  const response = route9(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.mime, "image/png");
+  assert.deepEqual(Array.from(response.bytes), source);
+  delete sandbox.$app;
+  delete sandbox.$security;
+  delete sandbox.$filepath;
+  delete sandbox.$os;
+});
+
+test("prepared media returns a signed public-media URL and makes the copy public", () => {
   const setting = record({ integration_token: "local-token" });
   const job = record({ id: "job-pb", supabase_id: "job-public", status: "processing", payload: {
     social_media_grant: { expires_at: "2099-01-01T00:00:00.000Z", paths: ["products/roos/photo.jpeg"] },
@@ -243,7 +275,8 @@ test("prepared media returns a direct PocketBase file URL and makes the copy pub
   };
   const response = route8(event);
   assert.equal(response.status, 200);
-  assert.equal(response.data.url, "https://api.example.test/api/files/storage_files/history-record/prepared.jpg");
+  assert.match(response.data.url, /^https:\/\/api\.example\.test\/api\/overweel3d\/social\/public-media\?grant_id=[^&]+&token=[^&]+$/);
+  assert.ok(saved.some((value) => value.data?.job_id === "job-public" && value.data?.path === "social-publisher/job-pb/0.jpg"), "de publieke grant moet naar de voorbereide kopie wijzen");
   assert.equal(saved.find((value) => value.data?.bucket === "social-publisher")?.data?.public, true);
   delete sandbox.$security;
   delete sandbox.$os;
@@ -251,7 +284,7 @@ test("prepared media returns a direct PocketBase file URL and makes the copy pub
   delete sandbox.$app;
 });
 
-test("prepared MP4 is stored publicly for Meta to fetch", () => {
+test("prepared MP4 receives a signed public-media URL for Meta", () => {
   const setting = record({ integration_token: "local-token" });
   const job = record({ id: "job-pb", supabase_id: "job-public", status: "processing", payload: {
     social_media_grant: { expires_at: "2099-01-01T00:00:00.000Z", paths: ["products/item/video.mov"] },
@@ -271,7 +304,7 @@ test("prepared MP4 is stored publicly for Meta to fetch", () => {
   };
   const response = route8(event);
   assert.equal(response.status, 200);
-  assert.match(response.data.url, /\.mp4$/);
+  assert.match(response.data.url, /\/api\/overweel3d\/social\/public-media\?grant_id=[^&]+&token=[^&]+$/);
   assert.equal(job.get("payload").social_media_grant.prepared["0"], "social-publisher/job-pb/0.mp4");
   delete sandbox.$security; delete sandbox.$os; delete sandbox.$filesystem; delete sandbox.$app;
 });
@@ -480,6 +513,15 @@ test("an overdue post keeps its original time and is actually claimed", () => {
   delete sandbox.$os;
 });
 
+test("a manually written post is never published without explicit approval", () => {
+  const settings = record({ enabled: true, dry_run: false, paused_platforms: [], templates: {} });
+  const job = record({ id: "manual-job", status: "queued", source_type: "manual", source_name: "Eigen bericht", priority: 100, scheduled_at: "2026-01-01T00:00:00.000Z", media_paths: [], payload: { texts: { default: "Test" } } });
+  sandbox.$app = { findRecordsByFilter: () => [job] };
+  assert.equal(socialClaim(settings, true), null);
+  assert.equal(job.getString("status"), "queued");
+  delete sandbox.$app;
+});
+
 test("claiming a job no longer needs the media-grant collection", () => {
   const settings = record({ enabled: true, dry_run: false, paused_platforms: [], templates: {} });
   const job = record({ id: "safe-job", supabase_id: "safe-job", status: "queued", source_type: "color", source_name: "Zwart", priority: 100, scheduled_at: "2026-01-01T00:00:00.000Z", media_paths: ["generated-color:#000000"], payload: { facebook_media_mode: "combined" } });
@@ -585,6 +627,84 @@ test("the next spotlight is stored in the queue before its publication time", ()
   delete sandbox.$security;
 });
 
+test("spotlight rotation excludes the last three published products", () => {
+  const products = ["one", "two", "three", "four", "five"].map((id) => record({ id, supabase_id: id, name: id, active: true }));
+  const image = record({ storage_path: "products/photo.jpg", is_primary: true, sort_order: 0 });
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "products" ? products : collection === "product_images" ? [image] : [],
+    findFirstRecordByFilter: (collection) => collection === "storage_files" ? { id: "stored-photo" } : null,
+  };
+  const selected = socialSpotlightProduct(record({ spotlight_recent_product_ids: ["one", "two", "three"] }), "2099-01-03T18:00:00.000Z");
+  assert.ok(["four", "five"].includes(selected.getString("supabase_id")));
+  delete sandbox.$app;
+});
+
+test("product fingerprint changes for a new price or variant", () => {
+  const product = record({ id: "product", supabase_id: "product", price: 20 });
+  const variant = record({ id: "variant", supabase_id: "variant", name: "Groot", price_adjustment: 5, active: true, sort_order: 0 });
+  sandbox.$security = { sha256: (value) => require("node:crypto").createHash("sha256").update(value).digest("hex") };
+  sandbox.$app = { findRecordsByFilter: (collection) => collection === "product_variants" ? [variant] : [] };
+  const initial = socialProductFingerprint(product);
+  product.set("price", 22);
+  assert.notEqual(socialProductFingerprint(product), initial);
+  const afterPrice = socialProductFingerprint(product);
+  variant.set("name", "Extra groot");
+  assert.notEqual(socialProductFingerprint(product), afterPrice);
+  delete sandbox.$app;
+  delete sandbox.$security;
+});
+
+test("catalog sync creates one automatic post when a known product changes", () => {
+  const settingsData = { last_sync_at: "2026-11-01T00:00:00.000Z", product_fingerprints_initialized: true, product_fingerprints: { product: "old-fingerprint" } };
+  const product = record({ id: "product-pb", supabase_id: "product", name: "Roos", price: 22, active: true });
+  const existingNewJob = record({ id: "new-product-job", event_key: "new:product:product", status: "completed" });
+  const image = record({ storage_path: "products/roos.jpg", is_primary: true, sort_order: 0 });
+  const saved = [];
+  sandbox.$security = {
+    randomString: () => "random-id",
+    sha256: (value) => require("node:crypto").createHash("sha256").update(value).digest("hex"),
+  };
+  sandbox.$app = {
+    findRecordsByFilter: (collection) => collection === "products" ? [product] : collection === "product_images" ? [image] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => {
+      if (collection === "social_post_jobs" && params.key === "new:product:product") return existingNewJob;
+      if (collection === "storage_files") return { id: "stored-photo" };
+      return null;
+    },
+    findCollectionByNameOrId: () => ({}),
+    save: (item) => saved.push(item),
+  };
+  assert.equal(socialSyncCatalog(record(settingsData)), 1);
+  const update = saved.find((item) => item.data?.source_type === "product_update");
+  assert.equal(update?.data?.source_name, "Roos");
+  assert.equal(update?.data?.status, "queued");
+  assert.notEqual(settingsData.product_fingerprints.product, "old-fingerprint");
+  delete sandbox.$app;
+  delete sandbox.$security;
+});
+
+test("a stale completed spotlight advances to the next two-day slot", () => {
+  const firstAt = "2099-01-03T18:00:00.000Z";
+  const settingsData = { spotlight_enabled: true, spotlight_next_at: firstAt };
+  const completed = record({ id: "old-spotlight", event_key: "spotlight:2099-01-03", source_type: "spotlight", status: "completed" });
+  const product = record({ id: "product-pb", supabase_id: "product-1", name: "Roos", active: true });
+  const image = record({ storage_path: "products/roos.jpg", is_primary: true, sort_order: 0 });
+  const saved = [];
+  sandbox.$security = { randomString: () => "random-id", sha256: (value) => `hash:${value}` };
+  sandbox.$app = {
+    findRecordsByFilter: (collection, filter) => collection === "social_post_jobs" && filter.includes("source_type = 'spotlight'") ? [] : collection === "products" ? [product] : collection === "product_images" ? [image] : [],
+    findFirstRecordByFilter: (collection, _filter, params) => collection === "social_post_jobs" && params.key === "spotlight:2099-01-03" ? completed : collection === "storage_files" ? { id: "stored-photo" } : null,
+    findCollectionByNameOrId: () => ({}),
+    save: (item) => saved.push(item),
+  };
+  socialScheduleSpotlight(record(settingsData));
+  const queued = saved.find((item) => item.data?.source_type === "spotlight");
+  assert.equal(settingsData.spotlight_next_at, "2099-01-05T18:00:00.000Z");
+  assert.equal(queued?.data?.scheduled_at, settingsData.spotlight_next_at);
+  delete sandbox.$app;
+  delete sandbox.$security;
+});
+
 test("completing a spotlight immediately queues the next product two days ahead", () => {
   const settingsData = { enabled: true, dry_run: false, spotlight_enabled: true, spotlight_next_at: "2026-10-09T17:00:00.000Z", paused_platforms: [] };
   const settings = record(settingsData);
@@ -676,6 +796,35 @@ test("media grant serves the prepared image without reading jobs or settings", (
   assert.equal(response.status, 200);
   assert.equal(response.mime, "image/jpeg");
   assert.deepEqual(Array.from(response.bytes), [7, 8, 9]);
+  delete sandbox.$app;
+  delete sandbox.$security;
+  delete sandbox.$os;
+  delete sandbox.$filepath;
+});
+
+test("media grant serves prepared MP4 with the correct content type", () => {
+  const preparedPath = "social-publisher/job-1/0.mp4";
+  const grant = record({
+    id: "grant-pb", supabase_id: "grant-video", token_hash: "hash:video-token",
+    expires_at: "2099-01-01T00:00:00.000Z", path: preparedPath, prepared_path: "",
+  });
+  const file = { getString: () => "prepared.mp4", baseFilesPath: () => "/files" };
+  sandbox.$security = { sha256: (value) => `hash:${value}`, equal: (left, right) => left === right };
+  sandbox.$app = {
+    findFirstRecordByFilter: (collection, _filter, params) => {
+      if (collection === "social_media_grants" && params.value === "grant-video") return grant;
+      if (collection === "storage_files" && params.value === preparedPath) return file;
+      return null;
+    },
+  };
+  sandbox.$os = { stat: () => ({ size: () => 4 }), readFile: () => [0, 0, 0, 1] };
+  sandbox.$filepath = { join: (...parts) => parts.join("/") };
+  const query = { grant_id: "grant-video", token: "video-token" };
+  const event = { request: { url: { query: () => ({ get: (key) => query[key] || "" }) } }, response: { header: () => ({ set: () => {} }) }, blob: (status, mime, bytes) => ({ status, mime, bytes }) };
+  const response = route10(event);
+  assert.equal(response.status, 200);
+  assert.equal(response.mime, "video/mp4");
+  assert.deepEqual(Array.from(response.bytes), [0, 0, 0, 1]);
   delete sandbox.$app;
   delete sandbox.$security;
   delete sandbox.$os;

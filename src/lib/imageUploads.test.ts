@@ -10,6 +10,10 @@ vi.mock("heic2any", () => ({
   default: vi.fn(async () => new Blob(["jpeg"], { type: "image/jpeg" })),
 }));
 
+vi.mock("heic-to/csp", () => ({
+  heicTo: vi.fn(async () => new Blob(["modern-jpeg"], { type: "image/jpeg" })),
+}));
+
 import { isHeicFile, jpegNameForHeic, jpegPathForHeic, uploadFileWithHeicConversion } from "./imageUploads";
 
 describe("HEIC upload helpers", () => {

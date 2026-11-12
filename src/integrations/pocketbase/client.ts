@@ -14,18 +14,24 @@ function emitUploadProgress(detail: { id: string; name: string; path: string; pe
 
 function uploadStorageRecord(existingId: string | null, form: FormData, file: File, path: string): Promise<RecordModel> {
   const id = `${path}:${Date.now()}:${Math.random()}`;
+  let lastProgress = -1;
   emitUploadProgress({ id, name: file.name, path, percent: 0, status: "uploading" });
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(existingId ? "PATCH" : "POST", `${POCKETBASE_URL}/api/collections/storage_files/records${existingId ? `/${existingId}` : ""}`);
-    xhr.timeout = 180_000;
+    // A 250 MB video can legitimately need considerably longer than three
+    // minutes on Wi-Fi. Each file remains an independent upload request.
+    xhr.timeout = 30 * 60_000;
     if (pocketbase.authStore.token) xhr.setRequestHeader("Authorization", pocketbase.authStore.token);
     // Safari occasionally returns a null `response` for multipart uploads when
     // responseType=json is used. Read text and parse it ourselves instead.
     xhr.responseType = "text";
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
-      emitUploadProgress({ id, name: file.name, path, percent: Math.min(99, Math.round(event.loaded / event.total * 100)), status: "uploading" });
+      const percent = Math.min(99, Math.round(event.loaded / event.total * 100));
+      if (percent === lastProgress) return;
+      lastProgress = percent;
+      emitUploadProgress({ id, name: file.name, path, percent, status: "uploading" });
     };
     xhr.onerror = () => {
       const error = "Netwerkfout tijdens uploaden.";
@@ -38,7 +44,7 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
       reject(new Error(error));
     };
     xhr.ontimeout = () => {
-      const error = "Upload duurde langer dan 3 minuten en is afgebroken. Controleer de internetverbinding en probeer het bestand opnieuw.";
+      const error = "Upload duurde langer dan 30 minuten en is afgebroken. Controleer de internetverbinding en probeer het bestand opnieuw.";
       emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error });
       reject(new Error(error));
     };
@@ -137,7 +143,11 @@ async function refreshStoredSession() {
     sessionRefreshPromise = pocketbase.collection("users")
       .authRefresh({ requestKey: null })
       .then(() => sessionShape())
-      .catch(() => {
+      .catch((error) => {
+        // A network interruption during a file upload is not a sign-out.
+        if (error?.status !== 401 && error?.status !== 403 && pocketbase.authStore.isValid) {
+          return sessionShape();
+        }
         pocketbase.authStore.clear();
         return null;
       })
@@ -318,7 +328,7 @@ export const supabase = {
   channel: (_name:string) => ({ on(..._args:any[]){return this;}, subscribe(..._args:any[]){return this;}, unsubscribe(..._args:any[]){return Promise.resolve("ok");} }),
   removeChannel: async (..._args:any[]) => "ok",
   storage: { from: (bucket:string) => ({
-    upload:async(path:string,file:File,_options?:any)=>{try{const existing=await findStoredFile(bucket,path).catch(()=>null); if(existing&&!_options?.upsert)throw new Error("Er bestaat al een bestand op dit pad."); const form=new FormData();form.set("bucket",bucket);form.set("path",path);form.set("file",file,file.name);form.set("owner_user_id",(pocketbase.authStore.record as any)?.supabase_id||"");form.set("public",String(path.startsWith("products/")||path.startsWith("portfolio/")||path.startsWith("colors/")||path.startsWith("reviews/"))); const record=await uploadStorageRecord(existing?.id||null,form,file,path);return{data:{path,id:record.id},error:null}}catch(e){return{data:null,error:asError(e)}}},
+    upload:async(path:string,file:File,_options?:any)=>{try{const hadSession=Boolean(pocketbase.authStore.token);if(hadSession&&!await refreshStoredSession())throw new Error("Uw sessie is verlopen. Log opnieuw in voordat u bestanden uploadt.");const existing=await findStoredFile(bucket,path).catch(()=>null); if(existing&&!_options?.upsert)throw new Error("Er bestaat al een bestand op dit pad."); const form=new FormData();form.set("bucket",bucket);form.set("path",path);form.set("file",file,file.name);form.set("owner_user_id",(pocketbase.authStore.record as any)?.supabase_id||"");form.set("public",String(path.startsWith("products/")||path.startsWith("portfolio/")||path.startsWith("colors/")||path.startsWith("reviews/"))); const record=await uploadStorageRecord(existing?.id||null,form,file,path);return{data:{path,id:record.id},error:null}}catch(e){return{data:null,error:asError(e)}}},
     remove:async(paths:string[])=>{try{for(const path of paths){const record=await findStoredFile(bucket,path).catch(()=>null);if(record)await pocketbase.collection("storage_files").delete(record.id,{requestKey:null});storageUrlCache.delete(`${bucket}:${path}`)}return{data:paths,error:null}}catch(e){return{data:null,error:asError(e)}}},
     download:async(path:string)=>{try{const url=await storedFileUrl(bucket,path);const response=await fetch(url);if(!response.ok)throw new Error(`Download mislukt (${response.status})`);return{data:await response.blob(),error:null}}catch(e){return{data:null,error:asError(e)}}},
     createSignedUrl:async(path:string,_expires?:number)=>{try{const signedUrl=await storedFileUrl(bucket,path);return{data:{signedUrl},error:null}}catch(e){return{data:null,error:asError(e)}}},

@@ -68,15 +68,43 @@ async function libraryJpeg(file: File, quality: number): Promise<Blob> {
   return jpegBlob;
 }
 
+async function maintainedLibraryJpeg(file: File, quality: number): Promise<Blob> {
+  // The CSP build avoids unsafe-eval and uses a current libheif decoder. This
+  // supports newer iPhone HEIC variants that the unmaintained heic2any decoder
+  // cannot always open.
+  const { heicTo } = await import("heic-to/csp");
+  const result = await heicTo({ blob: file, type: "image/jpeg", quality });
+  if (!(result instanceof Blob) || result.size <= 0) {
+    throw new Error("De HEIC-decoder leverde geen geldige JPG op.");
+  }
+  return result;
+}
+
+const convertedImageCache = new WeakMap<File, Promise<File>>();
+
 export async function prepareImageFileForUpload(file: File, quality = 0.9): Promise<File> {
   if (!isHeicFile(file)) return file;
 
-  // Safari/iPadOS already contains a native HEIC decoder. Using that first avoids
-  // the WebAssembly/Worker failures and high memory use of heic2any on iPads.
-  // Other browsers use heic2any first and retain the native route as a fallback.
+  const cached = convertedImageCache.get(file);
+  if (cached) return cached;
+
+  const conversion = convertHeicFile(file, quality);
+  convertedImageCache.set(file, conversion);
+  try {
+    return await conversion;
+  } catch (error) {
+    convertedImageCache.delete(file);
+    throw error;
+  }
+}
+
+async function convertHeicFile(file: File, quality: number): Promise<File> {
+
+  // heic-to follows current libheif releases and is therefore the primary
+  // decoder. Retain both older routes as fallbacks for unusual browser builds.
   const converters = isAppleWebKit()
-    ? [nativeBrowserJpeg, libraryJpeg]
-    : [libraryJpeg, nativeBrowserJpeg];
+    ? [maintainedLibraryJpeg, nativeBrowserJpeg, libraryJpeg]
+    : [maintainedLibraryJpeg, libraryJpeg, nativeBrowserJpeg];
   let jpegBlob: Blob | null = null;
   let lastError: unknown = null;
   for (const converter of converters) {

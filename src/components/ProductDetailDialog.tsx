@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import {
   availableMaterialsForProduct,
+  catalogProductPriceLabel,
   buildProductOptionAnswers,
   CatalogProduct,
   colorMatchesMaterial,
@@ -59,6 +60,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [files, setFiles] = useState<Record<string, File[]>>({});
   const [addonEnabled, setAddonEnabled] = useState<Record<string, boolean>>({});
+  const [addonCounts, setAddonCounts] = useState<Record<string, number>>({});
   const [addonColors, setAddonColors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -88,7 +90,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   const selectedVariant = variants.find((variant) => variant.id === variantId) || null;
   const priceOnRequest = Number(product?.price || 0) <= 0;
   const unitPrice = Number(product?.price || 0) + Number(selectedVariant?.price_adjustment || 0)
-    + options.filter((option) => option.is_addon && addonEnabled[option.id]).reduce((total, option) => total + Number(option.price_adjustment || 0), 0);
+    + options.filter((option) => option.is_addon && addonEnabled[option.id]).reduce((total, option) => total + Number(option.price_adjustment || 0) * (addonCounts[option.id] || 1), 0);
   const materialColors = useMemo(() => {
     if (!product || !material) return [];
     const explicitlyAllowed = new Set(product.colors || []);
@@ -114,6 +116,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
     setValues({});
     setFiles({});
     setAddonEnabled({});
+    setAddonCounts({});
     setAddonColors({});
     setError(null);
     const productMedia = orderedProductImages(product);
@@ -166,7 +169,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
         const chosen = addonColors[option.id] || [];
         if (Array.from({ length: option.color_slots }).some((_, index) => !chosen[index])) return `Vul elk kleurvak van “${option.label}” in.`;
       }
-      if (!option.required) continue;
+      if (!option.required || (option.is_addon && option.type === "checkbox")) continue;
       if (option.type === "photo" && !(files[option.id]?.length)) return `Upload minimaal één foto bij “${option.label}”.`;
       if (option.type === "checkbox" && values[option.id] !== true) return `Bevestig “${option.label}”.`;
       if (option.type !== "photo" && option.type !== "checkbox" && !String(values[option.id] || "").trim()) return `Vul “${option.label}” in.`;
@@ -187,9 +190,9 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
         slotLabel: product.color_selection_mode === "multiple" ? productColorSlotTitle(product, index) : undefined,
       }] : [];
     });
-    const optionAnswers = buildProductOptionAnswers(options.filter((option) => !option.is_addon || addonEnabled[option.id]), values);
+    const optionAnswers = buildProductOptionAnswers(options.filter((option) => !option.is_addon || (addonEnabled[option.id] && option.type !== "checkbox")), values);
     options.filter((option) => option.is_addon && addonEnabled[option.id]).forEach((option) => {
-      optionAnswers.push({ optionId: option.id, label: option.label, type: option.type, value: "Ja" });
+      optionAnswers.push({ optionId: option.id, label: option.label, type: option.type, value: "Ja", addonQuantity: addonCounts[option.id] || 1 });
       (addonColors[option.id] || []).forEach((colorId, index) => {
         const color = materialColors.find((item) => item.id === colorId);
         if (color) optionAnswers.push({ optionId: `${option.id}:color:${index}`, label: option.color_slot_labels[index] || `Kleur ${index + 1}`, type: "select", value: color.name });
@@ -201,7 +204,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
       colors: selectedColors,
       quantity: Math.max(1, Math.floor(quantity)),
       optionAnswers,
-      optionFiles: options.filter((option) => option.type === "photo" && files[option.id]?.length).map((option) => ({ optionId: option.id, label: option.label, files: files[option.id] })),
+      optionFiles: options.filter((option) => option.type === "photo" && (!option.is_addon || addonEnabled[option.id]) && files[option.id]?.length).map((option) => ({ optionId: option.id, label: option.label, files: files[option.id] })),
       variantId: selectedVariant?.id || null,
       variantName: selectedVariant?.name || null,
       unitPrice,
@@ -212,7 +215,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   const renderOption = (option: ProductOption) => {
     if (option.type === "photo") return <div className="flex flex-wrap gap-2 mt-1">
       {(files[option.id] || []).map((file, index) => <div key={`${file.name}-${index}`} className="relative w-16 h-16 rounded-md overflow-hidden border"><LocalMediaPreview file={file} alt="Uploadvoorbeeld" className="h-full w-full object-cover" /><button type="button" onClick={() => setFiles((current) => ({ ...current, [option.id]: current[option.id].filter((_, fileIndex) => fileIndex !== index) }))} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}
-      <label className="relative w-16 h-16 overflow-hidden rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer"><Upload className="w-4 h-4 text-muted-foreground" /><input type="file" accept="image/*" multiple className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(event) => { addFiles(option.id, Array.from(event.target.files || [])); event.target.value = ""; }} /></label>
+      <label className="relative w-16 h-16 overflow-hidden rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer"><Upload className="w-4 h-4 text-muted-foreground" /><input type="file" accept="image/*" multiple className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(event) => { addFiles(option.id, Array.from(event.target.files || [])); }} /></label>
     </div>;
     if (option.type === "textarea") return <Textarea rows={3} maxLength={option.max_length || undefined} value={String(values[option.id] || "")} onChange={(event) => setValues((current) => ({ ...current, [option.id]: event.target.value }))} />;
     if (option.type === "select") return <Select value={String(values[option.id] || "")} onValueChange={(value) => setValues((current) => ({ ...current, [option.id]: value }))}><SelectTrigger><SelectValue placeholder="Maak een keuze" /></SelectTrigger><SelectContent>{option.choices.map((choice) => <SelectItem key={choice} value={choice}>{choice}</SelectItem>)}</SelectContent></Select>;
@@ -224,7 +227,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-2xl">{product.name}</DialogTitle></DialogHeader>
     <div className="grid md:grid-cols-2 gap-6">
       <div><div className="aspect-square bg-muted rounded-lg overflow-hidden">{mediaItems[activePhoto]?.url ? mediaItems[activePhoto].mediaType === "video" ? <video src={mediaItems[activePhoto].url} aria-label={product.name} controls playsInline preload="metadata" className="w-full h-full object-contain" /> : <img src={mediaItems[activePhoto].url} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Geen media</div>}</div>{mediaItems.length > 1 && <div className="flex gap-2 mt-2 overflow-x-auto">{mediaItems.map((media, index) => <button type="button" key={media.path} onClick={() => setActivePhoto(index)} className={`relative w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${index === activePhoto ? "border-accent" : "border-border"}`}>{media.mediaType === "video" ? <video src={media.url} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={media.url} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />}</button>)}</div>}</div>
-      <div className="space-y-4"><div className="text-2xl font-bold text-accent">{priceOnRequest ? "Op aanvraag" : `€${unitPrice.toFixed(2)}`}</div>{product.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>}
+      <div className="space-y-4"><div className="text-2xl font-bold text-accent">{priceOnRequest ? "Op aanvraag" : selectedVariant || variants.length === 0 ? `€${unitPrice.toFixed(2)}` : catalogProductPriceLabel(product)}</div>{product.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p>}
         {variants.length > 0 && <div><Label>Variant *</Label><Select value={variantId} onValueChange={setVariantId}><SelectTrigger><SelectValue placeholder="Kies formaat of uitvoering" /></SelectTrigger><SelectContent>{variants.map((variant) => <SelectItem key={variant.id} value={variant.id}>{variant.name}{priceOnRequest ? " (op aanvraag)" : ` (€${(Number(product.price) + Number(variant.price_adjustment || 0)).toFixed(2)})`}</SelectItem>)}</SelectContent></Select></div>}
         <div><Label>Materiaal *</Label>{product.material_mode === "fixed" ? <div className="mt-1 rounded-lg border bg-muted/40 p-3"><p className="font-medium">{materialLabel(material)}</p><p className="text-xs text-muted-foreground">Vast materiaal voor dit product</p></div> : <Select value={material} onValueChange={setMaterial}><SelectTrigger><SelectValue placeholder="Kies materiaal" /></SelectTrigger><SelectContent>{materials.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>}</div>
         <div><Label>{product.color_selection_mode === "multiple" ? "Kleuren per onderdeel" : "Kleur"}{product.color_required ? " *" : ""}</Label>{!material ? <p className="text-xs text-muted-foreground mt-1">Kies eerst een materiaal.</p> : materialColors.length === 0 ? <p className="text-xs text-destructive mt-1">Voor dit materiaal zijn momenteel geen kleuren beschikbaar.</p> : product.color_selection_mode === "single" ? <Select value={selectedColorIds[0] || ""} onValueChange={(value) => setSelectedColorIds([value])}><SelectTrigger><SelectValue placeholder={product.color_required ? "Kies een kleur" : "Geen kleur gekozen"} /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select> : <div className="space-y-3 mt-2">{Array.from({ length: product.max_colors }, (_, index) => {
@@ -233,7 +236,7 @@ export function ProductDetailDialog({ product, colors, open, onOpenChange, onAdd
           return <div key={index}><Label className="text-xs">{productColorSlotTitle(product, index)}{required ? " *" : ""}</Label><Select value={selectedColorIds[index] || noneValue} onValueChange={(value) => setColorSlot(index, value === noneValue ? "" : value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!required && <SelectItem value={noneValue}>Geen kleur</SelectItem>}{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select></div>;
         })}</div>}</div>
         <div><Label>Aantal</Label><Input type="number" min={1} step={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))} /></div>
-        {options.map((option) => option.is_addon ? <div key={option.id} className="rounded-xl border-2 border-accent/30 p-4 space-y-3"><div><Label>{option.label}{option.price_adjustment ? ` (+€${Number(option.price_adjustment).toFixed(2)})` : ""}</Label>{option.description && <p className="text-xs text-muted-foreground">{option.description}</p>}</div><div className="grid grid-cols-2 gap-2"><Button type="button" variant={addonEnabled[option.id] ? "default" : "outline"} onClick={() => setAddonEnabled((current) => ({ ...current, [option.id]: true }))}>Ja, toevoegen</Button><Button type="button" variant={!addonEnabled[option.id] ? "default" : "outline"} onClick={() => setAddonEnabled((current) => ({ ...current, [option.id]: false }))}>Nee</Button></div>{addonEnabled[option.id] && <div className="space-y-3">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label className="text-xs">{option.color_slot_labels[index] || `Kleur ${index + 1}`} *</Label><Select value={addonColors[option.id]?.[index] || ""} onValueChange={(value) => setAddonColors((current) => { const selected = [...(current[option.id] || [])]; selected[index] = value; return { ...current, [option.id]: selected }; })}><SelectTrigger><SelectValue placeholder="Kies een kleur" /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select></div>)}{option.type !== "checkbox" && renderOption(option)}</div>}</div> : <div key={option.id}><Label>{option.label}{option.required ? " *" : ""}</Label>{option.description && <p className="text-xs text-muted-foreground mb-1">{option.description}</p>}{renderOption(option)}{option.max_length && ["text", "textarea"].includes(option.type) && <p className="text-[10px] text-muted-foreground mt-1">{String(values[option.id] || "").length}/{option.max_length} tekens</p>}</div>)}
+        {options.map((option) => option.is_addon ? <div key={option.id} className="rounded-xl border-2 border-accent/30 p-4 space-y-3"><div><Label>{option.label}{option.price_adjustment ? ` (+€${Number(option.price_adjustment).toFixed(2)})` : ""}</Label>{option.description && <p className="text-xs text-muted-foreground">{option.description}</p>}</div><div className="grid grid-cols-2 gap-2"><Button type="button" variant={addonEnabled[option.id] ? "default" : "outline"} onClick={() => setAddonEnabled((current) => ({ ...current, [option.id]: true }))}>Ja, toevoegen</Button><Button type="button" variant={!addonEnabled[option.id] ? "default" : "outline"} onClick={() => setAddonEnabled((current) => ({ ...current, [option.id]: false }))}>Nee</Button></div>{addonEnabled[option.id] && <div className="space-y-3"><label>Aantal per product<Input type="number" min={1} max={999} value={addonCounts[option.id] ?? 1} onChange={(event) => setAddonCounts({ ...addonCounts, [option.id]: Math.min(999, Math.max(1, Math.floor(Number(event.target.value) || 1))) })} /></label>{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label className="text-xs">{option.color_slot_labels[index] || `Kleur ${index + 1}`} *</Label><Select value={addonColors[option.id]?.[index] || ""} onValueChange={(value) => setAddonColors((current) => { const selected = [...(current[option.id] || [])]; selected[index] = value; return { ...current, [option.id]: selected }; })}><SelectTrigger><SelectValue placeholder="Kies een kleur" /></SelectTrigger><SelectContent>{materialColors.map((color) => <SelectItem key={color.id} value={color.id}><span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.hex }} />{color.name}</span></SelectItem>)}</SelectContent></Select></div>)}{option.type !== "checkbox" && renderOption(option)}</div>}</div> : <div key={option.id}><Label>{option.label}{option.required ? " *" : ""}</Label>{option.description && <p className="text-xs text-muted-foreground mb-1">{option.description}</p>}{renderOption(option)}{option.max_length && ["text", "textarea"].includes(option.type) && <p className="text-[10px] text-muted-foreground mt-1">{String(values[option.id] || "").length}/{option.max_length} tekens</p>}</div>)}
         {error && <p role="alert" className="text-sm text-destructive rounded-lg bg-destructive/10 p-3">{error}</p>}
         <Button onClick={handleAdd} disabled={(variants.length > 0 && !variantId) || !material || (product.color_required && !selectedColorIds[0])} className="w-full" size="lg"><Plus className="w-4 h-4" /> Toevoegen aan winkelwagen</Button>
       </div>

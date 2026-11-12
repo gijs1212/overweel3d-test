@@ -29,7 +29,7 @@ export function CatalogOrderItems({ items }: { items?: unknown }) {
         {item.answers?.length > 0 && <dl className="mt-4 grid sm:grid-cols-2 gap-3">
           {item.answers.map((answer, answerIndex) => <div key={`${answer.optionId}-${answerIndex}`} className="rounded-lg bg-muted/40 p-3">
             <dt className="text-xs font-semibold text-muted-foreground">{answer.label}</dt>
-            <dd className="text-sm whitespace-pre-wrap mt-1">{typeof answer.value === "boolean" ? (answer.value ? "Ja" : "Nee") : answer.value}</dd>
+            <dd className="text-sm whitespace-pre-wrap mt-1">{answer.addonQuantity ? `${answer.addonQuantity * item.quantity}× totaal (${answer.addonQuantity} per product)` : typeof answer.value === "boolean" ? (answer.value ? "Ja" : "Nee") : answer.value}</dd>
             {answer.files?.length ? <div className="flex flex-wrap gap-2 mt-2"><span className="sr-only"><ImageIcon />Bijlagen</span>{answer.files.map((path) => <AnswerImage key={path} path={path} label={answer.label} />)}</div> : null}
           </div>)}
         </dl>}

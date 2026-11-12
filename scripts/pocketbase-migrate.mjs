@@ -180,7 +180,7 @@ async function ensureStorageCollection() {
   const all = await request("/api/collections?perPage=500");
   const existing = all.items.find((collection) => collection.name === "storage_files");
   if (existing) {
-    existing.fields = existing.fields.map((field) => field.name === "file" ? { ...field, protected: true } : field);
+    existing.fields = existing.fields.map((field) => field.name === "file" ? { ...field, protected: true, maxSize: 262144000 } : field);
     await request(`/api/collections/${existing.id}`, { method: "PATCH", body: JSON.stringify({ fields: existing.fields }) });
     return;
   }
@@ -189,7 +189,7 @@ async function ensureStorageCollection() {
     fields: [
       { name: "bucket", type: "text", required: true },
       { name: "path", type: "text", required: true },
-      { name: "file", type: "file", required: true, maxSelect: 1, maxSize: 104857600, protected: true },
+      { name: "file", type: "file", required: true, maxSelect: 1, maxSize: 262144000, protected: true },
       { name: "owner_user_id", type: "text" },
       { name: "public", type: "bool" },
     ],

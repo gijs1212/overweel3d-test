@@ -64,14 +64,9 @@ class PocketBaseSocialClient:
 
     async def download_media(self, path: str, destination: Path) -> Path:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        if path.startswith("generated-color:"):
-            url = f"{self.api_root}/media"
-            headers = self.headers
-            params = {"path": path}
-        else:
-            url = await self.resolve_media_url(path)
-            headers = {}
-            params = None
+        url = f"{self.api_root}/media"
+        headers = self.headers
+        params = {"path": path}
         async with self.client.stream(
             "GET", url, headers=headers, params=params,
         ) as response:
@@ -92,12 +87,9 @@ class PocketBaseSocialClient:
     async def prepare_public_media(self, job_id: str, index: int, path: str) -> str:
         # The source is read over the authenticated, local integration route.
         # Never rely on the short-lived public-media grant as an input URL.
-        if path.startswith("generated-color:"):
-            response = await self.client.get(
-                f"{self.api_root}/media", headers=self.headers, params={"path": path},
-            )
-        else:
-            response = await self.client.get(await self.resolve_media_url(path))
+        response = await self.client.get(
+            f"{self.api_root}/media", headers=self.headers, params={"path": path},
+        )
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -146,9 +138,10 @@ class PocketBaseSocialClient:
         with tempfile.TemporaryDirectory(prefix="social-video-", dir=temp_root) as directory:
             source = Path(directory) / "source"
             output = Path(directory) / "prepared.mp4"
-            source_url = await self.resolve_media_url(path)
             total = 0
-            async with self.client.stream("GET", source_url) as response:
+            async with self.client.stream(
+                "GET", f"{self.api_root}/media", headers=self.headers, params={"path": path},
+            ) as response:
                 response.raise_for_status()
                 with source.open("wb") as target:
                     async for chunk in response.aiter_bytes():
@@ -179,13 +172,17 @@ class PocketBaseSocialClient:
                 "video_base64": base64.b64encode(video).decode("ascii"),
             })
         url = str(prepared.get("url") or "") if isinstance(prepared, dict) else ""
-        expected = pairing_store.pocketbase_url + "/api/files/storage_files/"
-        if not url.startswith(expected):
-            raise PocketBaseActionError("PocketBase gaf geen geldige video-URL terug.")
-        response = await self.client.head(url)
-        response.raise_for_status()
-        if response.headers.get("content-type", "").split(";", 1)[0].lower() != "video/mp4":
-            raise PocketBaseActionError("De publieke video-URL levert geen MP4-bestand.")
+        if not url.startswith(("https://", "http://")):
+            raise PocketBaseActionError("PocketBase gaf geen publieke video-URL terug.")
+        try:
+            async with self.client.stream("GET", url) as response:
+                response.raise_for_status()
+                if response.headers.get("content-type", "").split(";", 1)[0].lower() != "video/mp4":
+                    raise PocketBaseActionError("De publieke video-URL levert geen MP4-bestand.")
+        except httpx.HTTPError as exc:
+            raise PocketBaseActionError(
+                "De voorbereide video is niet zonder aanmelding bereikbaar voor Meta."
+            ) from exc
         return url
 
     async def close(self) -> None:

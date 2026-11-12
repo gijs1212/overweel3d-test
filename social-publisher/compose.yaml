@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: overweel3d-social-publisher:3.0.1
+    image: overweel3d-social-publisher:3.0.2
     restart: unless-stopped
     environment:
       POCKETBASE_URL: ${POCKETBASE_URL:-https://api.gijsoverweel.nl}

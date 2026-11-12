@@ -205,7 +205,7 @@ function route0(e) {
     var publisherLastSeenMs = publisherLastSeenAt ? new Date(publisherLastSeenAt).getTime() : NaN;
     var publisherAgeSeconds = isFinite(publisherLastSeenMs) ? Math.max(0, (Date.now() - publisherLastSeenMs) / 1000) : null;
     return json(e, {
-      hook_version: "1.19.12",
+      hook_version: "1.19.18",
       publisher_last_seen_at: publisherLastSeenAt,
       publisher_connected: publisherAgeSeconds !== null && publisherAgeSeconds <= 90,
       publisher_age_seconds: publisherAgeSeconds,
@@ -251,7 +251,6 @@ function route0(e) {
     requireAdmin(e);
     var immediateSetting = socialSetting();
     if (!immediateSetting.getBool("enabled")) fail("Zet de automatisering eerst op actief.");
-    if (immediateSetting.getBool("dry_run")) fail("Schakel de droogloop uit om echt online te publiceren.");
     var immediateJob = byId("social_post_jobs", String(p.p_job_id || ""));
     if (!immediateJob) throw new NotFoundError("Socialmediataak niet gevonden.");
     if (["queued", "failed"].indexOf(immediateJob.getString("status")) < 0) fail("Alleen wachtende of mislukte taken kunnen direct worden geplaatst.");
@@ -500,7 +499,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.12" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.18" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -620,7 +619,14 @@ function storedFileBytes(stored, maxBytes) {
   if (!stored) throw new NotFoundError("Opgeslagen bestand niet gevonden.");
   var filename = stored.getString("file");
   if (!filename) throw new NotFoundError("Het opslagrecord bevat geen bestand.");
-  var absolutePath = $filepath.join(stored.baseFilesPath(), filename);
+  var fileKey = String(stored.baseFilesPath()).replace(/\/+$/, "") + "/" + filename;
+  // baseFilesPath() is een key ten opzichte van <pb_data>/storage en geen
+  // absoluut schijfpad. De Go blob-reader schrijft zijn bytes niet terug in
+  // een gewone JavaScript-array, dus lees lokale PocketBase-opslag vanaf de
+  // officiële absolute opslaglocatie.
+  var absolutePath = typeof $app.dataDir === "function"
+    ? $filepath.join($app.dataDir(), "storage", fileKey)
+    : $filepath.join(stored.baseFilesPath(), filename);
   var stat = $os.stat(absolutePath);
   if (maxBytes && stat.size() > maxBytes) throw new BadRequestError("Bestand is te groot.");
   return $os.readFile(absolutePath);
@@ -1620,6 +1626,10 @@ var SOCIAL_DEFAULT_TEMPLATES = {
     facebook: "{direct_url}\n\nNieuw bij Overweel3D: {name} ✨\n\nBekijk dit nieuwe product en stel het samen.\n\n#Overweel3D #3Dprinten #Nieuw\n\nhttps://overweel3d.gijsoverweel.nl/",
     instagram: "{direct_url}\n\nNieuw bij Overweel3D: {name} ✨\n\nBekijk dit nieuwe product en stel het samen.\n\n#Overweel3D #3Dprinten #Nieuw\n\nhttps://overweel3d.gijsoverweel.nl/",
   },
+  product_update: {
+    facebook: "{direct_url}\n\n{name} is vernieuwd bij Overweel3D ✨\n\n{change_label}. Bekijk de actuele uitvoeringen en prijs in de catalogus.\n\n#Overweel3D #3Dprinten #Productupdate\n\nhttps://overweel3d.gijsoverweel.nl/",
+    instagram: "{direct_url}\n\n{name} is vernieuwd bij Overweel3D ✨\n\n{change_label}. Bekijk de actuele uitvoeringen en prijs in de catalogus.\n\n#Overweel3D #3Dprinten #Productupdate\n\nhttps://overweel3d.gijsoverweel.nl/",
+  },
   color: {
     facebook: "{direct_url}\n\nNieuwe kleur bij Overweel3D: {name} ({material}) 🎨\n\nBekijk de kleur in ons assortiment.\n\n#Overweel3D #3Dprinten #NieuweKleur\n\nhttps://overweel3d.gijsoverweel.nl/",
     instagram: "{direct_url}\n\nNieuwe kleur bij Overweel3D: {name} ({material}) 🎨\n\nBekijk de kleur in ons assortiment.\n\n#Overweel3D #3Dprinten #NieuweKleur\n\nhttps://overweel3d.gijsoverweel.nl/",
@@ -1845,17 +1855,39 @@ function socialSyncCatalog(setting) {
   if (!startedAt) { startedAt = new Date().toISOString(); setting.set("backfill_started_at", startedAt); $app.save(setting); }
   var initialSync = !setting.getString("last_sync_at");
   var created = 0;
+  var productFingerprints = socialObject(setting.get("product_fingerprints"));
+  var fingerprintsInitialized = setting.getBool("product_fingerprints_initialized");
+  var fingerprintsChanged = false;
   var products = [];
   try { products = $app.findRecordsByFilter("products", "active = true", "created", 5000, 0) || []; } catch (_) {}
   products.forEach(function (product) {
     var id = product.getString("supabase_id") || product.id;
+    var fingerprint = socialProductFingerprint(product);
+    var hadFingerprint = Object.prototype.hasOwnProperty.call(productFingerprints, id);
     var productKey = "new:product:" + id;
     var existingProductJob = socialJob(productKey);
-    if (existingProductJob && existingProductJob.getString("status") !== "waiting_for_media") return;
     var media = socialImagesForProduct(product);
     var isBackfill = initialSync;
-    if (socialCreateJob(setting, "product", product, media, { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) }, isBackfill, productKey)) created += 1;
+    if (!existingProductJob || existingProductJob.getString("status") === "waiting_for_media") {
+      if (socialCreateJob(setting, "product", product, media, { name: product.getString("name"), direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id) }, isBackfill, productKey)) created += 1;
+    }
+    if (fingerprintsInitialized && hadFingerprint && productFingerprints[id] !== fingerprint) {
+      var changePayload = {
+        name: product.getString("name"),
+        change_label: "De prijs of productvarianten zijn bijgewerkt",
+        direct_url: "https://overweel3d.gijsoverweel.nl/bestellen?product=" + encodeURIComponent(id)
+      };
+      if (socialCreateJob(setting, "product_update", product, media, changePayload, false, "update:product:" + id + ":" + fingerprint)) created += 1;
+    }
+    if (!hadFingerprint || productFingerprints[id] !== fingerprint) {
+      productFingerprints[id] = fingerprint;
+      fingerprintsChanged = true;
+    }
   });
+  if (!fingerprintsInitialized || fingerprintsChanged) {
+    setting.set("product_fingerprints", productFingerprints);
+    setting.set("product_fingerprints_initialized", true);
+  }
   var colors = [];
   try { colors = $app.findRecordsByFilter("filament_colors", "active = true", "created", 5000, 0) || []; } catch (_) {}
   colors.forEach(function (color) {
@@ -1883,6 +1915,26 @@ function socialSyncCatalog(setting) {
   });
   setting.set("last_sync_at", new Date().toISOString()); $app.save(setting);
   return created;
+}
+
+function socialProductFingerprint(product) {
+  var id = product.getString("supabase_id") || product.id;
+  var variants = [];
+  try { variants = $app.findRecordsByFilter("product_variants", "product_id = {:id}", "sort_order", 1000, 0, { id: id }) || []; } catch (_) {}
+  if (product.id !== id) {
+    try { variants = variants.concat($app.findRecordsByFilter("product_variants", "product_id = {:id}", "sort_order", 1000, 0, { id: product.id }) || []); } catch (_) {}
+  }
+  var normalized = variants.map(function (variant) {
+    return [
+      variant.getString("supabase_id") || variant.id,
+      variant.getString("name"),
+      variant.getString("size_label"),
+      variant.getString("material_id"),
+      Number(variant.get("price_adjustment") || 0),
+      variant.getBool("active")
+    ];
+  }).sort(function (a, b) { return String(a[0]).localeCompare(String(b[0])); });
+  return $security.sha256(JSON.stringify({ price: Number(product.get("price") || 0), variants: normalized })).slice(0, 24);
 }
 
 function socialAmsterdamOffset(date) {
@@ -1957,13 +2009,18 @@ function socialSelectNextJob(candidates, setting, now) {
   return { job: selected, scheduled_at: new Date(readyAt).toISOString(), due: readyAt <= now.getTime() };
 }
 
-function socialSpotlightProduct(nextAt) {
+function socialSpotlightProduct(setting, nextAt) {
   var products = [];
   try { products = $app.findRecordsByFilter("products", "active = true", "", 5000, 0) || []; } catch (_) {}
   products = products.filter(function (product) { return socialImagesForProduct(product).length > 0; });
   if (!products.length) return null;
   products.sort(function (a, b) { return String(a.getString("supabase_id") || a.id).localeCompare(String(b.getString("supabase_id") || b.id)); });
-  return products[socialStableIndex(nextAt, products.length)];
+  var recent = socialArray(setting.get("spotlight_recent_product_ids"));
+  var exclusionCount = Math.min(3, Math.max(0, products.length - 1));
+  var excluded = recent.slice(-exclusionCount);
+  var eligible = products.filter(function (product) { return excluded.indexOf(product.getString("supabase_id") || product.id) < 0; });
+  if (!eligible.length) eligible = products;
+  return eligible[socialStableIndex(nextAt, eligible.length)];
 }
 
 function socialNextPublication(setting) {
@@ -1981,7 +2038,7 @@ function socialNextPublication(setting) {
   if (unfinished.length) return { state: "waiting_for_media", source_name: "Bestaande catalogus", source_type: "backfill", scheduled_at: null, platforms: [], is_backfill: true };
   if (setting.getBool("spotlight_enabled")) {
     var nextAt = setting.getString("spotlight_next_at") || socialNextLocal19(now, 0).toISOString();
-    var product = socialSpotlightProduct(nextAt);
+    var product = socialSpotlightProduct(setting, nextAt);
     if (product) {
       var platforms = ["facebook", "instagram"].filter(function (platform) { return socialArray(setting.get("paused_platforms")).indexOf(platform) < 0; });
       return { state: platforms.length ? state : "paused", source_name: product.getString("name"), source_type: "spotlight", scheduled_at: nextAt, platforms: platforms, is_backfill: false };
@@ -2031,7 +2088,23 @@ function socialScheduleSpotlight(setting) {
     setting.set("spotlight_next_at", nextText);
     $app.save(setting);
   }
-  var product = socialSpotlightProduct(nextText);
+  // A previously completed or cancelled occurrence may still have the same
+  // idempotency key. Move to the next two-day slot instead of silently failing
+  // to create a replacement task forever.
+  for (var skipped = 0; skipped < 366; skipped++) {
+    var existingKey = "spotlight:" + next.toISOString().slice(0, 10);
+    var existingOccurrence = socialJob(existingKey);
+    if (!existingOccurrence) break;
+    var existingStatus = existingOccurrence.getString("status");
+    if (["completed", "dry_run_complete", "cancelled"].indexOf(existingStatus) < 0) return;
+    next = socialNextLocal19(next, 2);
+    nextText = next.toISOString();
+  }
+  if (nextText !== setting.getString("spotlight_next_at")) {
+    setting.set("spotlight_next_at", nextText);
+    $app.save(setting);
+  }
+  var product = socialSpotlightProduct(setting, nextText);
   if (product) {
     var id = product.getString("supabase_id") || product.id;
     var dateKey = next.toISOString().slice(0, 10);
@@ -2072,10 +2145,13 @@ function socialClaim(setting, metaReady) {
   try { candidates = $app.findRecordsByFilter("social_post_jobs", "status = 'queued' || status = 'failed'", "-priority,scheduled_at", 5000, 0) || []; }
   catch (error) { console.error("Social Publisher kon de wachtrij niet lezen:", error); throw error; }
   var sessionChecks = candidates.filter(function (candidate) { return candidate.getString("source_type") === "session_check" && socialReadyAt(candidate, setting, now) <= now.getTime(); });
-  // Compliance mode: content is never published merely because a schedule is due.
-  // An admin must explicitly approve it through "Nu online zetten", which sets force_now.
+  // Catalog events and spotlights are explicitly configured automatic posts.
+  // Manually written posts still require the admin's "Nu online zetten" action.
   var approvedCandidates = candidates.filter(function (candidate) {
-    return candidate.getString("source_type") === "session_check" || socialObject(candidate.get("payload")).force_now === true;
+    var sourceType = candidate.getString("source_type");
+    return sourceType === "session_check" ||
+      ["product", "product_update", "color", "discount", "spotlight"].indexOf(sourceType) >= 0 ||
+      socialObject(candidate.get("payload")).force_now === true;
   });
   var next = metaReady ? socialSelectNextJob(approvedCandidates, setting, now) : null;
   var job = sessionChecks.length && (!next || sessionChecks[0].getInt("priority") >= next.job.getInt("priority")) ? sessionChecks[0] : next && next.due ? next.job : null;
@@ -2095,7 +2171,7 @@ function socialClaim(setting, metaReady) {
   var platforms = type === "session_check" ? requestedPlatforms : socialTargetPlatforms(job, setting);
   if (!platforms.length) return null;
   var mediaPaths = socialArray(job.get("media_paths")).slice(0, 10);
-  if (type === "product" || type === "spotlight") {
+  if (type === "product" || type === "product_update" || type === "spotlight") {
     var sourceProduct = byId("products", job.getString("source_id"));
     if (sourceProduct) {
       var productId = sourceProduct.getString("supabase_id") || sourceProduct.id;
@@ -2168,8 +2244,17 @@ function socialReport(setting, p) {
     job.set("completed_at", new Date().toISOString());
     if (job.getString("source_type") === "spotlight") {
       setting.set("spotlight_next_at", socialNextLocal19(new Date(), 2).toISOString());
-      $app.save(setting);
     }
+    if (["product", "product_update", "spotlight"].indexOf(job.getString("source_type")) >= 0) {
+      var recentProducts = socialArray(setting.get("spotlight_recent_product_ids"));
+      var publishedProductId = job.getString("source_id");
+      if (publishedProductId) {
+        recentProducts = recentProducts.filter(function (id) { return id !== publishedProductId; });
+        recentProducts.push(publishedProductId);
+        setting.set("spotlight_recent_product_ids", recentProducts.slice(-3));
+      }
+    }
+    $app.save(setting);
   }
   else if (reportedStatus === "failed") {
     var attempts = job.getInt("attempts") + 1; job.set("attempts", attempts);
@@ -2230,7 +2315,7 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.12" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.18" });
   }
   if (action === "poll") {
     var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -2249,9 +2334,9 @@ function route8(e) {
         next_due: diagnosticNext ? diagnosticNext.due : false,
         next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
         next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
-      }, version: "1.19.12" });
+      }, version: "1.19.18" });
     }
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.12" });
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.18" });
   }
   if (action === "resolve_media") {
     var sourcePath = String(p.path || "").trim();
@@ -2316,19 +2401,13 @@ function route8(e) {
     mediaPayload.social_media_grant = mediaGrant;
     mediaJob.set("payload", mediaPayload); $app.save(mediaJob);
     var mediaJobId = mediaJob.getString("supabase_id") || mediaJob.id;
-    var activeMediaGrants = [];
-    try {
-      activeMediaGrants = $app.findRecordsByFilter("social_media_grants", "job_id = {:job} && media_index = {:index} && expires_at > {:now}", "", 100, 0, {
-        job: mediaJobId, index: mediaIndex + 1, now: new Date().toISOString()
-      }) || [];
-    } catch (_) {}
-    activeMediaGrants.forEach(function (activeGrant) {
-      activeGrant.set("prepared_path", imagePath);
-      $app.save(activeGrant);
-    });
+    // Het bestandsveld van storage_files is bewust beschermd. Maak daarom een
+    // korte, willekeurige publieke grant aan in plaats van Meta naar /api/files
+    // te sturen. De originele admin-upload en integratietoken blijven afgeschermd.
+    var publicGrant = socialCreateMediaGrant(mediaJobId, mediaIndex, imagePath, mediaGrant.expires_at);
     return json(e, {
       prepared: true,
-      url: publicBaseUrl(e) + "/api/files/storage_files/" + encodeURIComponent(imageRecord.id) + "/" + encodeURIComponent(imageRecord.getString("file"))
+      url: publicBaseUrl(e) + "/api/overweel3d/social/public-media?grant_id=" + encodeURIComponent(publicGrant.id) + "&token=" + encodeURIComponent(publicGrant.token)
     });
   }
   if (action === "report") return json(e, socialReport(setting, p));
@@ -2344,6 +2423,16 @@ function route8(e) {
   fail("Onbekende Social Publisher-actie: " + action);
 }
 
+function socialMediaMime(name) {
+  name = String(name || "").toLowerCase();
+  if (/\.mp4$/.test(name)) return "video/mp4";
+  if (/\.webm$/.test(name)) return "video/webm";
+  if (/\.(mov|m4v)$/.test(name)) return "video/quicktime";
+  if (/\.png$/.test(name)) return "image/png";
+  if (/\.webp$/.test(name)) return "image/webp";
+  return "image/jpeg";
+}
+
 function route9(e) {
   socialRequireToken(e);
   var path = String(e.request.url.query().get("path") || "");
@@ -2356,7 +2445,7 @@ function route9(e) {
   if (!stored) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
   var bytes = storedFileBytes(stored, 30 * 1024 * 1024);
   var name = stored.getString("file").toLowerCase();
-  var mime = /\.png$/.test(name) ? "image/png" : /\.webp$/.test(name) ? "image/webp" : "image/jpeg";
+  var mime = socialMediaMime(name);
   e.response.header().set("Cache-Control", "private, no-store");
   return e.blob(200, mime, bytes);
 }
@@ -2408,7 +2497,7 @@ function route10(e) {
   var stored = storedFileForPath(path);
   if (!stored) throw new NotFoundError("Socialmedia-afbeelding niet gevonden.");
   var name = stored.getString("file").toLowerCase();
-  var mime = /\.png$/.test(name) ? "image/png" : /\.webp$/.test(name) ? "image/webp" : "image/jpeg";
+  var mime = socialMediaMime(name);
   e.response.header().set("Cache-Control", "private, no-store");
   return e.blob(200, mime, storedFileBytes(stored, 30 * 1024 * 1024));
 }
@@ -2501,4 +2590,4 @@ function socialCleanupJobs(nowMs) {
 }
 
 
-module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, route11, applyOrderDefaults, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };
+module.exports = { route0, route1, route2, route3, route4, route5, route6, route7, route8, route9, route10, route11, applyOrderDefaults, socialColorPng, socialColorMedia, socialImagesForProduct, socialEnqueueExistingCatalog, socialSyncCatalog, socialProductFingerprint, socialSpotlightProduct, socialClaim, socialReport, socialScheduleSpotlight, socialNextPublication, socialCleanupJobs };

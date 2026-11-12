@@ -214,7 +214,6 @@ export default function AdminColors() {
     const selection = validateMediaSelection(files, { allowVideos: false, maxFiles: 12 });
     if (selection.accepted.length) setNewPhotoFiles((prev) => [...prev, ...selection.accepted.map(({ file }) => file)].slice(0, 12));
     if (selection.errors.length) toast({ title: "Enkele foto's zijn overgeslagen", description: selection.errors[0], variant: "destructive" });
-    e.target.value = "";
   };
 
   const uploadPhotos = async (uploadedPaths: string[]): Promise<string[]> => {

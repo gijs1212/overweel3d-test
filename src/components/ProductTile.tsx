@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProductPhotoUrl } from "@/lib/productPhotos";
-import { CatalogProduct, isVideoProductMedia, orderedProductImages } from "@/lib/productCatalog";
+import { catalogProductPriceLabel, CatalogProduct, isVideoProductMedia, orderedProductImages } from "@/lib/productCatalog";
 
 interface ProductTileProps {
   product: CatalogProduct;
@@ -37,6 +37,8 @@ export function ProductTile({ product, onClick }: ProductTileProps) {
             aria-label={product.name}
             muted
             playsInline
+            autoPlay
+            loop
             preload="metadata"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           /> : <img src={photoUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -53,7 +55,7 @@ export function ProductTile({ product, onClick }: ProductTileProps) {
       {product.product_categories?.name && (
         <span className="text-[11px] text-muted-foreground mt-0.5">{product.product_categories.name}</span>
       )}
-      <span className="text-sm text-muted-foreground mt-0.5">{Number(product.price) > 0 ? `€${Number(product.price).toFixed(2)}` : "Op aanvraag"}</span>
+      <span className="text-sm text-muted-foreground mt-0.5">{catalogProductPriceLabel(product)}</span>
     </div>
   );
 }

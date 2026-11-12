@@ -98,6 +98,7 @@ export interface CatalogProduct {
 }
 
 export interface ProductOptionAnswer {
+  addonQuantity?: number;
   optionId: string;
   label: string;
   type: ProductOptionType | "legacy_text";
@@ -117,6 +118,30 @@ export interface CatalogOrderItem {
   variantId?: string | null;
   variantName?: string | null;
 }
+
+export const activeProductVariants = (product: Pick<CatalogProduct, "product_variants">) =>
+  (product.product_variants || []).filter((variant) => variant.active);
+
+export const productVariantTotalPrice = (
+  product: Pick<CatalogProduct, "price">,
+  variant: Pick<ProductVariant, "price_adjustment">,
+) => Number(product.price || 0) + Number(variant.price_adjustment || 0);
+
+export const lowestProductPrice = (
+  product: Pick<CatalogProduct, "price" | "product_variants">,
+) => {
+  const variants = activeProductVariants(product);
+  if (!variants.length) return Number(product.price || 0);
+  return Math.min(...variants.map((variant) => productVariantTotalPrice(product, variant)));
+};
+
+export const catalogProductPriceLabel = (
+  product: Pick<CatalogProduct, "price" | "product_variants">,
+) => {
+  if (Number(product.price || 0) <= 0) return "Op aanvraag";
+  const prefix = activeProductVariants(product).length > 1 ? "Vanaf " : "";
+  return `${prefix}€${lowestProductPrice(product).toFixed(2)}`;
+};
 
 export const normalizeMaterialId = (value: string) => {
   const normalized = value.trim().toLowerCase();

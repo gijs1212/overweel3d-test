@@ -196,7 +196,7 @@ export default function AdminOrderFiles() {
                 <h2 className="font-semibold">Sleep bestanden hierheen</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Of kies meerdere bestanden tegelijk. Maximaal 100 MB per bestand.</p>
                 <Button type="button" variant="outline" className="mt-5" onClick={() => fileInputRef.current?.click()} disabled={uploading}>Bestanden kiezen</Button>
-                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; addFiles(selected); }} />
+                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => { const selected = Array.from(event.currentTarget.files || []); addFiles(selected); }} />
               </div>
 
               {selectedFiles.length > 0 && (

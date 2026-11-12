@@ -22,7 +22,7 @@ export function classifyMediaFile(file: Pick<File, "name" | "type">): MediaFileK
 
 export function validateMediaSelection(files: File[], options: MediaSelectionOptions = {}) {
   const maxImageBytes = options.maxImageBytes ?? 12 * 1024 * 1024;
-  const maxVideoBytes = options.maxVideoBytes ?? 50 * 1024 * 1024;
+  const maxVideoBytes = options.maxVideoBytes ?? 250 * 1024 * 1024;
   const maxFiles = options.maxFiles ?? 20;
   const accepted: AcceptedMediaFile[] = [];
   const errors: string[] = [];

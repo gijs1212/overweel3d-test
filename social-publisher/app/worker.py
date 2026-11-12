@@ -55,7 +55,7 @@ class SocialWorker:
             return False
         async with self._heartbeat_lock:
             try:
-                response = await self.pb.action("heartbeat", {"version": "3.0.1"})
+                response = await self.pb.action("heartbeat", {"version": "3.0.2"})
                 if not isinstance(response, dict) or response.get("connected") is not True:
                     raise RuntimeError("PocketBase heeft de heartbeat niet bevestigd.")
                 if not version_at_least(response.get("hook_version"), "1.19.1"):
@@ -157,7 +157,7 @@ class SocialWorker:
     async def tick(self) -> None:
         if not self.pb.paired or not self.hook_ready:
             return
-        response = await self.pb.action("poll", {"version": "3.0.1", "meta_ready": self.meta.configured})
+        response = await self.pb.action("poll", {"version": "3.0.2", "meta_ready": self.meta.configured})
         job = response.get("job") if isinstance(response, dict) else None
         if not job:
             return
