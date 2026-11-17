@@ -205,7 +205,7 @@ function route0(e) {
     var publisherLastSeenMs = publisherLastSeenAt ? new Date(publisherLastSeenAt).getTime() : NaN;
     var publisherAgeSeconds = isFinite(publisherLastSeenMs) ? Math.max(0, (Date.now() - publisherLastSeenMs) / 1000) : null;
     return json(e, {
-      hook_version: "1.19.18",
+      hook_version: "1.19.19",
       publisher_last_seen_at: publisherLastSeenAt,
       publisher_connected: publisherAgeSeconds !== null && publisherAgeSeconds <= 90,
       publisher_age_seconds: publisherAgeSeconds,
@@ -499,7 +499,7 @@ function route0(e) {
 }
 
 function route1(e) {
-  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.18" });
+  return e.json(200, { ok: true, service: "overweel3d-pocketbase", version: "1.19.19" });
 }
 
 function sendMail(to, subject, html, replyTo) {
@@ -2315,7 +2315,7 @@ function route8(e) {
     setting.set("publisher_last_seen_at", heartbeatAt);
     setting.set("publisher_version", String(p.version || "").slice(0, 100));
     $app.save(setting);
-    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.18" });
+    return json(e, { connected: true, received_at: heartbeatAt, hook_version: "1.19.19" });
   }
   if (action === "poll") {
     var publisherVersion = String(p.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -2334,9 +2334,9 @@ function route8(e) {
         next_due: diagnosticNext ? diagnosticNext.due : false,
         next_scheduled_at: diagnosticNext ? diagnosticNext.scheduled_at : "",
         next_platforms: diagnosticNext ? socialTargetPlatforms(diagnosticNext.job, setting) : []
-      }, version: "1.19.18" });
+      }, version: "1.19.19" });
     }
-    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.18" });
+    return json(e, { job: socialClaim(setting, p.meta_ready === true), version: "1.19.19" });
   }
   if (action === "resolve_media") {
     var sourcePath = String(p.path || "").trim();

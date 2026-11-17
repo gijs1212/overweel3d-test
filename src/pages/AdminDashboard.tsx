@@ -5,13 +5,12 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, MailPlus, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator, Upload, ImagePlus, Share2 } from "lucide-react";
+import { Search, Loader2, Package, Eye, Plus, FileText, Megaphone, ShoppingBag, Tag, Mail, Users, Printer, BarChart3, Star, Gift, Palette, ChevronRight, Euro, Layers3, Boxes, Calculator, Upload, ImagePlus, Share2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, OrderStatus } from "@/lib/constants";
 import { getFunctionErrorMessage } from "@/lib/functionErrors";
-import { Switch } from "@/components/ui/switch";
 import { PlateApprovalRequests } from "@/components/PlateApprovalRequests";
 
 interface AdminOrder {
@@ -39,8 +38,6 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [customerFilter, setCustomerFilter] = useState<string>(() => searchParams.get("customer")?.trim().toLowerCase() || "all");
   const [sendingTestMail, setSendingTestMail] = useState(false);
-  const [newsletterEnabled, setNewsletterEnabled] = useState(true);
-  const [savingNewsletter, setSavingNewsletter] = useState(false);
   const [printerSummary, setPrinterSummary] = useState({ total: 0, active: 0 });
   const [loyaltySettings, setLoyaltySettings] = useState({ pointsPerEuro: 1, eurosPerPoint: 0.05 });
   const [savingLoyalty, setSavingLoyalty] = useState(false);
@@ -53,12 +50,11 @@ export default function AdminDashboard() {
     }
 
     const fetchOrders = async () => {
-      const [{ data, error }, settingResult, loyaltyResult, printersResult] = await Promise.all([
+      const [{ data, error }, loyaltyResult, printersResult] = await Promise.all([
         supabase
         .from("orders")
         .select("id, order_number, customer_name, customer_email, status, instant_quote_price, final_price, submitted_at, material, link_first_viewed_at, link_last_viewed_at, link_view_count")
         .order("submitted_at", { ascending: false }),
-        supabase.from("app_settings").select("value").eq("key", "newsletter_enabled").maybeSingle(),
         supabase.from("app_settings").select("key,value").in("key", ["loyalty_points_per_euro", "loyalty_euros_per_point"]),
         supabase.from("printers").select("status"),
       ]);
@@ -68,7 +64,6 @@ export default function AdminDashboard() {
       } else {
         setOrders((data as AdminOrder[]) || []);
       }
-      setNewsletterEnabled(settingResult.data?.value !== false);
       const loyaltyValues = new Map((loyaltyResult.data || []).map((setting) => [setting.key, Number(setting.value)]));
       setLoyaltySettings({
         pointsPerEuro: loyaltyValues.get("loyalty_points_per_euro") ?? 1,
@@ -97,20 +92,6 @@ export default function AdminDashboard() {
     setSavingLoyalty(false);
     if (error) toast({ title: "Puntenregeling opslaan mislukt", description: error.message, variant: "destructive" });
     else toast({ title: "Puntenregeling opgeslagen", description: `Klanten ontvangen ${loyaltySettings.pointsPerEuro} punt(en) per euro; één punt is €${loyaltySettings.eurosPerPoint.toFixed(3)} korting.` });
-  };
-
-  const toggleNewsletter = async (enabled: boolean) => {
-    setSavingNewsletter(true);
-    const previous = newsletterEnabled;
-    setNewsletterEnabled(enabled);
-    const { error } = await supabase.from("app_settings").update({ value: enabled }).eq("key", "newsletter_enabled");
-    if (error) {
-      setNewsletterEnabled(previous);
-      toast({ title: "Instelling opslaan mislukt", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: enabled ? "Nieuwsbrief ingeschakeld" : "Nieuwsbrief tijdelijk uitgeschakeld", description: enabled ? "Automatische en handmatige nieuwsbrieven worden weer verzonden." : "Nieuwe nieuwsbriefcampagnes worden centraal tegengehouden." });
-    }
-    setSavingNewsletter(false);
   };
 
   const handleSendTestMail = async () => {
@@ -205,13 +186,12 @@ export default function AdminDashboard() {
             </div>
           </header>
 
-          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
             {[
               [Package, "Open orders", openOrderCount.toString()],
               [Euro, "Totale orderwaarde", `€${totalOrderValue.toFixed(2)}`],
               [Printer, "Printers actief", `${printerSummary.active} / ${printerSummary.total}`],
             ].map(([Icon, label, value]) => <div key={label as string} className="rounded-2xl border border-black/10 bg-white p-5"><div className="mb-5 flex h-9 w-9 items-center justify-center rounded-lg bg-black text-white"><Icon className="h-4 w-4" /></div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40">{label as string}</p><p className="mt-1 text-2xl font-semibold tracking-tight">{value as string}</p></div>)}
-            <div className="rounded-2xl border border-black/10 bg-white p-5"><div className="mb-5 flex items-start justify-between"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-black text-white"><MailPlus className="h-4 w-4" /></div><Switch checked={newsletterEnabled} onCheckedChange={toggleNewsletter} disabled={savingNewsletter} aria-label="Nieuwsbrief in- of uitschakelen" /></div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40">Nieuwsbrief</p><p className="mt-1 text-lg font-semibold">{newsletterEnabled ? "Actief" : "Gepauzeerd"}</p></div>
           </div>
 
           <PlateApprovalRequests />
@@ -224,7 +204,7 @@ export default function AdminDashboard() {
               ["Printer", [["Printers & plaatkoppeling", "/admin/production", Printer], ["Filamentvoorraad", "/admin/filament-inventory", Boxes], ["Automatische prijsberekening", "/admin/price-calculator", Calculator], ["Kostenrapportage", "/admin/reports", BarChart3]]],
               ["Producten & kleuren", [["Opdrachten", "/admin/assignments", ImagePlus], ["Producten & varianten", "/admin/products", ShoppingBag], ["Materialen", "/admin/materials", Layers3], ["Kleuren", "/admin/colors", Palette], ["Reviews", "/admin/reviews", Star]]],
               ["Klanten", [["Klantenoverzicht", "/admin/customers", Users], ["Nieuwe bestelling", "/admin/new-order", Plus], ["Bestanden uploaden", "/admin/order-files", Upload]]],
-              ["Marketing", [["Social Publisher", "/admin/social", Share2], ["Nieuwsbrief", "/admin/newsletter", MailPlus], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Loyaliteitsprogramma", "/admin#loyaliteitsprogramma", Gift], ["Blog & content", "/admin/blog", FileText], ["Websitecontent", "/admin/content", Megaphone]]],
+              ["Marketing", [["Social Publisher", "/admin/social", Share2], ["Kortingscodes", "/admin/discounts", Tag], ["Cadeaubonnen", "/admin/gift-cards", Gift], ["Loyaliteitsprogramma", "/admin#loyaliteitsprogramma", Gift], ["Blog & content", "/admin/blog", FileText], ["Websitecontent", "/admin/content", Megaphone]]],
             ].map(([title, items]) => <section key={title as string} className="rounded-xl border border-black/10 bg-neutral-50 p-4"><h3 className="mb-2 text-sm font-bold">{title as string}</h3><div className="space-y-1">{(items as [string,string,typeof Package][]).map(([label,to,Icon]) => <Link key={to} to={to} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-black/65 transition-colors hover:bg-black hover:text-white"><Icon className="w-4 h-4"/><span className="flex-1">{label}</span><ChevronRight className="w-4 h-4 opacity-40"/></Link>)}</div></section>)}
             </div>
           </section>

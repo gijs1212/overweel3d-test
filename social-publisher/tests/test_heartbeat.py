@@ -23,7 +23,7 @@ class HeartbeatTests(unittest.TestCase):
         self.assertTrue(asyncio.run(worker.heartbeat()))
         self.assertTrue(worker.is_connected)
         self.assertTrue(worker.last_heartbeat_at)
-        action.assert_awaited_once_with("heartbeat", {"version": "3.0.2"})
+        action.assert_awaited_once_with("heartbeat", {"version": "3.1.0"})
 
     def test_failed_heartbeat_clears_connection_and_exposes_error(self):
         worker = SocialWorker()

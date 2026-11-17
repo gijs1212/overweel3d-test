@@ -1,65 +1,45 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { signedUrl, publicRecord } = vi.hoisted(() => ({
-  signedUrl: vi.fn(),
-  publicRecord: vi.fn(),
-}));
+const getPublicUrl = vi.fn((path: string) => ({ data: { publicUrl: `https://appwrite.example/v1/storage/public/${encodeURIComponent(path)}` } }));
+const createSignedUrl = vi.fn(async (path: string) => ({ data: { signedUrl: `https://appwrite.example/v1/storage/private/${encodeURIComponent(path)}` }, error: null }));
+
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { storage: { from: () => ({ createSignedUrl: signedUrl }) } },
-}));
-vi.mock("@/integrations/pocketbase/client", () => ({
-  POCKETBASE_URL: "https://api.example.test",
-  pocketbase: {
-    authStore: { token: "" },
-    filter: vi.fn(() => "public-filter"),
-    collection: vi.fn(() => ({ getFirstListItem: publicRecord })),
-    files: { getURL: (record: { id: string; file: string }) => `https://api.example.test/api/files/storage/${record.id}/${record.file}` },
-  },
+  supabase: { storage: { from: vi.fn(() => ({ getPublicUrl, createSignedUrl })) } },
 }));
 
-import { getProductPhotoUrl } from "./productPhotos";
+import { getProductPhotoUrl, normalizeProductStoragePath } from "./productPhotos";
 
 afterEach(() => {
-  vi.unstubAllGlobals();
-  signedUrl.mockClear();
-  publicRecord.mockReset();
+  getPublicUrl.mockClear();
+  createSignedUrl.mockClear();
 });
 
-describe("publieke productmedia", () => {
-  it("toont een actieve productfoto zonder account of bestandstoken", async () => {
-    const fetcher = vi.fn();
-    vi.stubGlobal("fetch", fetcher);
-
+describe("Appwrite-productmedia", () => {
+  it("toont een productfoto zonder account via de publieke bucket", async () => {
     const url = await getProductPhotoUrl("products/product123/photo.jpg");
-    expect(url).toBe("https://api.example.test/api/overweel3d/catalog/media?path=products%2Fproduct123%2Fphoto.jpg");
-    expect(fetcher).not.toHaveBeenCalled();
-    expect(signedUrl).not.toHaveBeenCalled();
+    expect(url).toContain("/storage/public/products%2Fproduct123%2Fphoto.jpg");
+    expect(getPublicUrl).toHaveBeenCalledWith("products/product123/photo.jpg");
+    expect(createSignedUrl).not.toHaveBeenCalled();
   });
 
-  it.each(["portfolio/project/photo.jpg", "colors/blue.jpg", "reviews/user/photo.jpg"])(
+  it.each(["portfolio/project/photo.jpg", "colors/blue.jpg", "reviews/user/photo.jpg", "social/manual/post.jpg"])(
     "toont openbare media zonder account voor %s",
     async (path) => {
-      const fetcher = vi.fn().mockResolvedValue(new Response("{}", { status: 404 }));
-      vi.stubGlobal("fetch", fetcher);
-      publicRecord.mockResolvedValue({ id: "public-record", file: "photo.jpg" });
-      expect(await getProductPhotoUrl(path)).toBe(
-        "https://api.example.test/api/files/storage/public-record/photo.jpg",
-      );
-      expect(fetcher).toHaveBeenCalledOnce();
-      expect(signedUrl).not.toHaveBeenCalled();
+      expect(await getProductPhotoUrl(path)).toContain(`/storage/public/${encodeURIComponent(path)}`);
+      expect(createSignedUrl).not.toHaveBeenCalled();
     },
   );
 
-  it("weigert voor oudere mediapaden een media-URL van een andere host", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      url: "https://example.org/api/files/storage/file/photo.jpg",
-    }), { status: 200 })));
-    expect(await getProductPhotoUrl("catalog-assets/untrusted.jpg")).toBe("");
+  it("normaliseert oude Supabase-opslagpaden", () => {
+    expect(normalizeProductStoragePath("/storage/v1/object/public/orders/products/a.jpg")).toBe("products/a.jpg");
   });
 
-  it("vraagt zonder account geen privé-bestandstoken op", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 404 })));
-    expect(await getProductPhotoUrl("orders/private.3mf")).toBe("");
-    expect(signedUrl).not.toHaveBeenCalled();
+  it("gebruikt alleen voor niet-openbare media de opslagresolver", async () => {
+    expect(await getProductPhotoUrl("private/order.3mf")).toContain("/storage/private/private%2Forder.3mf");
+    expect(createSignedUrl).toHaveBeenCalledWith("private/order.3mf", 3600);
+  });
+
+  it("laat reeds bruikbare HTTPS-URLs ongewijzigd", async () => {
+    expect(await getProductPhotoUrl("https://cdn.example/photo.jpg")).toBe("https://cdn.example/photo.jpg");
   });
 });

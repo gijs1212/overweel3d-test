@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getFunctionErrorMessage } from "@/lib/functionErrors";
 
 interface Profile {
   id: string;
@@ -16,7 +15,6 @@ interface Profile {
   city: string;
   country: string;
   vat_number: string;
-  newsletter_subscribed: boolean;
   account_welcome_email_sent_at: string | null;
   loyalty_points: number;
 }
@@ -33,7 +31,6 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<void>;
-  setNewsletterPreference: (active: boolean) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -67,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // PocketBase returns the authoritative role on the refreshed user record.
+    // Appwrite returns the authoritative role on the refreshed user record.
     // This avoids relying on an admin-only list query during a fresh page load.
     setIsAdmin(nextUser.app_metadata?.role === "admin");
     await fetchProfile(nextUser.id);
@@ -103,13 +100,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const revalidateWhenVisible = () => {
       if (document.visibilityState === "visible") void validateStoredSession(false);
     };
+    const keepSessionFresh = () => {
+      if (currentUserId.current && navigator.onLine && document.visibilityState === "visible") {
+        void validateStoredSession(false);
+      }
+    };
+    // Appwrite uses renewable sessions. Refresh well before expiry while
+    // an admin keeps the dashboard open, so selecting a file days later never
+    // starts an upload with a stale token.
+    const keepAliveTimer = window.setInterval(keepSessionFresh, 4 * 60_000);
     window.addEventListener("focus", revalidateWhenVisible);
+    window.addEventListener("online", keepSessionFresh);
     document.addEventListener("visibilitychange", revalidateWhenVisible);
 
     return () => {
       active = false;
+      window.clearInterval(keepAliveTimer);
       subscription.unsubscribe();
       window.removeEventListener("focus", revalidateWhenVisible);
+      window.removeEventListener("online", keepSessionFresh);
       document.removeEventListener("visibilitychange", revalidateWhenVisible);
     };
   }, [applySession]);
@@ -125,11 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw error;
 
-    // Supabase can return an obfuscated user for an existing e-mail address.
-    // Only a response with a newly-created identity may request the welcome mail.
     if (data.user?.id && (data.user.identities?.length ?? 0) > 0) {
       const { error: welcomeError } = await supabase.functions.invoke("send-account-welcome", {
-        body: { userId: data.user.id },
+        body: { userId: data.user.id, fullName: fullName.trim() },
       });
       if (welcomeError) {
         console.warn("Account welcome email could not be sent:", welcomeError.message);
@@ -141,6 +148,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     if (!signInData.user) return false;
+    // Apply the returned session immediately. The compatibility client also
+    // emits an auth event, but navigation must not depend on callback timing.
+    await applySession(signInData.session);
     return signInData.user.app_metadata?.role === "admin";
   };
 
@@ -175,22 +185,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id);
   };
 
-  const setNewsletterPreference = async (active: boolean) => {
-    if (!user) throw new Error("Log in om uw nieuwsbriefvoorkeur te wijzigen.");
-    const { data, error } = await supabase.functions.invoke("manage-newsletter", {
-      body: { action: "set_preference", active },
-    });
-    if (error) throw new Error(await getFunctionErrorMessage(error, "De nieuwsbriefvoorkeur kon niet worden opgeslagen."));
-    if (!data?.success) throw new Error(data?.error || "De nieuwsbriefvoorkeur kon niet worden opgeslagen.");
-    await fetchProfile(user.id);
-  };
-
   return (
     <AuthContext.Provider
       value={{
         user, session, profile, isAdmin, loading,
         signUp, signIn, signOut, resetPassword, updatePassword,
-        updateProfile, setNewsletterPreference, refreshProfile,
+        updateProfile, refreshProfile,
       }}
     >
       {children}

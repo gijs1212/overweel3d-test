@@ -4,7 +4,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    pocketbase_url: str = "https://api.gijsoverweel.nl"
+    # pocketbase_url remains as a compatibility alias for existing persisted
+    # publisher-config.json files and the current pairing request shape.
+    pocketbase_url: str = "https://appwrite.gijsoverweel.nl/v1"
+    appwrite_endpoint: str = "https://appwrite.gijsoverweel.nl/v1"
+    appwrite_project_id: str = "6af9acde00152998cadb"
+    appwrite_function_id: str = "overweel3d-api"
     social_publisher_token: str = ""
     control_password: str
     poll_seconds: int = 30
@@ -19,7 +24,8 @@ class Settings(BaseSettings):
 
     @property
     def api_root(self) -> str:
-        return self.pocketbase_url.rstrip("/") + "/api/overweel3d/social"
+        endpoint = (self.appwrite_endpoint or self.pocketbase_url).rstrip("/")
+        return f"{endpoint}/functions/{self.appwrite_function_id}/executions"
 
 
 settings = Settings()

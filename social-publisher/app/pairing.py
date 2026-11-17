@@ -58,6 +58,16 @@ class PairingStore:
             return str(self._state.get("pocketbase_url") or settings.pocketbase_url).rstrip("/")
 
     @property
+    def appwrite_endpoint(self) -> str:
+        value = self.pocketbase_url
+        if value.endswith("/v1"):
+            return value
+        # Existing pairings pointed at the former API hostname. New pairings
+        # should send the Appwrite /v1 endpoint, while this fallback keeps a
+        # manually upgraded configuration usable.
+        return settings.appwrite_endpoint.rstrip("/")
+
+    @property
     def paired(self) -> bool:
         return bool(self.token)
 
@@ -68,7 +78,7 @@ class PairingStore:
             if len(str(token)) < 32:
                 raise ValueError("De ontvangen interne sleutel is ongeldig.")
             if not str(pocketbase_url).startswith("https://"):
-                raise ValueError("PocketBase moet via HTTPS bereikbaar zijn.")
+                raise ValueError("Appwrite moet via HTTPS bereikbaar zijn.")
             self._state.update({
                 "token": str(token),
                 "pocketbase_url": str(pocketbase_url).rstrip("/"),

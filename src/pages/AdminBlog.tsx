@@ -11,7 +11,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
-import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
 
 interface BlogPost {
   id: string;
@@ -182,13 +181,6 @@ export default function AdminBlog() {
       });
       if (!error) {
         success++;
-        if (article.status === "published") {
-          const newsletter = await sendAutomaticNewsletters([{
-            templateKind: "article", changeType: "new", itemName: article.title || "Nieuw artikel",
-            details: article.excerpt || "", itemUrl: `${window.location.origin}/blog/${slug}`,
-          }]);
-          if (newsletter.errors.length) toast({ title: "Artikel geïmporteerd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
-        }
       }
     }
     toast({ title: `${success}/${articles.length} artikelen geïmporteerd! 📚` });
@@ -200,11 +192,6 @@ export default function AdminBlog() {
     const { error } = await supabase.from("blog_posts").update({ status: "published", published_at: new Date().toISOString() }).eq("id", postId);
     if (error) toast({ title: "Publiceren mislukt", description: error.message, variant: "destructive" });
     else {
-      const post = posts.find((item) => item.id === postId);
-      if (post) {
-        const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: "new", itemName: post.title, details: post.excerpt, itemUrl: `${window.location.origin}/blog/${post.slug}` }]);
-        if (newsletter.errors.length) toast({ title: "Artikel gepubliceerd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
-      }
       toast({ title: "Gepubliceerd! ✅" }); await fetchPosts();
     }
     setPostActionId(null);
@@ -215,11 +202,6 @@ export default function AdminBlog() {
     const { error } = await supabase.from("blog_posts").update({ status: "draft" }).eq("id", postId);
     if (error) toast({ title: "Terugtrekken mislukt", description: error.message, variant: "destructive" });
     else {
-      const post = posts.find((item) => item.id === postId);
-      if (post) {
-        const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: "removed", itemName: post.title, details: post.excerpt, itemUrl: `${window.location.origin}/blog/${post.slug}` }]);
-        if (newsletter.errors.length) toast({ title: "Artikel teruggetrokken, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
-      }
       toast({ title: "Artikel teruggetrokken" }); await fetchPosts();
     }
     setPostActionId(null);
@@ -227,14 +209,9 @@ export default function AdminBlog() {
 
   const handleDelete = async () => {
     if (!deletePostId) return;
-    const post = posts.find((item) => item.id === deletePostId);
     const { error } = await supabase.from("blog_posts").delete().eq("id", deletePostId);
     if (error) toast({ title: "Verwijderen mislukt", description: error.message, variant: "destructive" });
     else {
-      if (post) {
-        const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: "removed", itemName: post.title, details: post.excerpt, itemUrl: `${window.location.origin}/blog/${post.slug}` }]);
-        if (newsletter.errors.length) toast({ title: "Artikel verwijderd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
-      }
       toast({ title: "Artikel verwijderd" }); await fetchPosts();
     }
     setDeletePostId(null);

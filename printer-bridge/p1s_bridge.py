@@ -10,7 +10,10 @@ import json, os, re, socket, ssl, struct, time, urllib.request
 HOST = os.environ["BAMBU_HOST"]
 ACCESS_CODE = os.environ["BAMBU_ACCESS_CODE"]
 SERIAL = os.environ["BAMBU_SERIAL"]
-WEBSITE_API_URL = os.environ.get("WEBSITE_API_URL", "https://api.gijsoverweel.nl/api/overweel3d").rstrip("/")
+WEBSITE_API_URL = os.environ.get("WEBSITE_API_URL", "https://appwrite.gijsoverweel.nl/v1/functions/overweel3d-api/executions").rstrip("/")
+if "/api/overweel3d" in WEBSITE_API_URL:
+    WEBSITE_API_URL = "https://appwrite.gijsoverweel.nl/v1/functions/overweel3d-api/executions"
+APPWRITE_PROJECT_ID = os.environ.get("APPWRITE_PROJECT_ID", "6af9acde00152998cadb")
 PRINTER_ID = os.environ["OVERWEEL_PRINTER_ID"]
 BRIDGE_TOKEN = os.environ["OVERWEEL_BRIDGE_TOKEN"]
 
@@ -96,11 +99,15 @@ def status_payload(report: dict) -> dict:
         "ams_slots": slots, "raw_status": report}
 
 def forward(payload: dict) -> None:
-    request = urllib.request.Request(WEBSITE_API_URL + "/bridge/status",
-        data=json.dumps(payload).encode(), method="POST", headers={"content-type": "application/json",
-        "x-printer-id": PRINTER_ID, "x-bridge-token": BRIDGE_TOKEN})
+    execution_body = {"kind": "bridge", "name": "status", "body": {"printer_id": PRINTER_ID, "bridge_token": BRIDGE_TOKEN, "payload": payload}}
+    request = urllib.request.Request(WEBSITE_API_URL,
+        data=json.dumps({"body": json.dumps(execution_body), "async": False, "path": "/", "method": "POST", "headers": json.dumps({"content-type": "application/json"})}).encode(),
+        method="POST", headers={"content-type": "application/json", "x-appwrite-project": APPWRITE_PROJECT_ID})
     with urllib.request.urlopen(request, timeout=10) as response:
-        if response.status >= 300: raise RuntimeError(response.read().decode())
+        execution = json.loads(response.read().decode() or "{}")
+    result = json.loads(execution.get("responseBody") or "{}")
+    if execution.get("status") != "completed" or int(execution.get("responseStatusCode") or 500) >= 300:
+        raise RuntimeError(result.get("error") or execution.get("errors") or "Appwrite bridge-status is mislukt")
 
 def run() -> None:
     context = ssl.create_default_context(); context.check_hostname = False; context.verify_mode = ssl.CERT_NONE

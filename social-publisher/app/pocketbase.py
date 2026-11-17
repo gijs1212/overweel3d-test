@@ -14,7 +14,7 @@ from .pairing import pairing_store
 
 
 class PocketBaseActionError(RuntimeError):
-    """PocketBase action failure with the safe server response preserved."""
+    """Appwrite action failure (legacy name retained for compatibility)."""
 
 
 def _error_detail(response: httpx.Response) -> str:
@@ -30,7 +30,7 @@ def _error_detail(response: httpx.Response) -> str:
             return f"{message}: {serialized}"[:4000] if message else serialized[:4000]
         if message:
             return message[:4000]
-    return response.text.strip()[:4000] or "PocketBase gaf geen foutdetails terug."
+    return response.text.strip()[:4000] or "Appwrite gaf geen foutdetails terug."
 
 
 class PocketBaseSocialClient:
@@ -47,59 +47,80 @@ class PocketBaseSocialClient:
 
     @property
     def api_root(self) -> str:
-        return pairing_store.pocketbase_url + "/api/overweel3d/social"
+        return f"{pairing_store.appwrite_endpoint}/functions/{settings.appwrite_function_id}/executions"
 
     async def action(self, action: str, payload: dict[str, Any] | None = None) -> Any:
+        function_payload = {
+            "kind": "social",
+            "name": action,
+            "body": {**(payload or {}), "token": pairing_store.token},
+        }
         response = await self.client.post(
-            f"{self.api_root}/{action}", headers=self.headers, json=payload or {},
+            self.api_root,
+            headers={"X-Appwrite-Project": settings.appwrite_project_id},
+            json={"body": __import__("json").dumps(function_payload), "async": False},
         )
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             raise PocketBaseActionError(
-                f"PocketBase-actie '{action}' mislukt ({response.status_code}): {_error_detail(response)}"
+                f"Appwrite-actie '{action}' mislukt ({response.status_code}): {_error_detail(response)}"
             ) from exc
-        value = response.json()
-        return value.get("data", value)
+        execution = response.json()
+        status_code = int(execution.get("responseStatusCode") or execution.get("statusCode") or 200)
+        response_body = execution.get("responseBody") or execution.get("response") or "{}"
+        try:
+            value = __import__("json").loads(response_body) if isinstance(response_body, str) else response_body
+        except ValueError as exc:
+            raise PocketBaseActionError("Appwrite Function gaf een ongeldig antwoord terug.") from exc
+        if status_code >= 400 or execution.get("status") == "failed":
+            message = value.get("error") if isinstance(value, dict) else str(value)
+            raise PocketBaseActionError(f"Appwrite-actie '{action}' mislukt ({status_code}): {message}")
+        return value.get("data", value) if isinstance(value, dict) else value
+
+    @staticmethod
+    def _generated_color(path: str) -> bytes | None:
+        if not path.startswith("generated-color:#"):
+            return None
+        color = path.removeprefix("generated-color:")
+        if len(color) != 7 or any(ch not in "#0123456789abcdefABCDEF" for ch in color):
+            raise ValueError("Ongeldige gegenereerde kleur.")
+        output = io.BytesIO()
+        Image.new("RGB", (1024, 1024), color).save(output, format="PNG", optimize=True)
+        return output.getvalue()
+
+    async def _source_bytes(self, path: str) -> bytes:
+        generated = self._generated_color(path)
+        if generated is not None:
+            return generated
+        source = await self.action("resolve_media", {"path": path})
+        url = str(source.get("url") or "") if isinstance(source, dict) else ""
+        if not url.startswith(("https://", "http://")):
+            raise PocketBaseActionError("Appwrite gaf geen geldige media-URL terug.")
+        response = await self.client.get(url)
+        response.raise_for_status()
+        return response.content
 
     async def download_media(self, path: str, destination: Path) -> Path:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        url = f"{self.api_root}/media"
-        headers = self.headers
-        params = {"path": path}
-        async with self.client.stream(
-            "GET", url, headers=headers, params=params,
-        ) as response:
-            response.raise_for_status()
-            with destination.open("wb") as output:
-                async for chunk in response.aiter_bytes():
-                    output.write(chunk)
+        destination.write_bytes(await self._source_bytes(path))
         return destination
 
     async def resolve_media_url(self, path: str) -> str:
         result = await self.action("resolve_media", {"path": path})
         url = str(result.get("url") or "") if isinstance(result, dict) else ""
-        expected = pairing_store.pocketbase_url + "/api/files/storage_files/"
-        if not url.startswith(expected):
-            raise PocketBaseActionError("PocketBase gaf geen geldige productafbeeldings-URL terug.")
+        if not url.startswith(("https://", "http://")):
+            raise PocketBaseActionError("Appwrite gaf geen geldige productafbeeldings-URL terug.")
         return url
 
     async def prepare_public_media(self, job_id: str, index: int, path: str) -> str:
         # The source is read over the authenticated, local integration route.
         # Never rely on the short-lived public-media grant as an input URL.
-        response = await self.client.get(
-            f"{self.api_root}/media", headers=self.headers, params={"path": path},
-        )
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise PocketBaseActionError(
-                f"Bronafbeelding niet bereikbaar ({response.status_code}): {path}"
-            ) from exc
-        if len(response.content) > 30 * 1024 * 1024:
+        content = await self._source_bytes(path)
+        if len(content) > 30 * 1024 * 1024:
             raise ValueError("Bronafbeelding is groter dan 30 MB.")
         try:
-            with Image.open(io.BytesIO(response.content)) as source:
+            with Image.open(io.BytesIO(content)) as source:
                 if source.width * source.height > 40_000_000:
                     raise ValueError("Bronafbeelding is te groot om te verwerken.")
                 photo = ImageOps.exif_transpose(source).convert("RGB")
@@ -114,7 +135,7 @@ class PocketBaseSocialClient:
         })
         url = str(prepared.get("url") or "") if isinstance(prepared, dict) else ""
         if not url.startswith(("https://", "http://")):
-            raise PocketBaseActionError("PocketBase gaf geen publieke URL voor de voorbereide afbeelding terug.")
+            raise PocketBaseActionError("Appwrite gaf geen publieke URL voor de voorbereide afbeelding terug.")
         # This is the exact URL Meta will fetch. The authenticated source can
         # succeed while the public file URL is still missing or serves JSON.
         try:
@@ -132,23 +153,18 @@ class PocketBaseSocialClient:
         return url
 
     async def prepare_public_video(self, job_id: str, index: int, path: str) -> str:
-        """Transcode a product video to Meta-compatible MP4 and host it briefly in PocketBase."""
+        """Transcode a product video to Meta-compatible MP4 and host it briefly in Appwrite."""
         temp_root = settings.data_dir / "tmp"
         temp_root.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="social-video-", dir=temp_root) as directory:
             source = Path(directory) / "source"
             output = Path(directory) / "prepared.mp4"
             total = 0
-            async with self.client.stream(
-                "GET", f"{self.api_root}/media", headers=self.headers, params={"path": path},
-            ) as response:
-                response.raise_for_status()
-                with source.open("wb") as target:
-                    async for chunk in response.aiter_bytes():
-                        total += len(chunk)
-                        if total > 200 * 1024 * 1024:
-                            raise ValueError("Productvideo is groter dan 200 MB.")
-                        target.write(chunk)
+            content = await self._source_bytes(path)
+            total = len(content)
+            if total > 200 * 1024 * 1024:
+                raise ValueError("Productvideo is groter dan 200 MB.")
+            source.write_bytes(content)
             process = await asyncio.create_subprocess_exec(
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
                 "-vf", "scale=trunc(min(iw\\,1920)/2)*2:-2", "-r", "30",
@@ -173,7 +189,7 @@ class PocketBaseSocialClient:
             })
         url = str(prepared.get("url") or "") if isinstance(prepared, dict) else ""
         if not url.startswith(("https://", "http://")):
-            raise PocketBaseActionError("PocketBase gaf geen publieke video-URL terug.")
+            raise PocketBaseActionError("Appwrite gaf geen publieke video-URL terug.")
         try:
             async with self.client.stream("GET", url) as response:
                 response.raise_for_status()

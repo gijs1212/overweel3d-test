@@ -55,23 +55,23 @@ class SocialWorker:
             return False
         async with self._heartbeat_lock:
             try:
-                response = await self.pb.action("heartbeat", {"version": "3.0.2"})
+                response = await self.pb.action("heartbeat", {"version": "3.1.0"})
                 if not isinstance(response, dict) or response.get("connected") is not True:
-                    raise RuntimeError("PocketBase heeft de heartbeat niet bevestigd.")
+                    raise RuntimeError("Appwrite heeft de heartbeat niet bevestigd.")
                 if not version_at_least(response.get("hook_version"), "1.19.1"):
-                    raise RuntimeError("PocketBase-hook 1.19.1 of nieuwer is nodig voor de Facebook-publicatiemodus.")
+                    raise RuntimeError("De Overweel3D Appwrite Function is niet compatibel met deze publisher.")
             except Exception as exc:
                 self.connected = False
                 self.hook_ready = False
                 self.last_connection_error = str(exc)
-                log.warning("PocketBase-heartbeat mislukt: %s", exc)
+                log.warning("Appwrite-heartbeat mislukt: %s", exc)
                 return False
             self.connected = True
             was_ready = self.hook_ready
             self.hook_ready = True
             self.last_heartbeat_at = datetime.now(timezone.utc).isoformat()
             self.last_connection_error = ""
-            log.info("Heartbeat door PocketBase bevestigd.")
+            log.info("Heartbeat door Appwrite bevestigd.")
             if not was_ready:
                 self.request_immediate_poll()
             return True
@@ -157,7 +157,7 @@ class SocialWorker:
     async def tick(self) -> None:
         if not self.pb.paired or not self.hook_ready:
             return
-        response = await self.pb.action("poll", {"version": "3.0.2", "meta_ready": self.meta.configured})
+        response = await self.pb.action("poll", {"version": "3.1.0", "meta_ready": self.meta.configured})
         job = response.get("job") if isinstance(response, dict) else None
         if not job:
             return

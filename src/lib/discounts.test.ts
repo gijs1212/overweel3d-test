@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDiscountNewsletterDetails, calculateDiscount, discountValidationError, eligibleDiscountSubtotal, type ApplicableDiscount } from "./discounts";
+import { calculateDiscount, discountValidationError, eligibleDiscountSubtotal, type ApplicableDiscount } from "./discounts";
 
 const code: ApplicableDiscount = {
   code: "TEST10", discount_type: "percentage", discount_value: 10, active: true,
@@ -41,34 +41,4 @@ describe("discounts", () => {
     expect(discountValidationError({ ...code, expires_at: "2020-01-01T00:00:00Z" }, "klant@example.nl")).toContain("verlopen");
   });
 
-  it("vermeldt alle gegevens van een openbare artikelkorting in de nieuwsbrief", () => {
-    const details = buildDiscountNewsletterDetails({
-      code: "ROOS20",
-      discountType: "percentage",
-      discountValue: 20,
-      expiresAt: "2030-06-30T12:00:00Z",
-      maxUses: 50,
-      productName: "Roos",
-    });
-
-    expect(details).toContain("Code: ROOS20");
-    expect(details).toContain("Korting: 20%");
-    expect(details).toContain("30-6-2030");
-    expect(details).toContain("Maximaal 50 keer");
-    expect(details).toContain("alleen voor het artikel Roos");
-  });
-
-  it("maakt onbeperkt gebruik en geen vervaldatum expliciet", () => {
-    const details = buildDiscountNewsletterDetails({
-      code: "ALTIJD5",
-      discountType: "fixed",
-      discountValue: 5,
-      expiresAt: null,
-      maxUses: null,
-    });
-
-    expect(details).toContain("€5.00");
-    expect(details).toContain("Geen vervaldatum");
-    expect(details).toContain("Onbeperkt te gebruiken");
-  });
 });

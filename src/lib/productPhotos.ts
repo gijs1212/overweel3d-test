@@ -1,100 +1,45 @@
 import { supabase } from "@/integrations/supabase/client";
-import { pocketbase, POCKETBASE_URL } from "@/integrations/pocketbase/client";
 
-const cache = new Map<string, { url: string; expiresAt: number }>();
-
-function isTrustedProductMediaUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    const base = new URL(POCKETBASE_URL);
-    return url.origin === base.origin && (
-      url.pathname.startsWith("/api/files/")
-      || url.pathname === "/api/overweel3d/catalog/media"
-    );
-  } catch {
-    return false;
-  }
-}
+const cache = new Map<string, string>();
 
 export function normalizeProductStoragePath(path: string): string | null {
   if (!path || /^(https?:|data:|blob:)/i.test(path)) return null;
   if (path.startsWith("/") && !path.startsWith("/storage/")) return null;
   let decodedPath = path;
-  try { decodedPath = decodeURIComponent(path); } catch { /* Keep a malformed legacy path unchanged. */ }
+  try { decodedPath = decodeURIComponent(path); } catch { /* Preserve malformed legacy paths. */ }
   return decodedPath
     .replace(/^\/storage\/v1\/object\/(?:public|sign)\/orders\//, "")
     .replace(/^orders\//, "")
     .replace(/^\/+/, "");
 }
 
-/**
- * Active product media is public, even when the visitor has no account.
- * The server verifies that the path belongs to an active product before
- * resolving its PocketBase file URL. Private/admin media retains the old
- * authenticated fallback.
- */
+function isPublicMedia(path: string) {
+  return ["products/", "portfolio/", "colors/", "reviews/", "social/"]
+    .some((prefix) => path.startsWith(prefix));
+}
+
+/** Resolve catalogue media through the anonymous Appwrite public bucket. */
 export async function getProductPhotoUrl(path: string): Promise<string> {
   if (!path) return "";
-  // Already-renderable URLs are sometimes present in older product records.
   if (/^(https?:|data:|blob:)/i.test(path)) return path;
   if (path.startsWith("/") && !path.startsWith("/storage/")) return path;
 
-  const normalizedPath = normalizeProductStoragePath(path);
+  let normalizedPath = normalizeProductStoragePath(path);
   if (!normalizedPath) return path;
-  const now = Date.now();
   const cached = cache.get(normalizedPath);
-  if (cached && cached.expiresAt > now + 60_000) return cached.url;
+  if (cached) return cached;
 
-  // Catalogue, portfolio, colour and review media are deliberately public.
-  // Use the validated catalogue route directly so an anonymous browser never
-  // needs an auth token, a signed URL, or a CORS preflight before media loads.
-  const isProductMedia = normalizedPath.startsWith("products/");
-  const isOtherPublicMedia = ["portfolio/", "colors/", "reviews/"]
-    .some((prefix) => normalizedPath.startsWith(prefix));
-  if (isProductMedia) {
-    const publicUrl = `${POCKETBASE_URL}/api/overweel3d/catalog/media?path=${encodeURIComponent(normalizedPath)}`;
-    cache.set(normalizedPath, { url: publicUrl, expiresAt: now + 5 * 60 * 1000 });
-    return publicUrl;
+  if (!normalizedPath.includes("/")) normalizedPath = `products/${normalizedPath}`;
+  if (isPublicMedia(normalizedPath)) {
+    const { data } = supabase.storage.from("orders").getPublicUrl(normalizedPath);
+    const url = String(data?.publicUrl || "");
+    if (url) cache.set(normalizedPath, url);
+    return url;
   }
 
-  try {
-    const response = await fetch(`${POCKETBASE_URL}/api/overweel3d/catalog/media?path=${encodeURIComponent(normalizedPath)}&resolve=1`);
-    if (response.ok) {
-      const result = await response.json() as { url?: string };
-      if (result.url && isTrustedProductMediaUrl(result.url)) {
-        cache.set(normalizedPath, { url: result.url, expiresAt: now + 5 * 60 * 1000 });
-        return result.url;
-      }
-    }
-  } catch { /* An authenticated admin can still use the legacy fallback. */ }
-
-  // Older PocketBase hook versions only recognize product paths. Public
-  // portfolio, colour and approved-review records can still be resolved
-  // anonymously through the public storage_files list rule.
-  if (isOtherPublicMedia) {
-    try {
-      const stored = await pocketbase.collection("storage_files").getFirstListItem(
-        pocketbase.filter("path = {:path} && public = true", { path: normalizedPath }),
-        { requestKey: null },
-      );
-      const publicUrl = pocketbase.files.getURL(stored, stored.file);
-      if (publicUrl && isTrustedProductMediaUrl(publicUrl)) {
-        cache.set(normalizedPath, { url: publicUrl, expiresAt: now + 5 * 60 * 1000 });
-        return publicUrl;
-      }
-    } catch { /* Keep the media hidden when no explicitly public record exists. */ }
-  }
-
-  if (!pocketbase.authStore.token) return "";
-  let { data, error } = await supabase.storage.from("orders").createSignedUrl(normalizedPath, 60 * 60);
-
-  // Very old rows occasionally contain only a filename instead of products/<filename>.
-  if ((error || !data?.signedUrl) && !normalizedPath.includes("/")) {
-    ({ data, error } = await supabase.storage.from("orders").createSignedUrl(`products/${normalizedPath}`, 60 * 60));
-  }
-
+  const { data, error } = await supabase.storage.from("orders").createSignedUrl(normalizedPath, 60 * 60);
   if (error || !data?.signedUrl) return "";
-  cache.set(normalizedPath, { url: data.signedUrl, expiresAt: now + 60 * 60 * 1000 });
+  cache.set(normalizedPath, data.signedUrl);
   return data.signedUrl;
 }
 

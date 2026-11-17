@@ -2,7 +2,7 @@
 
 The bridge signs in with a one-time email code, subscribes read-only to the
 cloud MQTT report topic for the selected printer and forwards normalized status
-to PocketBase. The Bambu access token stays on this computer.
+to Appwrite. The Bambu access token stays on this computer.
 
 Bambu Lab does not publish a supported public consumer Cloud API. This client
 uses the same account/cloud endpoints used by Bambu clients and may need an
@@ -80,7 +80,10 @@ FAN_VENTILATION_DURATION_SECONDS = 60
 BAMBU_COLOR_CATALOG_INTERVAL_SECONDS = 60 * 60
 BAMBU_COLOR_CATALOG_URL = "https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/profiles/BBL/filament/filaments_color_codes.json"
 MQTT_HOST = "us.mqtt.bambulab.com"
-WEBSITE_API_URL = setting("WEBSITE_API_URL", "https://api.gijsoverweel.nl/api/overweel3d")
+WEBSITE_API_URL = setting("WEBSITE_API_URL", "https://appwrite.gijsoverweel.nl/v1/functions/overweel3d-api/executions")
+if "/api/overweel3d" in WEBSITE_API_URL:
+    WEBSITE_API_URL = "https://appwrite.gijsoverweel.nl/v1/functions/overweel3d-api/executions"
+APPWRITE_PROJECT_ID = setting("APPWRITE_PROJECT_ID", "6af9acde00152998cadb")
 BAMBU_SERIAL = ""
 PRINTER_ID = ""
 BRIDGE_TOKEN = ""
@@ -98,6 +101,30 @@ AMS_REFRESH_COMPLETED = threading.Event()
 
 class BridgeAuthorizationError(RuntimeError):
     """The local bridge token no longer matches the selected website printer."""
+
+
+def website_execution(kind: str, name: str, body: dict, timeout: int = 20) -> dict:
+    request = urllib.request.Request(
+        WEBSITE_API_URL,
+        data=json.dumps({
+            "body": json.dumps({"kind": kind, "name": name, "body": body}),
+            "async": False,
+            "path": "/",
+            "method": "POST",
+            "headers": json.dumps({"content-type": "application/json"}),
+        }).encode(),
+        method="POST",
+        headers={"content-type": "application/json", "x-appwrite-project": APPWRITE_PROJECT_ID},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        execution = json.loads(response.read().decode() or "{}")
+    payload = json.loads(execution.get("responseBody") or "{}")
+    status = int(execution.get("responseStatusCode") or 500)
+    if status == 403:
+        raise BridgeAuthorizationError(str(payload.get("error") or "Ongeldige blijvende bridge-token."))
+    if execution.get("status") != "completed" or status >= 300 or payload.get("error"):
+        raise RuntimeError(str(payload.get("error") or execution.get("errors") or "Appwrite Function is mislukt."))
+    return payload.get("data") or {}
 
 
 def migrate_persistent_file(source: Path, destination: Path) -> bool:
@@ -230,15 +257,8 @@ def exchange_website_pairing() -> None:
         except (OSError, ValueError):
             pass
 
-    request = urllib.request.Request(
-        WEBSITE_API_URL + "/functions/printer-pair",
-        data=json.dumps({"action": "exchange", "code": WEBSITE_PAIRING_CODE}).encode(),
-        method="POST",
-        headers={"content-type": "application/json"},
-    )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            config = json.loads(response.read().decode() or "{}")
+        config = website_execution("function", "printer-pair", {"action": "exchange", "code": WEBSITE_PAIRING_CODE})
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")
         try:
@@ -283,7 +303,7 @@ def save_bridge_token(token: str) -> None:
 
 def refresh_bridge_token(rejected_token: str = "") -> str:
     raise BridgeAuthorizationError(
-        "PocketBase weigert de blijvende bridge-token. Automatische tokenvernieuwing staat uit; "
+        "Appwrite weigert de blijvende bridge-token. Automatische tokenvernieuwing staat uit; "
         "controleer de website-koppelcode in de add-oninstellingen."
     )
 
@@ -745,16 +765,8 @@ def request_manual_status_refresh(timeout_seconds: int = 20) -> bool:
 
 def forward(payload: dict, retry_after_refresh: bool = False) -> None:
     token_used = BRIDGE_TOKEN
-    request = urllib.request.Request(
-        WEBSITE_API_URL + "/bridge/status",
-        data=json.dumps(payload).encode(),
-        method="POST",
-        headers={"content-type": "application/json", "x-printer-id": PRINTER_ID, "x-bridge-token": token_used},
-    )
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            if response.status >= 300:
-                raise RuntimeError(response.read().decode(errors="replace"))
+        website_execution("bridge", "status", {"printer_id": PRINTER_ID, "bridge_token": token_used, "payload": payload}, timeout=15)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")
         try:
@@ -763,7 +775,7 @@ def forward(payload: dict, retry_after_refresh: bool = False) -> None:
             message = detail or exc.reason
         if exc.code == 403:
             raise BridgeAuthorizationError(
-                "PocketBase weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
+                "Appwrite weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
             ) from exc
         raise RuntimeError(f"Status doorsturen mislukt ({exc.code}): {message[:300]}") from exc
 
@@ -825,20 +837,13 @@ def publish_scan_state(state: str, kind: str, request_id: int, detail: str = "")
 def bridge_control_request(payload: dict) -> dict:
     action = str(payload.get("action") or "onbekend")
     token_used = BRIDGE_TOKEN
-    request = urllib.request.Request(
-        WEBSITE_API_URL + "/bridge/control",
-        data=json.dumps(payload).encode(),
-        method="POST",
-        headers={"content-type": "application/json", "x-printer-id": PRINTER_ID, "x-bridge-token": token_used},
-    )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return json.loads(response.read().decode() or "{}")
+        return website_execution("bridge", "control", {"printer_id": PRINTER_ID, "bridge_token": token_used, "payload": payload}, timeout=25)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")
         if exc.code == 403:
             raise BridgeAuthorizationError(
-                "PocketBase weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
+                "Appwrite weigert de blijvende bridge-token; automatische tokenvernieuwing staat uit."
             ) from exc
         raise RuntimeError(f"Bridgeactie '{action}' mislukt ({exc.code}): {detail[:300]}") from exc
 
@@ -1564,7 +1569,7 @@ def sync_requested_file_metadata(request: dict) -> None:
             "cached_files": cached_files,
         })
         if completion.get("success") is not True:
-            raise RuntimeError("PocketBase heeft de bijgewerkte plaat- en cachegegevens niet bevestigd.")
+            raise RuntimeError("Appwrite heeft de bijgewerkte plaat- en cachegegevens niet bevestigd.")
         print(
             f"Volledige parse #{request_id} voltooid en bevestigd: {len(plates)} plaat/platen, "
             f"{len(filaments)} kleur(en) en {len(cached_files)} bestand(en) 48 uur in cache.",

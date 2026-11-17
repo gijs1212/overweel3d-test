@@ -18,7 +18,7 @@ from .meta_config import load_meta_config, save_meta_config
 from .pairing import pairing_store
 from .worker import SocialWorker
 
-VERSION = "3.0.2"
+VERSION = "3.1.0"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("overweel3d.social")
 
@@ -135,6 +135,7 @@ async def dashboard_status(_: str = Depends(authorized)):
         "last_heartbeat_at": worker.last_heartbeat_at,
         "last_connection_error": worker.last_connection_error,
         "pocketbase_url": pairing_store.pocketbase_url,
+        "appwrite_endpoint": pairing_store.appwrite_endpoint,
         "facebook_page": settings.facebook_page_name,
         "meta_api_configured": bool(settings.meta_page_access_token and settings.meta_page_id and settings.meta_instagram_user_id),
     }

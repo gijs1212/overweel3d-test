@@ -6,16 +6,14 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Loader2, Mail, Save, User } from "lucide-react";
+import { Loader2, Save, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Profile() {
-  const { loading: authLoading, profile, setNewsletterPreference, updateProfile, user } = useAuth();
+  const { loading: authLoading, profile, updateProfile, user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -31,7 +29,6 @@ export default function Profile() {
 
   useEffect(() => {
     if (profile) {
-      setNewsletterSubscribed(profile.newsletter_subscribed);
       setFormData({
         full_name: profile.full_name || "",
         email: profile.email || "",
@@ -58,9 +55,6 @@ export default function Profile() {
           : formData.billing_address.trim(),
         shipping_address: formData.shipping_address.trim(),
       });
-      if (newsletterSubscribed !== profile?.newsletter_subscribed) {
-        await setNewsletterPreference(newsletterSubscribed);
-      }
       toast({ title: "Profiel bijgewerkt!" });
     } catch (error: unknown) {
       toast({ title: "Fout", description: error instanceof Error ? error.message : "Opslaan mislukt.", variant: "destructive" });
@@ -82,7 +76,7 @@ export default function Profile() {
         <main className="flex min-h-[60vh] items-center justify-center pb-16 pt-20">
           <div className="text-center">
             <h1 className="mb-2 text-2xl font-bold text-primary">Log in voor uw profiel</h1>
-            <p className="mb-5 text-muted-foreground">Uw profiel- en nieuwsbriefvoorkeuren zijn aan uw account gekoppeld.</p>
+            <p className="mb-5 text-muted-foreground">Uw profielgegevens zijn aan uw account gekoppeld.</p>
             <Button asChild><Link to="/login">Inloggen</Link></Button>
           </div>
         </main>
@@ -150,28 +144,6 @@ export default function Profile() {
                     <Label>Land</Label>
                     <Input value={formData.country} onChange={(e) => update("country", e.target.value)} />
                   </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-6">
-                <div className="flex items-start justify-between gap-4 rounded-xl border border-border/70 bg-muted/30 p-4">
-                  <div className="flex gap-3">
-                    <Mail className="mt-0.5 h-5 w-5 text-accent" />
-                    <div>
-                      <Label htmlFor="newsletter-preference" className="font-semibold text-primary">
-                        Overweel3D-nieuwsbrief
-                      </Label>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Ontvang nieuws over kleuren, materialen, artikelen en wijzigingen in ons aanbod.
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="newsletter-preference"
-                    checked={newsletterSubscribed}
-                    onCheckedChange={setNewsletterSubscribed}
-                    aria-label="Abonneren op de nieuwsbrief"
-                  />
                 </div>
               </div>
 

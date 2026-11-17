@@ -3,10 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: overweel3d-social-publisher:3.0.2
+    image: overweel3d-social-publisher:3.1.0
     restart: unless-stopped
     environment:
-      POCKETBASE_URL: ${POCKETBASE_URL:-https://api.gijsoverweel.nl}
+      APPWRITE_ENDPOINT: ${APPWRITE_ENDPOINT:-https://appwrite.gijsoverweel.nl/v1}
+      APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-6af9acde00152998cadb}
+      APPWRITE_FUNCTION_ID: ${APPWRITE_FUNCTION_ID:-overweel3d-api}
       CONTROL_PASSWORD: ${CONTROL_PASSWORD:?Vul een sterk beheerwachtwoord in}
       POLL_SECONDS: ${POLL_SECONDS:-30}
       FACEBOOK_PAGE_NAME: ${FACEBOOK_PAGE_NAME:-Overweel3D}

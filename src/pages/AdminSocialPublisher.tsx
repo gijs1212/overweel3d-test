@@ -16,7 +16,7 @@ import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { getProductPhotoUrl, normalizeProductStoragePath } from "@/lib/productPhotos";
 import { createClientId } from "@/lib/clientId";
 import { isVersionAtLeast } from "@/lib/compatibleVersion";
-import { isSocialPublisherConnected, parsePocketBaseTimestamp } from "@/lib/socialPublisherStatus";
+import { isSocialPublisherConnected, parseBackendTimestamp } from "@/lib/socialPublisherStatus";
 
 type Platform = "facebook" | "instagram";
 type FacebookMediaMode = "combined" | "separate";
@@ -357,7 +357,7 @@ export default function AdminSocialPublisher() {
         if (acknowledged) break;
       }
       if (acknowledged) {
-        toast({ title: "Docker-container verbonden", description: "De eerste heartbeat is door PocketBase bevestigd." });
+        toast({ title: "Docker-container verbonden", description: "De eerste heartbeat is door Appwrite bevestigd." });
       } else {
         toast({ title: "Container gekoppeld", description: "De heartbeat is nog niet bevestigd. Bekijk de verbindingsfout in het containerdashboard." });
       }
@@ -386,7 +386,7 @@ export default function AdminSocialPublisher() {
       const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `social/discount-template/${createClientId()}.${extension}`;
       const result = await uploadFileWithHeicConversion("orders", path, file, { upsert: false });
-      if (result.error || !result.data) throw result.error || new Error("PocketBase heeft de upload niet bevestigd.");
+      if (result.error || !result.data) throw result.error || new Error("Appwrite heeft de upload niet bevestigd.");
       const saved = await supabase.from("social_publisher_settings").update({ discount_image_path: result.path }).eq("id", settings.id);
       if (saved.error) {
         await supabase.storage.from("orders").remove([result.path]);
@@ -657,12 +657,12 @@ export default function AdminSocialPublisher() {
 
   const testAccountLogins = async () => {
     setTestingAccounts(true);
-    setAccountTestSteps(["Controleopdracht naar PocketBase sturen"]);
+    setAccountTestSteps(["Controleopdracht naar Appwrite sturen"]);
     try {
       const capability = await supabase.rpc("social_publisher_status");
       if (capability.error) throw capability.error;
       if (!isVersionAtLeast(capability.data?.hook_version, "1.15.0")) {
-        throw new Error(`PocketBase-hook ${capability.data?.hook_version || "onbekend"} ondersteunt deze accountcontrole niet; versie 1.15.0 of nieuwer is nodig.`);
+        throw new Error(`Backendcompatibiliteit ${capability.data?.hook_version || "onbekend"} ondersteunt deze accountcontrole niet; versie 1.15.0 of nieuwer is nodig.`);
       }
       if (!isVersionAtLeast(capability.data?.publisher_version, "2.4.0")) {
         throw new Error(`Social Publisher ${capability.data?.publisher_version || "onbekend"} ondersteunt deze accountcontrole niet; versie 2.4.0 of nieuwer is nodig.`);
@@ -712,7 +712,7 @@ export default function AdminSocialPublisher() {
           return;
         }
       }
-      throw new Error("De container antwoordde niet binnen 150 seconden. Controleer de containerlogs en de PocketBase-hookstatus.");
+      throw new Error("De container antwoordde niet binnen 150 seconden. Controleer de containerlogs en de Appwrite Function-status.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Onbekende fout.";
       setAccountTestSteps((steps) => [...steps, `Controle mislukt: ${message}`]);
@@ -769,7 +769,7 @@ export default function AdminSocialPublisher() {
           const valid = candidate.media.filter((_, index) => Boolean(urls[index]));
           if (valid.length) { selected = candidate; selectedMedia = valid; break; }
         }
-        if (!selected) throw new Error("Geen productfoto kon uit PocketBase worden geladen.");
+        if (!selected) throw new Error("Geen productfoto kon uit Appwrite worden geladen.");
         sourceType = "spotlight";
         sourceId = selected.product.id;
         sourceName = selected.product.name;
@@ -811,7 +811,7 @@ export default function AdminSocialPublisher() {
   const visibleActivity = useMemo(() => activity.filter((item) => `${item.source_name} ${item.source_type} ${item.platform} ${item.status} ${item.error}`.toLocaleLowerCase("nl-NL").includes(activitySearch.toLocaleLowerCase("nl-NL"))), [activity, activitySearch]);
   const visibleProducts = useMemo(() => products.filter((product) => product.name.toLocaleLowerCase("nl-NL").includes(productSearch.trim().toLocaleLowerCase("nl-NL"))), [productSearch, products]);
   const publisherConnected = publisherHeartbeat.connected;
-  const publisherLastSeenMs = parsePocketBaseTimestamp(publisherHeartbeat.lastSeen);
+  const publisherLastSeenMs = parseBackendTimestamp(publisherHeartbeat.lastSeen);
   const publisherLastSeenLabel = Number.isFinite(publisherLastSeenMs)
     ? new Date(publisherLastSeenMs).toLocaleString("nl-NL")
     : publisherHeartbeat.lastSeen;

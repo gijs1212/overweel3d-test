@@ -332,6 +332,7 @@ export default function OrderDetail() {
   const isAccepted = order.status === "approved_by_customer" || order.status === "waiting_for_payment" || order.status === "in_production";
   const isRejected = order.status === "rejected_by_customer";
   const totalPrice = (order.final_price || 0) + (order.shipping_cost || 0);
+  const requiresQuote = order.order_method !== "prebuilt";
 
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
@@ -449,10 +450,25 @@ export default function OrderDetail() {
               <div className="bg-card rounded-2xl p-6 shadow-overweel-card">
                 <h3 className="font-bold text-primary mb-4">Prijsinformatie</h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Indicatieprijs</span>
-                    <span className="font-medium">€{Number(order.instant_quote_price || 0).toFixed(2)}</span>
-                  </div>
+                  {requiresQuote ? (
+                    <>
+                      {(order.instant_quote_price || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Kant-en-klaar subtotaal</span>
+                          <span className="font-medium">€{Number(order.instant_quote_price).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Overige onderdelen</span>
+                        <span className="font-semibold">Op offerte</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Prijs</span>
+                      <span className="font-medium">€{Number(order.instant_quote_price || 0).toFixed(2)}</span>
+                    </div>
+                  )}
                   {order.final_price != null && order.final_price > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Definitieve prijs</span>
@@ -485,11 +501,11 @@ export default function OrderDetail() {
                     </div>
                   )}
                 </div>
-                <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                  <p className="text-xs text-amber-800 dark:text-amber-200">
-                    ⚠️ De indicatieprijs is slechts een schatting.
-                  </p>
-                </div>
+                {requiresQuote && order.final_price == null && (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs text-amber-800">De definitieve prijs volgt na controle van de offerteonderdelen.</p>
+                  </div>
+                )}
               </div>
 
               {/* Order details */}
@@ -866,7 +882,7 @@ export default function OrderDetail() {
         open={repeatConfirmationOpen}
         onOpenChange={setRepeatConfirmationOpen}
         title="Deze bestelling opnieuw bestellen?"
-        description="Prijs kan veranderen, u zal hierover geïnformeerd worden. Alleen nog beschikbare kant-en-klare artikelen worden overgenomen."
+        description="Prijs kan veranderen, u zal hierover geïnformeerd worden. Beschikbare kant-en-klare artikelen worden opnieuw toegevoegd; bestanden en maatwerk worden als nieuwe maatwerkaanvraag aan de oorspronkelijke bestelling gekoppeld."
         confirmLabel="Opnieuw bestellen"
         onConfirm={() => navigate(`/bestellen?repeat=${order.id}`)}
       />

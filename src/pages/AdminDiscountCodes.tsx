@@ -12,8 +12,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
-import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
-import { buildDiscountNewsletterDetails } from "@/lib/discounts";
 
 interface DiscountProduct {
   id: string;
@@ -149,36 +147,9 @@ export default function AdminDiscountCodes() {
       };
       const { data: createdCode, error } = await supabase.from("discount_codes").insert(payload).select("code,discount_type,discount_value,expires_at,max_uses,is_public,product_id,category_id,minimum_order_amount,starts_at,per_customer_limit").single();
       if (error) throw error;
-      let newsletterError = "";
-      if (createdCode.is_public) {
-        const productName = products.find((product) => product.id === createdCode.product_id)?.name || null;
-        const categoryName = categories.find((category) => category.id === createdCode.category_id)?.name || null;
-        const ruleDetails = [
-          createdCode.starts_at ? `Start op ${new Date(createdCode.starts_at).toLocaleString("nl-NL")}.` : "Direct geldig.",
-          createdCode.minimum_order_amount > 0 ? `Minimale bestelwaarde €${Number(createdCode.minimum_order_amount).toFixed(2)}.` : "",
-          createdCode.per_customer_limit ? `Maximaal ${createdCode.per_customer_limit} keer per klant.` : "",
-          categoryName ? `Alleen voor categorie ${categoryName}.` : "",
-        ].filter(Boolean).join(" ");
-        const newsletter = await sendAutomaticNewsletters([{
-          templateKind: "discount",
-          changeType: "new",
-          itemName: createdCode.code,
-          details: `${buildDiscountNewsletterDetails({
-            code: createdCode.code,
-            discountType: createdCode.discount_type,
-            discountValue: Number(createdCode.discount_value),
-            expiresAt: createdCode.expires_at,
-            maxUses: createdCode.max_uses,
-            productName,
-          })} ${ruleDetails}`,
-          itemUrl: `${window.location.origin}/bestellen`,
-        }]);
-        newsletterError = newsletter.errors[0] || "";
-      }
       toast({
-        title: newsletterError ? "Kortingscode aangemaakt, nieuwsbrief mislukt" : "Kortingscode aangemaakt ✅",
-        description: newsletterError || (createdCode.is_public ? "De kortingscode is naar de nieuwsbriefabonnees gestuurd." : "Privécode: er is geen nieuwsbrief verstuurd."),
-        variant: newsletterError ? "destructive" : "default",
+        title: "Kortingscode aangemaakt ✅",
+        description: createdCode.is_public ? "De openbare code kan via de Social Publisher worden gedeeld." : "De code is privé en wordt niet openbaar gedeeld.",
       });
       setForm({ code: "", discount_type: "percentage", discount_value: 10, max_uses: "", expires_at: "", is_referral: false, is_public: false, owner_email: "", owner_name: "", reward_percentage: 10, product_id: "", category_id: "", minimum_order_amount: 0, per_customer_limit: "1", starts_at: "", stackable: false });
       await fetchCodes();
@@ -232,8 +203,8 @@ export default function AdminDiscountCodes() {
               <Switch id="is_public" checked={form.is_public || Boolean(form.product_id)} disabled={Boolean(form.product_id)} onCheckedChange={(is_public) => setForm({ ...form, is_public })} />
               <Label htmlFor="is_public" className="cursor-pointer">
                 {form.product_id
-                  ? "Artikelkorting – automatisch openbaar en direct versturen naar de nieuwsbrief"
-                  : form.is_public ? "Openbaar – direct versturen naar de nieuwsbrief" : "Privé – geen nieuwsbrief versturen"}
+                  ? "Artikelkorting – automatisch openbaar voor de Social Publisher"
+                  : form.is_public ? "Openbaar – kan via sociale media worden gedeeld" : "Privé – alleen voor rechtstreeks gebruik"}
               </Label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

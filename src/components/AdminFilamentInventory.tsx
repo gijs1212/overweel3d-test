@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMaterials } from "@/hooks/useMaterials";
-import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
 
 type InventoryRow = Database["public"]["Tables"]["filament_inventory"]["Row"] & {
   filament_colors: { name: string; material: string; hex: string } | null;
@@ -105,21 +104,10 @@ export function AdminFilamentInventory() {
       return;
     }
 
-    const newsletter = await sendAutomaticNewsletters([{
-      templateKind: "color",
-      changeType: "new",
-      itemName: promoteForm.name.trim(),
-      details: `${promoteForm.material}${promoteForm.description.trim() ? ` · ${promoteForm.description.trim()}` : ""}`,
-      itemUrl: `${window.location.origin}/kleuren`,
-    }]);
     setPromoting(false);
     setPromoteTarget(null);
     await load();
-    if (newsletter.errors.length) {
-      toast({ title: "Kleur toegevoegd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
-    } else {
-      toast({ title: "Nieuwe kleur toegevoegd", description: "De AMS-voorraad, het gemeten gewicht en passende producten zijn aan de nieuwe kleur gekoppeld." });
-    }
+    toast({ title: "Nieuwe kleur toegevoegd", description: "De AMS-voorraad, het gemeten gewicht en passende producten zijn aan de nieuwe kleur gekoppeld." });
   };
 
   return (

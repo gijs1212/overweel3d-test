@@ -349,7 +349,7 @@ export default function NewOrder() {
     const tooLarge = validExt.filter((f) => f.size > MAX_FILE_SIZE);
     if (tooLarge.length) {
       toast({
-        title: "Bestand(en) te groot (max 10MB)",
+        title: "Bestand(en) te groot (max 250 MB)",
         description: `${tooLarge.map((f) => f.name).join(", ")} — stuur deze via e-mail naar gijsoverweel@gmail.com`,
         variant: "destructive",
       });
@@ -723,7 +723,8 @@ export default function NewOrder() {
       }).filter(Boolean).join(", ");
       const totalQuantity = cart.reduce((sum, line) => sum + (line.kind === "custom" ? 1 : line.quantity), 0);
 
-      const orderMethod = cart.length === 1 ? cart[0].kind : "mixed";
+      const orderKinds = new Set(cart.map((line) => line.kind));
+      const orderMethod = orderKinds.size === 1 ? cart[0].kind : "mixed";
 
       const orderPayload = {
         order_number: orderNumber,
@@ -774,7 +775,7 @@ export default function NewOrder() {
         const uploaded = await uploadFileWithHeicConversion("orders", storagePath, fl.file, { upsert: false });
         const { error: upErr } = uploaded;
         if (upErr) { failedFiles.push(fl.file.name); continue; }
-        const { error: fileRowError } = await supabase.from("order_files").insert({
+        const { error: fileRowError } = await supabase.rpc("attach_order_file", {
           order_id: order.id,
           storage_path: uploaded.path,
           original_filename: uploaded.file.name,
@@ -966,7 +967,7 @@ export default function NewOrder() {
                               <span>
                                 <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                                 <p className="font-medium text-primary">Sleep bestanden hierheen of klik om te uploaden</p>
-                                <p className="text-xs text-muted-foreground mt-1">STL, OBJ, 3MF, STEP — max 10MB per bestand</p>
+                                <p className="text-xs text-muted-foreground mt-1">STL, OBJ, 3MF, STEP — max 250 MB per bestand</p>
                               </span>
                             </label>
                             {draftFiles.length > 0 && (

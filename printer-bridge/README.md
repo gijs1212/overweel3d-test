@@ -1,7 +1,7 @@
 # Overweel3D Bambu Bridge
 
 De bridge verbindt een of meer Bambu-printers via Bambu Cloud met de
-Overweel3D-productiepagina. Versie **1.34.0** ondersteunt uitsluitend:
+Overweel3D-productiepagina. Versie **1.35.0** ondersteunt uitsluitend:
 
 - live printerstatus, actieve bestandsnaam, plaat en voortgang;
 - nozzle-, temperatuur- en AMS-informatie;
@@ -13,6 +13,8 @@ Overweel3D-productiepagina. Versie **1.34.0** ondersteunt uitsluitend:
 
 De printwachtrij, SD/FTPS-scans, pc-besturing, VMware-koppeling en VM-agent zijn
 verwijderd. De bridge start nooit een print en schakelt geen pc of VM aan of uit.
+Versie 1.35.0 verstuurt status en AMS-gegevens via de centrale Appwrite Function;
+oude PocketBase-API-adressen worden automatisch naar Appwrite omgeleid.
 
 ## Home Assistant installeren
 

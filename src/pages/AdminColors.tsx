@@ -20,7 +20,6 @@ import { materialLabel, normalizeMaterialId } from "@/lib/productCatalog";
 import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { LocalMediaPreview } from "@/components/LocalMediaPreview";
 import { validateMediaSelection } from "@/lib/mediaFiles";
-import { sendAutomaticNewsletters, type AutomaticNewsletterEvent } from "@/lib/automaticNewsletter";
 
 function SignedImg({ path, className }: { path: string; className?: string }) {
   const [url, setUrl] = useState("");
@@ -113,21 +112,6 @@ export default function AdminColors() {
       return;
     }
     setColors((current) => current.map((item) => item.id === color.id ? { ...item, active } : item));
-    const materialHasOtherActiveColor = colors.some((item) => item.id !== color.id && item.active
-      && normalizeMaterialId(item.material) === normalizeMaterialId(color.material));
-    const newsletterEvents: AutomaticNewsletterEvent[] = [{
-      templateKind: "color", changeType: active ? "new" : "removed", itemName: color.name,
-      details: `${materialLabel(color.material)} · ${active ? "weer beschikbaar" : "tijdelijk niet beschikbaar; deze kleur komt waarschijnlijk later weer terug"}`,
-      itemUrl: `${window.location.origin}/kleuren`,
-      temporarilyUnavailable: !active,
-    }];
-    if (active && !materialHasOtherActiveColor) newsletterEvents.push({
-      templateKind: "material", changeType: "new", itemName: materialLabel(color.material),
-      details: "Dit materiaal is weer beschikbaar.",
-      itemUrl: `${window.location.origin}/kleuren`,
-    });
-    const newsletter = await sendAutomaticNewsletters(newsletterEvents);
-    if (newsletter.errors.length) toast({ title: "Beschikbaarheid gewijzigd, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
     toast({
       title: active ? `${color.name} is weer beschikbaar` : `${color.name} is tijdelijk onbeschikbaar`,
       description: active ? "De kleur staat weer in alle kleurkeuzes." : "De kleur is direct uit alle klant- en adminbestelkeuzes gehaald.",
@@ -288,30 +272,6 @@ export default function AdminColors() {
         if (error) throw new Error(`Kleur opgeslagen, maar oude foto's verwijderen mislukte: ${error.message}`);
       }
 
-      const availabilityChanged = editing && editing.active !== payload.active;
-      if (!editing || availabilityChanged) {
-        const changeType = !editing || payload.active ? "new" : "removed";
-        const materialHasOtherActiveColor = colors.some((item) => item.id !== editing?.id && item.active
-          && normalizeMaterialId(item.material) === normalizeMaterialId(payload.material));
-        const newsletterEvents: AutomaticNewsletterEvent[] = [{
-          templateKind: "color", changeType, itemName: payload.name,
-          details: payload.active
-            ? `${materialLabel(payload.material)}${payload.description ? ` · ${payload.description}` : ""}`
-            : `${materialLabel(payload.material)} · tijdelijk niet beschikbaar; deze kleur komt waarschijnlijk later weer terug`,
-          itemUrl: `${window.location.origin}/kleuren`,
-          temporarilyUnavailable: !payload.active,
-        }];
-        if (payload.active && !materialHasOtherActiveColor) newsletterEvents.push({
-          templateKind: "material", changeType: "new", itemName: materialLabel(payload.material),
-          details: "Dit materiaal is toegevoegd aan het beschikbare assortiment.", itemUrl: `${window.location.origin}/kleuren`,
-        });
-        const newsletter = await sendAutomaticNewsletters(newsletterEvents);
-        if (newsletter.errors.length) toast({ title: "Kleur opgeslagen, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
-        else toast({
-          title: "Nieuwsbrief verstuurd ✅",
-          description: `${newsletter.campaignsSent} melding${newsletter.campaignsSent === 1 ? "" : "en"} verstuurd naar ${newsletter.recipientsReached} ontvanger${newsletter.recipientsReached === 1 ? "" : "s"}.`,
-        });
-      }
       toast({ title: editing ? "Kleur bijgewerkt ✅" : "Kleur toegevoegd ✅" });
       cancel();
       fetchAll();
@@ -333,14 +293,6 @@ export default function AdminColors() {
       if (storageError) toast({ title: "Kleur verwijderd", description: "Enkele foto's konden niet uit storage worden verwijderd.", variant: "destructive" });
       else toast({ title: "Kleur en foto's verwijderd" });
     } else toast({ title: "Kleur verwijderd" });
-    if (color) {
-      const materialHasOtherActiveColor = colors.some((item) => item.id !== color.id && item.active
-        && normalizeMaterialId(item.material) === normalizeMaterialId(color.material));
-      const newsletterEvents: AutomaticNewsletterEvent[] = [{ templateKind: "color", changeType: "removed", itemName: color.name, details: materialLabel(color.material), itemUrl: `${window.location.origin}/kleuren` }];
-      if (color.active && !materialHasOtherActiveColor) newsletterEvents.push({ templateKind: "material", changeType: "removed", itemName: materialLabel(color.material), details: "Dit materiaal is niet langer beschikbaar.", itemUrl: `${window.location.origin}/kleuren` });
-      const newsletter = await sendAutomaticNewsletters(newsletterEvents);
-      if (newsletter.errors.length) toast({ title: "Kleur verwijderd, nieuwsbrief deels mislukt", description: newsletter.errors[0], variant: "destructive" });
-    }
     fetchAll();
   };
 

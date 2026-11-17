@@ -1,6 +1,6 @@
 # Overweel3D Bambu Bridge
 
-Versie **1.34.0** leest via Bambu Cloud de printerstatus, actieve print, nozzle,
+Versie **1.35.0** leest via Bambu Cloud de printerstatus, actieve print, nozzle,
 temperaturen en AMS-rollen uit. De app stuurt die gegevens naar de afgeschermde
 Overweel3D-productiepagina en werkt het admin-filamentbeheer automatisch bij.
 
@@ -12,4 +12,8 @@ meer aanwezig. De app verstuurt geen printopdrachten.
 
 Alle sessie- en koppelgegevens blijven in `/config/overweel3d` bewaard. Zie
 `DOCS.md` voor installatie en koppeling.
+
+De app communiceert vanaf versie 1.35.0 met Appwrite. Een nog opgeslagen oud
+PocketBase-adres wordt bij het starten automatisch vervangen door de nieuwe
+Appwrite Function-route.
 

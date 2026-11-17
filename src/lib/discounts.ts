@@ -16,15 +16,6 @@ export interface ApplicableDiscount {
   starts_at?: string | null;
 }
 
-interface DiscountNewsletterDetails {
-  code: string;
-  discountType: string;
-  discountValue: number;
-  expiresAt: string | null;
-  maxUses: number | null;
-  productName?: string | null;
-}
-
 export function discountValidationError(
   discount: ApplicableDiscount | null,
   customerEmail: string,
@@ -80,26 +71,3 @@ export function discountScopeLabel(
   return parts.join(" · ");
 }
 
-export function buildDiscountNewsletterDetails({
-  code,
-  discountType,
-  discountValue,
-  expiresAt,
-  maxUses,
-  productName,
-}: DiscountNewsletterDetails) {
-  const valueLabel = discountType === "percentage"
-    ? `${Number(discountValue)}%`
-    : `€${Number(discountValue).toFixed(2)}`;
-  const expiryLabel = expiresAt
-    ? `Vervalt op ${new Date(expiresAt).toLocaleDateString("nl-NL")}.`
-    : "Geen vervaldatum.";
-  const usageLabel = maxUses === null
-    ? "Onbeperkt te gebruiken."
-    : `Maximaal ${maxUses} keer te gebruiken.`;
-  const scopeLabel = productName
-    ? `Deze tijdelijke korting geldt alleen voor het artikel ${productName}.`
-    : "Deze korting geldt voor de volledige bestelling.";
-
-  return `Code: ${code}. Korting: ${valueLabel}. ${expiryLabel} ${usageLabel} ${scopeLabel}`;
-}

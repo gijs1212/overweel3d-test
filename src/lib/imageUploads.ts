@@ -145,7 +145,7 @@ export async function uploadFileWithHeicConversion(
       contentType: sourceFile.type || options.contentType,
       upsert: options.upsert ?? false,
     });
-    return { ...result, file: sourceFile, path: requestedPath, converted: false };
+    return { ...result, file: sourceFile, path: String(result.data?.path || requestedPath), converted: false };
   }
 
   // Mobile Safari may suspend or lose a selected photo while expensive HEIC
@@ -158,7 +158,8 @@ export async function uploadFileWithHeicConversion(
     contentType: sourceFile.type || "image/heic",
     upsert: options.upsert ?? false,
   });
-  if (staged.error) return { ...staged, file: sourceFile, path: stagedPath, converted: false };
+  if (staged.error) return { ...staged, file: sourceFile, path: String(staged.data?.path || stagedPath), converted: false };
+  const storedStagedPath = String(staged.data?.path || stagedPath);
 
   try {
     const file = await prepareImageFileForUpload(sourceFile);
@@ -169,19 +170,19 @@ export async function uploadFileWithHeicConversion(
       upsert: options.upsert ?? false,
     });
     if (result.error) {
-      await supabase.storage.from(bucket).remove([stagedPath]);
-      return { ...result, file, path, converted: true };
+      await supabase.storage.from(bucket).remove([storedStagedPath]);
+      return { ...result, file, path: String(result.data?.path || path), converted: true };
     }
-    const cleanup = await supabase.storage.from(bucket).remove([stagedPath]);
-    if (cleanup.error) console.warn(`Tijdelijk HEIC-bestand kon niet worden verwijderd: ${stagedPath}`, cleanup.error);
-    return { ...result, file, path, converted: true };
+    const cleanup = await supabase.storage.from(bucket).remove([storedStagedPath]);
+    if (cleanup.error) console.warn(`Tijdelijk HEIC-bestand kon niet worden verwijderd: ${storedStagedPath}`, cleanup.error);
+    return { ...result, file, path: String(result.data?.path || path), converted: true };
   } catch (error) {
-    await supabase.storage.from(bucket).remove([stagedPath]);
+    await supabase.storage.from(bucket).remove([storedStagedPath]);
     return {
       data: null,
       error: error instanceof Error ? error : new Error(String(error)),
       file: sourceFile,
-      path: stagedPath,
+      path: storedStagedPath,
       converted: false,
     };
   }

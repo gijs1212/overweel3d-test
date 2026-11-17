@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import UploadProgressCenter from "./UploadProgressCenter";
-import { UPLOAD_PROGRESS_EVENT } from "@/integrations/pocketbase/client";
+import { UPLOAD_PROGRESS_EVENT } from "@/integrations/appwrite/client";
 
 function report(detail: {
   id: string;

@@ -12,8 +12,14 @@ function emitUploadProgress(detail: { id: string; name: string; path: string; pe
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(UPLOAD_PROGRESS_EVENT, { detail }));
 }
 
-function uploadStorageRecord(existingId: string | null, form: FormData, file: File, path: string): Promise<RecordModel> {
-  const id = `${path}:${Date.now()}:${Math.random()}`;
+class StorageUploadError extends Error {
+  constructor(message: string, readonly status = 0) {
+    super(message);
+    this.name = "StorageUploadError";
+  }
+}
+
+function uploadStorageRecord(existingId: string | null, form: FormData, file: File, path: string, id: string): Promise<RecordModel> {
   let lastProgress = -1;
   emitUploadProgress({ id, name: file.name, path, percent: 0, status: "uploading" });
   return new Promise((resolve, reject) => {
@@ -36,17 +42,17 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
     xhr.onerror = () => {
       const error = "Netwerkfout tijdens uploaden.";
       emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error });
-      reject(new Error(error));
+      reject(new StorageUploadError(error));
     };
     xhr.onabort = () => {
       const error = "Upload geannuleerd.";
       emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error });
-      reject(new Error(error));
+      reject(new StorageUploadError(error));
     };
     xhr.ontimeout = () => {
       const error = "Upload duurde langer dan 30 minuten en is afgebroken. Controleer de internetverbinding en probeer het bestand opnieuw.";
       emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error });
-      reject(new Error(error));
+      reject(new StorageUploadError(error));
     };
     xhr.onload = () => {
       let payload: Record<string, unknown> = {};
@@ -55,10 +61,10 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
         if (!payload.id) {
           const error = `Upload van ${file.name} is ontvangen, maar PocketBase gaf geen geldig bestandsrecord terug.`;
           emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error });
-          reject(new Error(error));
+          reject(new StorageUploadError(error, xhr.status));
           return;
         }
-        emitUploadProgress({ id, name: file.name, path, percent: 100, status: "completed" });
+        emitUploadProgress({ id, name: file.name, path, percent: 99, status: "uploading" });
         resolve(payload as RecordModel);
         return;
       }
@@ -70,7 +76,7 @@ function uploadStorageRecord(existingId: string | null, form: FormData, file: Fi
       const reason = [genericMessage, ...details].filter(Boolean).join(" — ");
       const message = `Upload van ${file.name} naar ${path} mislukt (${xhr.status || "geen HTTP-status"})${reason ? `: ${reason}` : ""}${routeHint ? ` — ${routeHint}` : ""}`;
       emitUploadProgress({ id, name: file.name, path, percent: 0, status: "failed", error: message });
-      reject(new Error(message));
+      reject(new StorageUploadError(message, xhr.status));
     };
     xhr.send(form);
   });
@@ -167,10 +173,34 @@ async function findStoredFile(bucket: string, path: string) {
 
 async function storedFileUrl(bucket: string, path: string) {
   const record = await findStoredFile(bucket, path);
-  const token = await pocketbase.files.getToken();
-  const url = pocketbase.files.getURL(record, record.file, { token });
+  const token = pocketbase.authStore.isValid ? await pocketbase.files.getToken() : "";
+  const url = pocketbase.files.getURL(record, record.file, token ? { token } : undefined);
   storageUrlCache.set(`${bucket}:${path}`, url);
   return url;
+}
+
+async function verifyStoredUpload(bucket: string, path: string, recordId: string) {
+  const confirmed = await pocketbase.collection("storage_files").getOne(recordId, { requestKey: null });
+  const confirmedPath = String((confirmed as any).path || "");
+  const confirmedBucket = String((confirmed as any).bucket || "");
+  const confirmedFile = String((confirmed as any).file || "");
+  if (confirmedPath !== path || confirmedBucket !== bucket || !confirmedFile) {
+    throw new Error("PocketBase heeft het uploadrecord niet volledig opgeslagen.");
+  }
+  // Authenticated uploads must also be physically readable before the UI may
+  // call them completed. A one-byte range avoids downloading large videos.
+  if (pocketbase.authStore.isValid) {
+    const url = await storedFileUrl(bucket, path);
+    const response = await fetch(url, { headers: { Range: "bytes=0-0" }, cache: "no-store" });
+    if (!response.ok && response.status !== 206) {
+      throw new Error(`PocketBase heeft het bestand geregistreerd, maar teruglezen mislukt (${response.status}).`);
+    }
+  }
+  return confirmed;
+}
+
+function canRetryUpload(error: unknown) {
+  return error instanceof StorageUploadError && (error.status === 0 || error.status === 401 || error.status === 403 || error.status >= 500);
 }
 
 function profileFromUser(record: RecordModel) {
@@ -328,7 +358,37 @@ export const supabase = {
   channel: (_name:string) => ({ on(..._args:any[]){return this;}, subscribe(..._args:any[]){return this;}, unsubscribe(..._args:any[]){return Promise.resolve("ok");} }),
   removeChannel: async (..._args:any[]) => "ok",
   storage: { from: (bucket:string) => ({
-    upload:async(path:string,file:File,_options?:any)=>{try{const hadSession=Boolean(pocketbase.authStore.token);if(hadSession&&!await refreshStoredSession())throw new Error("Uw sessie is verlopen. Log opnieuw in voordat u bestanden uploadt.");const existing=await findStoredFile(bucket,path).catch(()=>null); if(existing&&!_options?.upsert)throw new Error("Er bestaat al een bestand op dit pad."); const form=new FormData();form.set("bucket",bucket);form.set("path",path);form.set("file",file,file.name);form.set("owner_user_id",(pocketbase.authStore.record as any)?.supabase_id||"");form.set("public",String(path.startsWith("products/")||path.startsWith("portfolio/")||path.startsWith("colors/")||path.startsWith("reviews/"))); const record=await uploadStorageRecord(existing?.id||null,form,file,path);return{data:{path,id:record.id},error:null}}catch(e){return{data:null,error:asError(e)}}},
+    upload:async(path:string,file:File,_options?:any)=>{
+      const uploadId=`${path}:${Date.now()}:${Math.random()}`;
+      try{
+        const hadSession=Boolean(pocketbase.authStore.token);
+        if(hadSession&&!await refreshStoredSession())throw new Error("Uw login is verlopen. Log opnieuw in; het geselecteerde bestand blijft beschikbaar zodat u daarna opnieuw kunt uploaden.");
+        const existing=await findStoredFile(bucket,path).catch(()=>null);
+        if(existing&&!_options?.upsert)throw new Error("Er bestaat al een bestand op dit pad.");
+        const makeForm=()=>{const form=new FormData();form.set("bucket",bucket);form.set("path",path);form.set("file",file,file.name);form.set("owner_user_id",(pocketbase.authStore.record as any)?.supabase_id||"");form.set("public",String(path.startsWith("products/")||path.startsWith("portfolio/")||path.startsWith("colors/")||path.startsWith("reviews/")));return form;};
+        let record:RecordModel|null=null;
+        let lastError:unknown=null;
+        for(let attempt=0;attempt<2;attempt+=1){
+          try{record=await uploadStorageRecord(existing?.id||null,makeForm(),file,path,uploadId);break;}
+          catch(error){
+            lastError=error;
+            // The server may have committed the multipart body while the
+            // browser missed the response. Recover that record before retrying
+            // so a unique-path conflict cannot turn a successful upload into a
+            // later failure.
+            const recovered=await findStoredFile(bucket,path).catch(()=>null);
+            if(recovered&&String((recovered as any).file||"")){record=recovered;break;}
+            if(attempt>0||!canRetryUpload(error))throw error;
+            if(hadSession&&!await refreshStoredSession())throw new Error("Uw login is tijdens het uploaden verlopen. Log opnieuw in en probeer het geselecteerde bestand opnieuw.");
+          }
+        }
+        if(!record)throw lastError||new Error("Uploaden is niet voltooid.");
+        const serverPath=String((record as any).path||path);
+        await verifyStoredUpload(bucket,serverPath,record.id);
+        emitUploadProgress({id:uploadId,name:file.name,path:serverPath,percent:100,status:"completed"});
+        return{data:{path:serverPath,id:record.id},error:null};
+      }catch(e){const error=asError(e);emitUploadProgress({id:uploadId,name:file.name,path,percent:0,status:"failed",error:error.message});return{data:null,error};}
+    },
     remove:async(paths:string[])=>{try{for(const path of paths){const record=await findStoredFile(bucket,path).catch(()=>null);if(record)await pocketbase.collection("storage_files").delete(record.id,{requestKey:null});storageUrlCache.delete(`${bucket}:${path}`)}return{data:paths,error:null}}catch(e){return{data:null,error:asError(e)}}},
     download:async(path:string)=>{try{const url=await storedFileUrl(bucket,path);const response=await fetch(url);if(!response.ok)throw new Error(`Download mislukt (${response.status})`);return{data:await response.blob(),error:null}}catch(e){return{data:null,error:asError(e)}}},
     createSignedUrl:async(path:string,_expires?:number)=>{try{const signedUrl=await storedFileUrl(bucket,path);return{data:{signedUrl},error:null}}catch(e){return{data:null,error:asError(e)}}},

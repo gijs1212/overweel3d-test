@@ -1,0 +1,7 @@
+{
+  "name": "overweel3d-appwrite-api",
+  "version": "1.5.1",
+  "type": "module",
+  "main": "src/main.js",
+  "dependencies": {}
+}

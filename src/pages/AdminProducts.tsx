@@ -18,7 +18,6 @@ import { uploadFileWithHeicConversion } from "@/lib/imageUploads";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMaterials } from "@/hooks/useMaterials";
-import { sendAutomaticNewsletters } from "@/lib/automaticNewsletter";
 import {
   CatalogProduct,
   colorMatchesMaterial,
@@ -277,11 +276,11 @@ export default function AdminProducts() {
   const addOption = () => setOptions((current) => [...current, {
     id: createClientId(), product_id: editingId || "", type: "text", label: "", description: "", required: false,
     choices: [], max_length: 100, sort_order: current.length, active: true,
-    is_addon: false, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
+    is_addon: false, price_adjustment: 0, allow_multiple_quantity: false, color_slots: 0, color_slot_labels: [],
   }]);
   const addExtra = () => setOptions((current) => [...current, {
     id: createClientId(), product_id: editingId || "", type: "checkbox", label: "Nieuwe extra", description: "", required: false,
-    choices: [], max_length: 100, sort_order: current.length, active: true, is_addon: true, price_adjustment: 0, color_slots: 0, color_slot_labels: [],
+    choices: [], max_length: 100, sort_order: current.length, active: true, is_addon: true, price_adjustment: 0, allow_multiple_quantity: false, color_slots: 0, color_slot_labels: [],
   }]);
   const updateOption = (id: string, patch: Partial<ProductOption>) => setOptions((current) => current.map((option) => option.id === id ? { ...option, ...patch } : option));
   const addVariant = () => {
@@ -380,7 +379,9 @@ export default function AdminProducts() {
         const { error } = await supabase.from("product_options").insert(options.map((option, index) => ({
           product_id: productId!, type: option.type, label: option.label.trim(), description: option.description.trim(), required: option.required,
           choices: option.choices.map((choice) => choice.trim()).filter(Boolean), max_length: ["text", "textarea"].includes(option.type) ? option.max_length : null, sort_order: index, active: true,
-          is_addon: option.is_addon, price_adjustment: Number(option.price_adjustment) || 0, color_slots: option.is_addon ? option.color_slots : 0, color_slot_labels: option.is_addon ? option.color_slot_labels : [],
+          is_addon: option.is_addon, price_adjustment: Number(option.price_adjustment) || 0,
+          allow_multiple_quantity: option.is_addon && option.allow_multiple_quantity === true,
+          color_slots: option.is_addon ? option.color_slots : 0, color_slot_labels: option.is_addon ? option.color_slot_labels : [],
         })));
         if (error) throw error;
       }
@@ -436,12 +437,6 @@ export default function AdminProducts() {
         const { error } = await supabase.storage.from("orders").remove(managedRemovedPaths);
         if (error) throw new Error(`Product opgeslagen, maar oude afbeeldingen verwijderen mislukte: ${error.message}`);
       }
-      const previousProduct = products.find((product) => product.id === editingId);
-      const availabilityChanged = previousProduct && previousProduct.active !== form.active;
-      if ((createdProduct && form.active) || availabilityChanged) {
-        const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: form.active ? "new" : "removed", itemName: form.name.trim(), details: form.description.trim(), itemUrl: `${window.location.origin}/opdrachten` }]);
-        if (newsletter.errors.length) toast({ title: "Product opgeslagen, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
-      }
       toast({ title: editingId ? "Product bijgewerkt" : "Product aangemaakt", description: "Alle productinstellingen zijn opgeslagen." });
       resetEditor(); await fetchCatalog();
     } catch (error) {
@@ -469,16 +464,12 @@ export default function AdminProducts() {
       if (storageError) toast({ title: "Product verwijderd", description: "Enkele opslagbestanden konden niet worden verwijderd.", variant: "destructive" });
       else toast({ title: "Product en afbeeldingen verwijderd" });
     } else toast({ title: "Product verwijderd" });
-    const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: "removed", itemName: product.name, details: product.description, itemUrl: `${window.location.origin}/opdrachten` }]);
-    if (newsletter.errors.length) toast({ title: "Product verwijderd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
     fetchCatalog();
   };
   const toggleProductActive = async (product: CatalogProduct) => {
     const { error } = await supabase.from("products").update({ active: !product.active }).eq("id", product.id);
     if (error) toast({ title: "Wijzigen mislukt", description: error.message, variant: "destructive" });
     else {
-      const newsletter = await sendAutomaticNewsletters([{ templateKind: "article", changeType: product.active ? "removed" : "new", itemName: product.name, details: product.description, itemUrl: `${window.location.origin}/opdrachten` }]);
-      if (newsletter.errors.length) toast({ title: "Product gewijzigd, nieuwsbrief mislukt", description: newsletter.errors[0], variant: "destructive" });
       toast({ title: product.active ? "Product verborgen" : "Product zichtbaar gemaakt" }); fetchCatalog();
     }
   };
@@ -616,7 +607,7 @@ export default function AdminProducts() {
         </div></div>
 
         <div className="border-t pt-6"><div className="flex flex-wrap items-center gap-3 mb-3"><div><Label>Extra’s en informatievragen</Label><p className="text-xs text-muted-foreground">Extra’s verhogen de prijs en beginnen met een ja/nee-keuze. Informatievragen verzamelen alleen de gegevens die nodig zijn voor het product.</p></div><div className="ml-auto flex gap-2"><Button type="button" variant="outline" size="sm" onClick={addOption}><Plus className="w-4 h-4" /> Informatievraag</Button><Button type="button" size="sm" onClick={addExtra}><Plus className="w-4 h-4" /> Betaalde extra</Button></div></div><div className="space-y-4">
-          {options.filter((option) => option.is_addon).map((option) => <div key={`addon-${option.id}`} className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 grid md:grid-cols-3 gap-3"><div><Label>Bedrag dat erbij komt (€)</Label><Input type="number" min={0} step="0.01" value={option.price_adjustment} onChange={(event) => updateOption(option.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div><Label>Kleurinformatie voor deze extra</Label><Input type="number" min={0} max={12} value={option.color_slots} onChange={(event) => { const color_slots = Math.min(12, Math.max(0, Number(event.target.value) || 0)); updateOption(option.id, { color_slots, color_slot_labels: Array.from({ length: color_slots }, (_, index) => option.color_slot_labels[index] || `Kleur ${index + 1}`) }); }} /></div><div className="md:col-span-3 grid sm:grid-cols-2 gap-2">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label>Vraag over kleur {index + 1} *</Label><Input value={option.color_slot_labels[index] || ""} onChange={(event) => { const color_slot_labels = [...option.color_slot_labels]; color_slot_labels[index] = event.target.value; updateOption(option.id, { color_slot_labels }); }} /></div>)}</div></div>)}
+          {options.filter((option) => option.is_addon).map((option) => <div key={`addon-${option.id}`} className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 grid md:grid-cols-3 gap-3"><div><Label>Bedrag dat erbij komt (€)</Label><Input type="number" min={0} step="0.01" value={option.price_adjustment} onChange={(event) => updateOption(option.id, { price_adjustment: Number(event.target.value) || 0 })} /></div><div><Label>Kleurinformatie voor deze extra</Label><Input type="number" min={0} max={12} value={option.color_slots} onChange={(event) => { const color_slots = Math.min(12, Math.max(0, Number(event.target.value) || 0)); updateOption(option.id, { color_slots, color_slot_labels: Array.from({ length: color_slots }, (_, index) => option.color_slot_labels[index] || `Kleur ${index + 1}`) }); }} /></div><div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2"><Switch checked={option.allow_multiple_quantity === true} onCheckedChange={(allow_multiple_quantity) => updateOption(option.id, { allow_multiple_quantity })} /><div><Label>Meerdere keren per product</Label><p className="text-xs text-muted-foreground">Uit: altijd 1×. Aan: klant kiest zelf het aantal.</p></div></div><div className="md:col-span-3 grid sm:grid-cols-2 gap-2">{Array.from({ length: option.color_slots }, (_, index) => <div key={index}><Label>Vraag over kleur {index + 1} *</Label><Input value={option.color_slot_labels[index] || ""} onChange={(event) => { const color_slot_labels = [...option.color_slot_labels]; color_slot_labels[index] = event.target.value; updateOption(option.id, { color_slot_labels }); }} /></div>)}</div></div>)}
           {options.map((option, index) => <div key={option.id} className="rounded-xl border p-4 grid md:grid-cols-2 gap-3"><div><Label>Type</Label><Select value={option.type} onValueChange={(type) => updateOption(option.id, { type: type as ProductOptionType, ...(option.is_addon && type === "checkbox" ? { required: false, color_slots: 0, color_slot_labels: [] } : {}), choices: ["select", "radio"].includes(type) ? option.choices : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{optionTypes.map((type) => <SelectItem key={type.value} value={type.value}>{option.is_addon && type.value === "checkbox" ? "Geen extra informatie vragen" : type.label}</SelectItem>)}</SelectContent></Select></div><div><Label>Label *</Label><Input value={option.label} onChange={(event) => updateOption(option.id, { label: event.target.value })} placeholder="Bijv. Tekst op voorkant" /></div><div className="md:col-span-2"><Label>Uitleg voor de klant</Label><Input value={option.description} onChange={(event) => updateOption(option.id, { description: event.target.value })} placeholder="Bijv. Welke tekst moet op de voorkant?" /></div>{["select", "radio"].includes(option.type) && <div className="md:col-span-2"><Label>Keuzes (één per regel)</Label><Textarea rows={3} value={option.choices.join("\n")} onChange={(event) => updateOption(option.id, { choices: event.target.value.split("\n") })} placeholder={"Klein\nMiddel\nGroot"} /></div>}{["text", "textarea"].includes(option.type) && <div><Label>Maximaal tekens</Label><Input type="number" min={1} max={5000} value={option.max_length || ""} onChange={(event) => updateOption(option.id, { max_length: Number(event.target.value) || null })} /></div>}<div className="flex items-end gap-2"><Switch checked={option.required} onCheckedChange={(required) => updateOption(option.id, { required })} /><Label>Verplicht</Label></div><div className="md:col-span-2 flex justify-between items-center"><span className="text-xs text-muted-foreground">Optie {index + 1}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOptions((current) => current.filter((item) => item.id !== option.id))}><Trash2 className="w-4 h-4 text-destructive" /> Verwijderen</Button></div></div>)}
           {options.length === 0 && <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">Geen extra opties. Klanten kiezen alleen materiaal, kleur en aantal.</p>}
         </div></div>

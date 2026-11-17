@@ -30,7 +30,6 @@ import AdminSocialPublisher from "./pages/AdminSocialPublisher";
 import AdminDiscountCodes from "./pages/AdminDiscountCodes";
 import AdminColors from "./pages/AdminColors";
 import AdminMaterials from "./pages/AdminMaterials";
-import AdminNewsletter from "./pages/AdminNewsletter";
 import AdminCustomers from "./pages/AdminCustomers";
 import AdminProduction from "./pages/AdminProduction";
 import AdminReports from "./pages/AdminReports";
@@ -43,7 +42,7 @@ import AdminAssignments from "./pages/AdminAssignments";
 import Kleuren from "./pages/Kleuren";
 import NotFound from "./pages/NotFound";
 import CookieBanner from "./components/CookieBanner";
-import NewsletterPopup from "./components/NewsletterPopup";
+import SocialFollowPopup from "./components/SocialFollowPopup";
 import UploadProgressCenter from "./components/UploadProgressCenter";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { MetaPixel } from "./components/MetaPixel";
@@ -86,7 +85,6 @@ const App = () => (
             <Route path="/admin/discounts" element={<AdminDiscountCodes />} />
             <Route path="/admin/colors" element={<AdminColors />} />
             <Route path="/admin/materials" element={<AdminMaterials />} />
-            <Route path="/admin/newsletter" element={<AdminNewsletter />} />
             <Route path="/admin/customers" element={<AdminCustomers />} />
             <Route path="/admin/production" element={<AdminProduction />} />
             <Route path="/admin/reports" element={<AdminReports />} />
@@ -105,7 +103,7 @@ const App = () => (
         </AuthProvider>
       </BrowserRouter>
       <CookieBanner />
-      <NewsletterPopup />
+      <SocialFollowPopup />
       <UploadProgressCenter />
     </TooltipProvider>
   </QueryClientProvider>

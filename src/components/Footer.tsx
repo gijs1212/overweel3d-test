@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { Mail, MapPin, Clock } from "lucide-react";
+import { Mail, MapPin, Clock, Facebook, Instagram } from "lucide-react";
 import { Logo } from "./Logo";
 import { openCookieSettings } from "@/lib/cookieConsent";
-import { NewsletterSignupForm } from "./NewsletterSignupForm";
+import { FACEBOOK_URL, INSTAGRAM_URL } from "./SocialFollowPopup";
 
 export function Footer() {
   return (
@@ -22,14 +22,12 @@ export function Footer() {
               Van prototype tot eindproduct, wij printen het voor u.
             </p>
             <div className="mt-7 max-w-xl">
-              <h4 className="mb-1 text-base font-semibold">Selecte updates in uw inbox</h4>
-              <p className="mb-4 text-sm leading-6 text-white/55">
-                Ontvang updates over nieuwe materialen, producten, kleuren en kortingsacties.
-              </p>
-              <NewsletterSignupForm
-                inputClassName="border-white/20 bg-white/[0.06] text-white placeholder:text-white/35 focus-visible:ring-white"
-                source="footer"
-              />
+              <h4 className="mb-1 text-base font-semibold">Volg Overweel3D</h4>
+              <p className="mb-4 text-sm leading-6 text-white/55">Nieuwe prints, kleuren en producten delen we via onze sociale kanalen.</p>
+              <div className="flex flex-wrap gap-3">
+                <a href={FACEBOOK_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-white/75 transition hover:border-white hover:text-white"><Facebook className="h-4 w-4" /> Facebook</a>
+                <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-white/75 transition hover:border-white hover:text-white"><Instagram className="h-4 w-4" /> Instagram</a>
+              </div>
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, FileUp, Loader2, X, XCircle } from "lucide-react";
-import { UPLOAD_PROGRESS_EVENT } from "@/integrations/pocketbase/client";
+import { UPLOAD_PROGRESS_EVENT } from "@/integrations/appwrite/client";
 
 type UploadItem = {
   id: string;
