@@ -1,0 +1,18 @@
+{
+  "id": "e7e27a2e-37a1-455f-a1db-79a5dfb52afd",
+  "slug": "manage-newsletter",
+  "name": "manage-newsletter",
+  "status": "ACTIVE",
+  "version": 2,
+  "created_at": 1787331858843,
+  "updated_at": 1787395779780,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_e7e27a2e-37a1-455f-a1db-79a5dfb52afd_2/source/index.ts",
+  "ezbr_sha256": "b8b199f1d4d49dd0fa145b3416e15f5f14bcc00066685f1c2a510e461a034194",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

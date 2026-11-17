@@ -1,0 +1,297 @@
+[
+  {
+    "schema_name": "auth",
+    "table_name": "users",
+    "tgname": "on_auth_user_created",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()"
+  },
+  {
+    "schema_name": "cron",
+    "table_name": "job",
+    "tgname": "cron_job_cache_invalidate",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER cron_job_cache_invalidate AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON cron.job FOR EACH STATEMENT EXECUTE FUNCTION cron.job_cache_invalidate()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "app_settings",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON app_settings FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "blog_posts",
+    "tgname": "update_blog_posts_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_blog_posts_updated_at BEFORE UPDATE ON blog_posts FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "delivery_appointments",
+    "tgname": "update_delivery_appointments_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_delivery_appointments_updated_at BEFORE UPDATE ON delivery_appointments FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_colors",
+    "tgname": "sync_filament_color_inventory",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER sync_filament_color_inventory AFTER INSERT OR UPDATE OF name, material, hex ON filament_colors FOR EACH ROW EXECUTE FUNCTION sync_filament_color_inventory()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_colors",
+    "tgname": "trg_filament_colors_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_filament_colors_updated_at BEFORE UPDATE ON filament_colors FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "tgname": "trg_filament_inventory_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_filament_inventory_updated_at BEFORE UPDATE ON filament_inventory FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_cards",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON gift_cards FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "materials",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON materials FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscribers",
+    "tgname": "trg_newsletter_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_newsletter_updated_at BEFORE UPDATE ON newsletter_subscribers FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "tgname": "trg_newsletter_subscriptions_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_newsletter_subscriptions_updated_at BEFORE UPDATE ON newsletter_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "tgname": "trg_sync_newsletter_profile_preference",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_sync_newsletter_profile_preference AFTER INSERT OR UPDATE OF active, user_id ON newsletter_subscriptions FOR EACH ROW EXECUTE FUNCTION sync_newsletter_profile_preference()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "tgname": "update_order_3mf_plate_mappings_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_order_3mf_plate_mappings_updated_at BEFORE UPDATE ON order_3mf_plate_mappings FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "tgname": "award_order_loyalty_points",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER award_order_loyalty_points BEFORE UPDATE OF status ON orders FOR EACH ROW EXECUTE FUNCTION award_order_loyalty_points()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "tgname": "synchronize_order_plate_jobs",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER synchronize_order_plate_jobs BEFORE UPDATE OF plate_print_statuses, plate_runs_required_per_plate ON orders FOR EACH ROW EXECUTE FUNCTION synchronize_order_plate_jobs()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "tgname": "update_orders_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "portfolio_projects",
+    "tgname": "update_portfolio_projects_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_portfolio_projects_updated_at BEFORE UPDATE ON portfolio_projects FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "tgname": "sync_print_job_plate_mapping_progress",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER sync_print_job_plate_mapping_progress AFTER INSERT OR UPDATE OF runs_required, runs_completed ON print_jobs FOR EACH ROW EXECUTE FUNCTION sync_print_job_plate_mapping_progress()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON print_jobs FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "tgname": "refresh_queue_after_ams_change",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER refresh_queue_after_ams_change AFTER INSERT OR DELETE OR UPDATE ON printer_ams_slots FOR EACH ROW EXECUTE FUNCTION refresh_printer_queue_color_status()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON printer_ams_slots FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "tgname": "set_queue_color_status_before_write",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER set_queue_color_status_before_write BEFORE INSERT OR UPDATE OF printer_id, required_colors ON printer_queue_items FOR EACH ROW EXECUTE FUNCTION set_printer_queue_item_color_status()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON printer_queue_items FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON printer_sd_files FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON printers FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_categories",
+    "tgname": "trg_product_categories_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_product_categories_updated_at BEFORE UPDATE ON product_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_color_availability",
+    "tgname": "trg_product_color_availability_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_product_color_availability_updated_at BEFORE UPDATE ON product_color_availability FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_images",
+    "tgname": "trg_product_images_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_product_images_updated_at BEFORE UPDATE ON product_images FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_images",
+    "tgname": "trg_set_unique_main_image",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_set_unique_main_image BEFORE INSERT OR UPDATE ON product_images FOR EACH ROW EXECUTE FUNCTION set_unique_main_image()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "tgname": "trg_product_options_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER trg_product_options_updated_at BEFORE UPDATE ON product_options FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON product_reviews FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "tgname": "verify_product_review",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER verify_product_review BEFORE INSERT ON product_reviews FOR EACH ROW EXECUTE FUNCTION verify_product_review()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_variants",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON product_variants FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "tgname": "update_products_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "profiles",
+    "tgname": "update_profiles_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at()"
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "tgname": "touch_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER touch_updated_at BEFORE UPDATE ON saved_carts FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "subscription",
+    "tgname": "tr_check_filters",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER tr_check_filters BEFORE INSERT OR UPDATE ON realtime.subscription FOR EACH ROW EXECUTE FUNCTION realtime.subscription_check_filters()"
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets",
+    "tgname": "enforce_bucket_name_length_trigger",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER enforce_bucket_name_length_trigger BEFORE INSERT OR UPDATE OF name ON storage.buckets FOR EACH ROW EXECUTE FUNCTION storage.enforce_bucket_name_length()"
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets",
+    "tgname": "protect_buckets_delete",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER protect_buckets_delete BEFORE DELETE ON storage.buckets FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete()"
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "objects",
+    "tgname": "protect_objects_delete",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER protect_objects_delete BEFORE DELETE ON storage.objects FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete()"
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "objects",
+    "tgname": "update_objects_updated_at",
+    "tgenabled": "O",
+    "definition": "CREATE TRIGGER update_objects_updated_at BEFORE UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION storage.update_updated_at_column()"
+  }
+]
+

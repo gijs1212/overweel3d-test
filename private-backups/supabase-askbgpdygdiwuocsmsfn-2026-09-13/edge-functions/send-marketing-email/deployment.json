@@ -1,0 +1,18 @@
+{
+  "id": "e0836038-d511-4366-9fa0-cf40f0ec9005",
+  "slug": "send-marketing-email",
+  "name": "send-marketing-email",
+  "status": "ACTIVE",
+  "version": 5,
+  "created_at": 1787331864096,
+  "updated_at": 1787398360951,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_e0836038-d511-4366-9fa0-cf40f0ec9005_5/source/index.ts",
+  "ezbr_sha256": "c39e6e33f99c231489664664f61d245025c976843ef3b0811d82c7430afd149c",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

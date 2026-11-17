@@ -1,0 +1,16 @@
+{
+  "schema": "public",
+  "table": "exported_orders",
+  "row_count": 1,
+  "rows": [
+    {
+      "id": "3f711975-bf0a-4df7-8844-d044414a4550",
+      "order_id": "7899b72a-f171-4067-9491-46a9e2c48516",
+      "created_at": "2026-03-24T14:28:34.653562+00:00",
+      "completed_at": "2026-03-24T14:28:34.131+00:00",
+      "download_url": "https://askbgpdygdiwuocsmsfn.supabase.co/functions/v1/export-order",
+      "order_number": "OW3D-00012"
+    }
+  ]
+}
+

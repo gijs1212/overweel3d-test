@@ -1,0 +1,272 @@
+{
+  "schema": "public",
+  "table": "product_color_availability",
+  "row_count": 33,
+  "rows": [
+    {
+      "id": "d43584b2-a81d-475a-aa04-6670119f153b",
+      "color_id": "c51ada91-33d4-4f5b-9eab-25d2cb2cda7b",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "1b800650-549f-408a-92f3-26cf16d8f103",
+      "color_id": "76fa8cdd-e507-4f01-b585-bccbfac4714b",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "931dd84a-0df3-40c1-b0d4-184046755a3f",
+      "color_id": "878606cf-c4de-4e6d-8e9e-7d50573c4093",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "13ba7a67-d863-46ff-a6da-a5306ff1a198",
+      "color_id": "2c4c1949-888d-427b-bf8d-b7d1cb74a9f2",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "bc54a617-35bb-4bab-81c8-d9a85b5da146",
+      "color_id": "bfee054c-57fa-41ee-8308-1637ca154b45",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "2594d9bb-4c08-4a9e-b56c-7825802cd306",
+      "color_id": "a28c54df-0042-4228-8bd8-2440d555ad77",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "28a6293f-c80f-4873-ae6b-fe9cf7cc085d",
+      "color_id": "4a4952d3-3937-4257-acb6-53832d4a3964",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "c1e0d315-e12e-44e7-b517-41bd965604a6",
+      "color_id": "f2eb3f70-fde3-4b04-af46-34f3d8cb523a",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "a2aeb460-ef74-4843-be40-95284d778264",
+      "color_id": "cdfcead6-3967-4bca-a3ee-25b3fa4beba4",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "87e3f04c-82e6-421e-abb0-cca5a83d0af2",
+      "color_id": "36d3d372-2da7-4b6e-ad81-01c08d6eae71",
+      "available": true,
+      "created_at": "2026-08-21T21:10:17.793405+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-21T21:10:17.793405+00:00"
+    },
+    {
+      "id": "9680f739-ecd5-4bb5-ba35-b83ac7466590",
+      "color_id": "c51ada91-33d4-4f5b-9eab-25d2cb2cda7b",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "a214b775-1a06-4f29-a789-2e5491042d86",
+      "color_id": "76fa8cdd-e507-4f01-b585-bccbfac4714b",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "4b912af2-4786-491a-9b5c-3602e570ba21",
+      "color_id": "878606cf-c4de-4e6d-8e9e-7d50573c4093",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "b5273688-126c-4084-a6d3-d26f56f51462",
+      "color_id": "cdfcead6-3967-4bca-a3ee-25b3fa4beba4",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "65677cd5-31bd-4c36-ad73-b44d034360e1",
+      "color_id": "f2eb3f70-fde3-4b04-af46-34f3d8cb523a",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "5124636e-9864-421f-9b39-602e025a9966",
+      "color_id": "2c4c1949-888d-427b-bf8d-b7d1cb74a9f2",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "f7ec307a-2815-421a-9771-71d1a49ea168",
+      "color_id": "4a4952d3-3937-4257-acb6-53832d4a3964",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "5d77cebf-4465-472a-9671-4a6c764e5a53",
+      "color_id": "a28c54df-0042-4228-8bd8-2440d555ad77",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "10d65802-d7bd-4ba6-a5d7-c2cde330156a",
+      "color_id": "bfee054c-57fa-41ee-8308-1637ca154b45",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "d6c879ce-2e04-46d8-85c6-86d1a051669e",
+      "color_id": "36d3d372-2da7-4b6e-ad81-01c08d6eae71",
+      "available": true,
+      "created_at": "2026-08-22T08:50:31.544472+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-22T08:50:31.544472+00:00"
+    },
+    {
+      "id": "508140ba-a271-4008-b54d-30543d1f1abe",
+      "color_id": "8928940b-3009-4713-a115-711fd892cd08",
+      "available": true,
+      "created_at": "2026-08-23T17:59:30.27466+00:00",
+      "product_id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "updated_at": "2026-08-23T17:59:30.27466+00:00"
+    },
+    {
+      "id": "ebc81f14-e048-4ce6-b936-32e334a94907",
+      "color_id": "8928940b-3009-4713-a115-711fd892cd08",
+      "available": true,
+      "created_at": "2026-08-23T17:59:30.27466+00:00",
+      "product_id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "updated_at": "2026-08-23T17:59:30.27466+00:00"
+    },
+    {
+      "id": "e0cefb8d-7e32-48cd-93a1-c5bcfff46711",
+      "color_id": "c51ada91-33d4-4f5b-9eab-25d2cb2cda7b",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "4b46a316-cd72-4e3a-915f-9c2bb53103ab",
+      "color_id": "bfee054c-57fa-41ee-8308-1637ca154b45",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "db641712-ecc1-48af-9e63-67d72e58b5a5",
+      "color_id": "2c4c1949-888d-427b-bf8d-b7d1cb74a9f2",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "91d8e2d7-fbe8-45fc-994c-2f93933b0d3b",
+      "color_id": "a28c54df-0042-4228-8bd8-2440d555ad77",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "511db594-cd32-4c27-9f50-d9087f007a3a",
+      "color_id": "4a4952d3-3937-4257-acb6-53832d4a3964",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "f84c22fd-15c4-4ed4-b00a-ad3f9689222b",
+      "color_id": "f2eb3f70-fde3-4b04-af46-34f3d8cb523a",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "af15d95e-6f21-4c1f-86a9-91c350916515",
+      "color_id": "cdfcead6-3967-4bca-a3ee-25b3fa4beba4",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "cc52e362-82bd-4792-bc8f-e38dc697c2de",
+      "color_id": "878606cf-c4de-4e6d-8e9e-7d50573c4093",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "c38de121-5a9c-4ed7-8aff-3288c690ea57",
+      "color_id": "76fa8cdd-e507-4f01-b585-bccbfac4714b",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "174de3a0-f34a-4cd7-87e2-1ccc99c76f42",
+      "color_id": "36d3d372-2da7-4b6e-ad81-01c08d6eae71",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    },
+    {
+      "id": "60e30221-c6a1-4e5a-a75a-e83c16e88acb",
+      "color_id": "8928940b-3009-4713-a115-711fd892cd08",
+      "available": true,
+      "created_at": "2026-08-23T20:23:59.944103+00:00",
+      "product_id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "updated_at": "2026-08-23T20:23:59.944103+00:00"
+    }
+  ]
+}
+

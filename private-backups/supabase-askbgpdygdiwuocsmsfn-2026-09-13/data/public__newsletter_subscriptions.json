@@ -1,0 +1,21 @@
+{
+  "schema": "public",
+  "table": "newsletter_subscriptions",
+  "row_count": 1,
+  "rows": [
+    {
+      "id": "2a0e866c-fe83-4572-b161-5e4ee18e0950",
+      "email": "gijsoverweel@gmail.com",
+      "active": true,
+      "source": "popup",
+      "user_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "created_at": "2026-08-21T11:55:16.897396+00:00",
+      "updated_at": "2026-08-21T17:03:23.020258+00:00",
+      "subscribed_at": "2026-08-21T11:55:16.897396+00:00",
+      "unsubscribed_at": null,
+      "welcome_email_sent_at": null,
+      "welcome_email_claimed_at": null
+    }
+  ]
+}
+

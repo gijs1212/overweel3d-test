@@ -1,0 +1,18 @@
+{
+  "id": "233b5449-0aa3-43cd-b3e2-08da620802c1",
+  "slug": "check-offline-printers",
+  "name": "check-offline-printers",
+  "status": "ACTIVE",
+  "version": 2,
+  "created_at": 1787825307971,
+  "updated_at": 1787825455626,
+  "verify_jwt": true,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_233b5449-0aa3-43cd-b3e2-08da620802c1_2/source/index.ts",
+  "ezbr_sha256": "f5aa05589686972a39cca90f1ba528f4b016f995d9aee8cd160d4a13ece636c9",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

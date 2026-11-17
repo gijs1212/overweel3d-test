@@ -1,0 +1,53 @@
+{
+  "schema": "public",
+  "table": "portfolio_projects",
+  "row_count": 5,
+  "rows": [
+    {
+      "id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "title": "Cadeaudoosjes",
+      "created_at": "2026-08-27T09:08:03.470366+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-27T09:08:15.788224+00:00",
+      "description": "",
+      "is_published": true
+    },
+    {
+      "id": "3609e1d0-6e3b-495a-8f9a-89154dfb499a",
+      "title": "Spaarvarkens met naam",
+      "created_at": "2026-08-27T09:09:30.454219+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-27T09:09:30.454219+00:00",
+      "description": "",
+      "is_published": true
+    },
+    {
+      "id": "5ec88ff1-424a-4a5e-8aab-cede80286f02",
+      "title": "Flexi Dino’s",
+      "created_at": "2026-08-27T09:09:48.564967+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-27T09:09:48.564967+00:00",
+      "description": "",
+      "is_published": true
+    },
+    {
+      "id": "ad05b802-e6b8-4c93-9263-a9b351c278c1",
+      "title": "Sieraden opbergdoos in vorm van vlinder",
+      "created_at": "2026-08-27T09:10:30.273807+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-27T09:10:30.273807+00:00",
+      "description": "",
+      "is_published": true
+    },
+    {
+      "id": "022cf7ba-cbc4-45d5-87f0-af2d6605f54d",
+      "title": "Custom Cadeaudoosjes",
+      "created_at": "2026-08-27T09:10:54.607693+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-27T09:10:54.607693+00:00",
+      "description": "",
+      "is_published": true
+    }
+  ]
+}
+

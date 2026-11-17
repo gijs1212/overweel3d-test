@@ -1,0 +1,18 @@
+{
+  "id": "d94d33ac-a3c2-489c-a7f7-16876abad466",
+  "slug": "send-account-welcome",
+  "name": "send-account-welcome",
+  "status": "ACTIVE",
+  "version": 3,
+  "created_at": 1787331846356,
+  "updated_at": 1787395786770,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_d94d33ac-a3c2-489c-a7f7-16876abad466_3/source/index.ts",
+  "ezbr_sha256": "440fedb189a5bb38dc571f2d11441d16e45a358ed3d50aada38fec1c5fab93be",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

@@ -1,0 +1,1133 @@
+[
+  {
+    "schemaname": "cron",
+    "tablename": "job",
+    "policyname": "cron_job_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "(username = CURRENT_USER)",
+    "with_check": null
+  },
+  {
+    "schemaname": "cron",
+    "tablename": "job_run_details",
+    "policyname": "cron_job_run_details_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "(username = CURRENT_USER)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "app_settings",
+    "policyname": "Admins manage settings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "app_settings",
+    "policyname": "Public settings are readable",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(key = ANY (ARRAY['newsletter_enabled'::text, 'abandoned_cart_enabled'::text, 'loyalty_points_per_euro'::text, 'loyalty_euros_per_point'::text]))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "blog_posts",
+    "policyname": "Admins can manage all blog posts",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "blog_posts",
+    "policyname": "Anyone can read published blog posts",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(status = 'published'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "categories",
+    "policyname": "authenticated delete",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "categories",
+    "policyname": "authenticated insert",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "true"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "categories",
+    "policyname": "authenticated update",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "categories",
+    "policyname": "public select",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "delivery_appointments",
+    "policyname": "Admins can manage all appointments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "delivery_appointments",
+    "policyname": "Customers can propose appointments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "((proposed_by = 'customer'::text) AND (EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = delivery_appointments.order_id) AND (orders.user_id = auth.uid())))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "delivery_appointments",
+    "policyname": "Customers can update their pending appointments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "((proposed_by = 'customer'::text) AND (status = 'pending'::text) AND (EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = delivery_appointments.order_id) AND (orders.user_id = auth.uid())))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "delivery_appointments",
+    "policyname": "Customers can view their order appointments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = delivery_appointments.order_id) AND (orders.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "discount_codes",
+    "policyname": "Admins can manage discount codes",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "discount_codes",
+    "policyname": "Customers can read their private discount codes",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(active AND (assigned_to_email IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.user_id = ( SELECT auth.uid() AS uid)) AND (lower(p.email) = lower(discount_codes.assigned_to_email))))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "discount_codes",
+    "policyname": "Public can read public discount codes",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(active AND is_public)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "discount_redemptions",
+    "policyname": "Admins manage discount redemptions",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "discount_redemptions",
+    "policyname": "Users view own discount redemptions",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "email_campaigns",
+    "policyname": "Admins can view email campaigns",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "exported_orders",
+    "policyname": "Admins can do everything with exported_orders",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "filament_colors",
+    "policyname": "Admins can manage colors",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": "has_role(auth.uid(), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "filament_colors",
+    "policyname": "Anyone can view colors",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "filament_inventory",
+    "policyname": "Admins manage filament inventory",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "gift_card_redemptions",
+    "policyname": "Admins manage gift card usage",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "gift_card_redemptions",
+    "policyname": "Users view own gift card usage",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "gift_cards",
+    "policyname": "Admins manage gift cards",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "loyalty_transactions",
+    "policyname": "Admins manage loyalty",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "loyalty_transactions",
+    "policyname": "Users view loyalty history",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "materials",
+    "policyname": "Admins manage materials",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "materials",
+    "policyname": "Anyone can view active materials",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(active OR has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "newsletter_subscribers",
+    "policyname": "Admins can delete subscribers",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "newsletter_subscribers",
+    "policyname": "Admins can manage subscribers",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": "has_role(auth.uid(), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "newsletter_subscribers",
+    "policyname": "Admins can view subscribers",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "newsletter_subscriptions",
+    "policyname": "Admins can delete newsletter subscriptions",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "newsletter_subscriptions",
+    "policyname": "Admins can update newsletter subscriptions",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": "has_role(auth.uid(), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "newsletter_subscriptions",
+    "policyname": "Admins can view newsletter subscriptions",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_3mf_plate_mappings",
+    "policyname": "Admins manage 3MF plate mappings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_events",
+    "policyname": "Admins can do everything with events",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_events",
+    "policyname": "Users can view visible events",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((visible_to_customer = true) AND (EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = order_events.order_id) AND (orders.user_id = auth.uid())))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_files",
+    "policyname": "Admins can do everything with order files",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_files",
+    "policyname": "Anon users can insert order files",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = order_files.order_id) AND (orders.user_id IS NULL))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_files",
+    "policyname": "Customers can upload files when requested",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_files.order_id) AND (o.user_id = auth.uid()) AND (o.customer_upload_requested = true))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_files",
+    "policyname": "Users can insert order files",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = order_files.order_id) AND (orders.user_id = auth.uid()))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_files",
+    "policyname": "Users can view own visible order files",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(customer_visible AND (EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = order_files.order_id) AND (orders.user_id = ( SELECT auth.uid() AS uid))))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_messages",
+    "policyname": "Admins can manage all messages",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_messages",
+    "policyname": "Customers can send messages on their orders",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "((sender_type = 'customer'::text) AND (sender_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = order_messages.order_id) AND (orders.user_id = auth.uid())))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "order_messages",
+    "policyname": "Customers can view messages on their orders",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(EXISTS ( SELECT 1\n   FROM orders\n  WHERE ((orders.id = order_messages.order_id) AND (orders.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "orders",
+    "policyname": "Admins can do everything with orders",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "orders",
+    "policyname": "Users can insert orders",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(user_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "orders",
+    "policyname": "Users can view own orders",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(user_id = auth.uid())",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_project_media",
+    "policyname": "Admins delete portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_project_media",
+    "policyname": "Admins insert portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_project_media",
+    "policyname": "Admins update portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_project_media",
+    "policyname": "Users view published portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((EXISTS ( SELECT 1\n   FROM portfolio_projects project\n  WHERE ((project.id = portfolio_project_media.project_id) AND project.is_published))) OR has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_project_media",
+    "policyname": "Visitors view published portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon}",
+    "cmd": "SELECT",
+    "qual": "(EXISTS ( SELECT 1\n   FROM portfolio_projects project\n  WHERE ((project.id = portfolio_project_media.project_id) AND project.is_published)))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_projects",
+    "policyname": "Admins delete portfolio projects",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_projects",
+    "policyname": "Admins insert portfolio projects",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_projects",
+    "policyname": "Admins update portfolio projects",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_projects",
+    "policyname": "Users view published portfolio projects",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(is_published OR has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "portfolio_projects",
+    "policyname": "Visitors view published portfolio projects",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon}",
+    "cmd": "SELECT",
+    "qual": "is_published",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "print_jobs",
+    "policyname": "Admins manage print jobs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "print_runs",
+    "policyname": "Admins manage print runs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "print_runs",
+    "policyname": "Customers view own print runs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(EXISTS ( SELECT 1\n   FROM (print_jobs j\n     JOIN orders o ON ((o.id = j.order_id)))\n  WHERE ((j.id = print_runs.print_job_id) AND (o.user_id = ( SELECT auth.uid() AS uid)))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "printer_ams_slots",
+    "policyname": "Admins manage AMS slots",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "printer_pairing_codes",
+    "policyname": "No direct pairing-code access",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "ALL",
+    "qual": "false",
+    "with_check": "false"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "printer_queue_items",
+    "policyname": "Admins manage printer queue",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "printer_sd_files",
+    "policyname": "Admins manage printer SD files",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "printers",
+    "policyname": "Admins manage printers",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_categories",
+    "policyname": "Admins manage categories",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": "has_role(auth.uid(), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_categories",
+    "policyname": "Anyone can view active categories",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(active OR has_role(auth.uid(), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_color_availability",
+    "policyname": "Admins can manage product color availability",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": "has_role(auth.uid(), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_color_availability",
+    "policyname": "Anyone can view product color availability",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_images",
+    "policyname": "Admins can delete product media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_images",
+    "policyname": "Admins can insert product media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_images",
+    "policyname": "Admins can update product media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_images",
+    "policyname": "Anyone can view product media",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_options",
+    "policyname": "Admins can delete product options",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_options",
+    "policyname": "Admins can insert product options",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_options",
+    "policyname": "Admins can update product options",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_options",
+    "policyname": "Anyone can view active product options",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(active OR has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_reviews",
+    "policyname": "Admins manage reviews",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_reviews",
+    "policyname": "Anyone views approved reviews",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(status = 'approved'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_reviews",
+    "policyname": "Users create own reviews",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_reviews",
+    "policyname": "Users update own pending reviews",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "((( SELECT auth.uid() AS uid) = user_id) AND (status = 'pending'::text))",
+    "with_check": "((( SELECT auth.uid() AS uid) = user_id) AND (status = 'pending'::text))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_reviews",
+    "policyname": "Users view own reviews",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_variants",
+    "policyname": "Admins manage variants",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "product_variants",
+    "policyname": "Anyone views active variants",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(active OR has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "products",
+    "policyname": "Admins can delete products",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "products",
+    "policyname": "Admins can insert products",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "products",
+    "policyname": "Admins can update products",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "products",
+    "policyname": "Anyone can view active products",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(active OR has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Admins can view all profiles",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Admins update profiles",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can update own profile",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can view own profile",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(user_id = auth.uid())",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "saved_carts",
+    "policyname": "Admins view saved carts",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "has_role(( SELECT auth.uid() AS uid), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "saved_carts",
+    "policyname": "Users manage own saved cart",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_roles",
+    "policyname": "Admins can manage roles",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "has_role(auth.uid(), 'admin'::app_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_roles",
+    "policyname": "Users can view own roles",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(user_id = auth.uid())",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Admins can manage all storage",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "((bucket_id = 'orders'::text) AND has_role(auth.uid(), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Admins delete portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "((bucket_id = 'orders'::text) AND (name ~~ 'portfolio/%'::text) AND has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Admins update portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "((bucket_id = 'orders'::text) AND (name ~~ 'portfolio/%'::text) AND has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": "((bucket_id = 'orders'::text) AND (name ~~ 'portfolio/%'::text) AND has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Admins upload portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "((bucket_id = 'orders'::text) AND (name ~~ 'portfolio/%'::text) AND has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Admins view printer camera",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((bucket_id = 'printer-camera'::text) AND has_role(( SELECT auth.uid() AS uid), 'admin'::app_role))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Anon users can upload order files",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(bucket_id = 'orders'::text)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Anon users can upload to orders bucket",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(bucket_id = 'orders'::text)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Authenticated users can upload order files",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(bucket_id = 'orders'::text)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Authenticated users view permitted order storage",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((bucket_id = 'orders'::text) AND (has_role(( SELECT auth.uid() AS uid), 'admin'::app_role) OR (EXISTS ( SELECT 1\n   FROM (order_files file\n     JOIN orders ordered ON ((ordered.id = file.order_id)))\n  WHERE ((file.storage_path = objects.name) AND file.customer_visible AND (ordered.user_id = ( SELECT auth.uid() AS uid))))) OR (EXISTS ( SELECT 1\n   FROM (order_3mf_plate_mappings mapping\n     JOIN orders ordered ON ((ordered.id = mapping.order_id)))\n  WHERE ((mapping.preview_storage_path = objects.name) AND mapping.active AND (ordered.user_id = ( SELECT auth.uid() AS uid)))))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Public read approved review photos",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "((bucket_id = 'orders'::text) AND (name ~~ 'reviews/%'::text) AND (EXISTS ( SELECT 1\n   FROM product_reviews review\n  WHERE ((review.status = 'approved'::text) AND (review.photos ? objects.name)))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Public read portfolio media",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "((bucket_id = 'orders'::text) AND (name ~~ 'portfolio/%'::text))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Public read product and color photos",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "((bucket_id = 'orders'::text) AND ((name ~~ 'products/%'::text) OR (name ~~ 'colors/%'::text)))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Public read product catalogue media",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "((bucket_id = 'orders'::text) AND ((name ~~ 'products/%'::text) OR (name ~~ 'colors/%'::text)))",
+    "with_check": null
+  }
+]
+

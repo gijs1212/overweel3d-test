@@ -1,0 +1,7 @@
+{
+  "schema": "storage",
+  "table": "s3_multipart_uploads",
+  "row_count": 0,
+  "rows": []
+}
+

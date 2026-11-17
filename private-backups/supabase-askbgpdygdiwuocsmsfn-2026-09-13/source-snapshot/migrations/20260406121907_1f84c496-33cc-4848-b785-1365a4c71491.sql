@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD COLUMN customer_photo_required boolean NOT NULL DEFAULT false;

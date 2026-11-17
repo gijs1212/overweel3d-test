@@ -1,0 +1,26 @@
+{
+  "schema": "public",
+  "table": "loyalty_transactions",
+  "row_count": 2,
+  "rows": [
+    {
+      "id": "6646c0c1-295b-4528-9ff1-cddf7fbae825",
+      "kind": "earned",
+      "points": 4,
+      "user_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "order_id": null,
+      "created_at": "2026-08-27T10:06:53.116329+00:00",
+      "description": "Punten voor bestelling OW3D-00037"
+    },
+    {
+      "id": "0636bfc7-6440-4649-a781-0af957ef9b44",
+      "kind": "redeemed",
+      "points": -4,
+      "user_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "order_id": null,
+      "created_at": "2026-08-27T10:47:14.119178+00:00",
+      "description": "Ingewisseld voor kortingscode LOYAL-85B1033FA8"
+    }
+  ]
+}
+

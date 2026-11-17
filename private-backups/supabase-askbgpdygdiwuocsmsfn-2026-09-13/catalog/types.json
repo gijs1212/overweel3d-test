@@ -1,0 +1,2278 @@
+[
+  {
+    "schema_name": "auth",
+    "typname": "_aal_level",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_audit_log_entries",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_code_challenge_method",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_custom_oauth_providers",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_factor_status",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_factor_type",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_flow_state",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_identities",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_instances",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_mfa_amr_claims",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_mfa_challenges",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_mfa_factors",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_authorization_status",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_authorizations",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_client_states",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_client_type",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_clients",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_consents",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_registration_type",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_oauth_response_type",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_one_time_token_type",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_one_time_tokens",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_refresh_tokens",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_saml_providers",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_saml_relay_states",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_schema_migrations",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_sessions",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_sso_domains",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_sso_providers",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_users",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_webauthn_challenges",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "_webauthn_credentials",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "aal_level",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "aal1",
+        "sort_order": 1
+      },
+      {
+        "label": "aal2",
+        "sort_order": 2
+      },
+      {
+        "label": "aal3",
+        "sort_order": 3
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "audit_log_entries",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "code_challenge_method",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "s256",
+        "sort_order": 1
+      },
+      {
+        "label": "plain",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "custom_oauth_providers",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "factor_status",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "unverified",
+        "sort_order": 1
+      },
+      {
+        "label": "verified",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "factor_type",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "totp",
+        "sort_order": 1
+      },
+      {
+        "label": "webauthn",
+        "sort_order": 2
+      },
+      {
+        "label": "phone",
+        "sort_order": 3
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "flow_state",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "identities",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "instances",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "mfa_amr_claims",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "mfa_challenges",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "mfa_factors",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_authorization_status",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "pending",
+        "sort_order": 1
+      },
+      {
+        "label": "approved",
+        "sort_order": 2
+      },
+      {
+        "label": "denied",
+        "sort_order": 3
+      },
+      {
+        "label": "expired",
+        "sort_order": 4
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_authorizations",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_client_states",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_client_type",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "public",
+        "sort_order": 1
+      },
+      {
+        "label": "confidential",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_clients",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_consents",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_registration_type",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "dynamic",
+        "sort_order": 1
+      },
+      {
+        "label": "manual",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "oauth_response_type",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "code",
+        "sort_order": 1
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "one_time_token_type",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "confirmation_token",
+        "sort_order": 1
+      },
+      {
+        "label": "reauthentication_token",
+        "sort_order": 2
+      },
+      {
+        "label": "recovery_token",
+        "sort_order": 3
+      },
+      {
+        "label": "email_change_token_new",
+        "sort_order": 4
+      },
+      {
+        "label": "email_change_token_current",
+        "sort_order": 5
+      },
+      {
+        "label": "phone_change_token",
+        "sort_order": 6
+      }
+    ]
+  },
+  {
+    "schema_name": "auth",
+    "typname": "one_time_tokens",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "refresh_tokens",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "saml_providers",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "saml_relay_states",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "schema_migrations",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "sessions",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "sso_domains",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "sso_providers",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "users",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "webauthn_challenges",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "auth",
+    "typname": "webauthn_credentials",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "cron",
+    "typname": "_job",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "cron",
+    "typname": "_job_run_details",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "cron",
+    "typname": "job",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "cron",
+    "typname": "job_run_details",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "extensions",
+    "typname": "_pg_stat_statements",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "extensions",
+    "typname": "_pg_stat_statements_info",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "extensions",
+    "typname": "pg_stat_statements",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "extensions",
+    "typname": "pg_stat_statements_info",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "__http_response",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "_http_method",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "_http_request_queue",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "_http_response",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "_http_response_1",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "_http_response_result",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "_request_status",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "http_method",
+    "typtype": "d",
+    "typcategory": "S",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "http_request_queue",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "http_response",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "http_response_result",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "net",
+    "typname": "request_status",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "PENDING",
+        "sort_order": 1
+      },
+      {
+        "label": "SUCCESS",
+        "sort_order": 2
+      },
+      {
+        "label": "ERROR",
+        "sort_order": 3
+      }
+    ]
+  },
+  {
+    "schema_name": "public",
+    "typname": "_app_role",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_app_settings",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_blog_posts",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_categories",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_delivery_appointments",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_discount_codes",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_discount_redemptions",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_email_campaigns",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_exported_orders",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_filament_colors",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_filament_inventory",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_gift_card_redemptions",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_gift_cards",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_loyalty_transactions",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_materials",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_newsletter_subscribers",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_newsletter_subscriptions",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_order_3mf_plate_mappings",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_order_events",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_order_files",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_order_messages",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_order_status",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_orders",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_portfolio_project_media",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_portfolio_projects",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_print_jobs",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_print_runs",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_printer_ams_slots",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_printer_pairing_codes",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_printer_queue_items",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_printer_sd_files",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_printers",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_product_categories",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_product_color_availability",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_product_images",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_product_options",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_product_reviews",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_product_variants",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_products",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_profiles",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_saved_carts",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "_user_roles",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "app_role",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "admin",
+        "sort_order": 1
+      },
+      {
+        "label": "customer",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "schema_name": "public",
+    "typname": "app_settings",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "blog_posts",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "categories",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "delivery_appointments",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "discount_codes",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "discount_redemptions",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "email_campaigns",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "exported_orders",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "filament_colors",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "filament_inventory",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "gift_card_redemptions",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "gift_cards",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "loyalty_transactions",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "materials",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "newsletter_subscribers",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "newsletter_subscriptions",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "order_3mf_plate_mappings",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "order_events",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "order_files",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "order_messages",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "order_status",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "draft",
+        "sort_order": 1
+      },
+      {
+        "label": "submitted",
+        "sort_order": 2
+      },
+      {
+        "label": "under_review",
+        "sort_order": 3
+      },
+      {
+        "label": "waiting_for_approval",
+        "sort_order": 4
+      },
+      {
+        "label": "approved_by_customer",
+        "sort_order": 5
+      },
+      {
+        "label": "rejected_by_customer",
+        "sort_order": 6
+      },
+      {
+        "label": "waiting_for_payment",
+        "sort_order": 7
+      },
+      {
+        "label": "in_production",
+        "sort_order": 8
+      },
+      {
+        "label": "completed",
+        "sort_order": 9
+      },
+      {
+        "label": "cancelled",
+        "sort_order": 10
+      }
+    ]
+  },
+  {
+    "schema_name": "public",
+    "typname": "orders",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "portfolio_project_media",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "portfolio_projects",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "print_jobs",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "print_runs",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "printer_ams_slots",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "printer_pairing_codes",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "printer_queue_items",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "printer_sd_files",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "printers",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "product_categories",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "product_color_availability",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "product_images",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "product_options",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "product_reviews",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "product_variants",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "products",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "profiles",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "saved_carts",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "public",
+    "typname": "user_roles",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_action",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_equality_op",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_09",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_10",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_11",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_12",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_13",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_14",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_15",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_messages_2026_09_16",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_schema_migrations",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_subscription",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_user_defined_filter",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_wal_column",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "_wal_rls",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "action",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "INSERT",
+        "sort_order": 1
+      },
+      {
+        "label": "UPDATE",
+        "sort_order": 2
+      },
+      {
+        "label": "DELETE",
+        "sort_order": 3
+      },
+      {
+        "label": "TRUNCATE",
+        "sort_order": 4
+      },
+      {
+        "label": "ERROR",
+        "sort_order": 5
+      }
+    ]
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "equality_op",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "eq",
+        "sort_order": 1
+      },
+      {
+        "label": "neq",
+        "sort_order": 2
+      },
+      {
+        "label": "lt",
+        "sort_order": 3
+      },
+      {
+        "label": "lte",
+        "sort_order": 4
+      },
+      {
+        "label": "gt",
+        "sort_order": 5
+      },
+      {
+        "label": "gte",
+        "sort_order": 6
+      },
+      {
+        "label": "in",
+        "sort_order": 7
+      },
+      {
+        "label": "like",
+        "sort_order": 8
+      },
+      {
+        "label": "ilike",
+        "sort_order": 9
+      },
+      {
+        "label": "is",
+        "sort_order": 10
+      },
+      {
+        "label": "match",
+        "sort_order": 11
+      },
+      {
+        "label": "imatch",
+        "sort_order": 12
+      },
+      {
+        "label": "isdistinct",
+        "sort_order": 13
+      }
+    ]
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_09",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_10",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_11",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_12",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_13",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_14",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_15",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "messages_2026_09_16",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "schema_migrations",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "subscription",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "user_defined_filter",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "wal_column",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "realtime",
+    "typname": "wal_rls",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_buckets",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_buckets_analytics",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_buckets_vectors",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_buckettype",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_migrations",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_objects",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_s3_multipart_uploads",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_s3_multipart_uploads_parts",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "_vector_indexes",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "buckets",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "buckets_analytics",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "buckets_vectors",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "buckettype",
+    "typtype": "e",
+    "typcategory": "E",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": [
+      {
+        "label": "STANDARD",
+        "sort_order": 1
+      },
+      {
+        "label": "ANALYTICS",
+        "sort_order": 2
+      },
+      {
+        "label": "VECTOR",
+        "sort_order": 3
+      }
+    ]
+  },
+  {
+    "schema_name": "storage",
+    "typname": "migrations",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "objects",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "s3_multipart_uploads",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "s3_multipart_uploads_parts",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "storage",
+    "typname": "vector_indexes",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "supabase_migrations",
+    "typname": "_schema_migrations",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "supabase_migrations",
+    "typname": "schema_migrations",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "vault",
+    "typname": "_decrypted_secrets",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "vault",
+    "typname": "_secrets",
+    "typtype": "b",
+    "typcategory": "A",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "vault",
+    "typname": "decrypted_secrets",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  },
+  {
+    "schema_name": "vault",
+    "typname": "secrets",
+    "typtype": "c",
+    "typcategory": "C",
+    "typnotnull": false,
+    "typdefault": null,
+    "enum_values": []
+  }
+]
+

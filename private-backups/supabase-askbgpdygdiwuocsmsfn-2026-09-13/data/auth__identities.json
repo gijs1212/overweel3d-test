@@ -1,0 +1,127 @@
+{
+  "schema": "auth",
+  "table": "identities",
+  "row_count": 7,
+  "rows": [
+    {
+      "id": "50a6f3f4-0234-47b0-bb53-3d22b0d50e5f",
+      "email": "gijsoverweel@gmail.com",
+      "user_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "provider": "email",
+      "created_at": "2026-03-07T19:11:37.381699+00:00",
+      "updated_at": "2026-03-07T19:11:37.381699+00:00",
+      "provider_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "identity_data": {
+        "sub": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+        "email": "gijsoverweel@gmail.com",
+        "full_name": "Gijs Overweel",
+        "email_verified": true,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-03-07T19:11:37.381644+00:00"
+    },
+    {
+      "id": "2a4f152c-6f85-48cf-b7f9-57ad425a4cbd",
+      "email": "gijsoverweel@hotmail.com",
+      "user_id": "96a06c94-74fb-40a3-8c8c-82a5ad1f1a99",
+      "provider": "email",
+      "created_at": "2026-03-08T09:12:58.630034+00:00",
+      "updated_at": "2026-03-08T09:12:58.630034+00:00",
+      "provider_id": "96a06c94-74fb-40a3-8c8c-82a5ad1f1a99",
+      "identity_data": {
+        "sub": "96a06c94-74fb-40a3-8c8c-82a5ad1f1a99",
+        "email": "gijsoverweel@hotmail.com",
+        "full_name": "Gijs Overweel",
+        "email_verified": false,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-03-08T09:12:58.629391+00:00"
+    },
+    {
+      "id": "9750994c-9925-48ba-913a-fec2dc957a5a",
+      "email": "godertoverweel@hotmail.com",
+      "user_id": "562db348-2b33-4672-b02d-204dfd4e9150",
+      "provider": "email",
+      "created_at": "2026-03-10T19:25:27.659825+00:00",
+      "updated_at": "2026-03-10T19:25:27.659825+00:00",
+      "provider_id": "562db348-2b33-4672-b02d-204dfd4e9150",
+      "identity_data": {
+        "sub": "562db348-2b33-4672-b02d-204dfd4e9150",
+        "email": "godertoverweel@hotmail.com",
+        "full_name": "Godert Overweel",
+        "email_verified": false,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-03-10T19:25:27.659177+00:00"
+    },
+    {
+      "id": "edcf953b-ec66-4b68-8861-7b757c1c319c",
+      "email": "gijs12school@gmail.com",
+      "user_id": "250b5450-d19b-48c0-8a66-e1a0b2b6f1ba",
+      "provider": "email",
+      "created_at": "2026-03-11T08:36:19.831705+00:00",
+      "updated_at": "2026-03-11T08:36:19.831705+00:00",
+      "provider_id": "250b5450-d19b-48c0-8a66-e1a0b2b6f1ba",
+      "identity_data": {
+        "sub": "250b5450-d19b-48c0-8a66-e1a0b2b6f1ba",
+        "email": "gijs12school@gmail.com",
+        "full_name": "test",
+        "email_verified": false,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-03-11T08:36:19.830302+00:00"
+    },
+    {
+      "id": "1d5caa25-b9e0-4b9c-ba4b-a75a735e0bb8",
+      "email": "annemarie.overweel@hotmail.com",
+      "user_id": "8253c540-a339-4f6f-b9bd-b4aad8267d9b",
+      "provider": "email",
+      "created_at": "2026-06-02T14:42:48.282528+00:00",
+      "updated_at": "2026-06-02T14:42:48.282528+00:00",
+      "provider_id": "8253c540-a339-4f6f-b9bd-b4aad8267d9b",
+      "identity_data": {
+        "sub": "8253c540-a339-4f6f-b9bd-b4aad8267d9b",
+        "email": "annemarie.overweel@hotmail.com",
+        "full_name": "Annemarie Overweel",
+        "email_verified": false,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-06-02T14:42:48.281801+00:00"
+    },
+    {
+      "id": "7fa7951c-261b-4f6c-8089-58b487c63f99",
+      "email": "teun.vanheijningen2013@gmail.com",
+      "user_id": "ecf6b00f-92fa-4c46-a5a3-f31b97c2ba6c",
+      "provider": "email",
+      "created_at": "2026-06-17T16:51:23.327596+00:00",
+      "updated_at": "2026-06-17T16:51:23.327596+00:00",
+      "provider_id": "ecf6b00f-92fa-4c46-a5a3-f31b97c2ba6c",
+      "identity_data": {
+        "sub": "ecf6b00f-92fa-4c46-a5a3-f31b97c2ba6c",
+        "email": "teun.vanheijningen2013@gmail.com",
+        "full_name": "Teun van Heijningen",
+        "email_verified": false,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-06-17T16:51:23.327541+00:00"
+    },
+    {
+      "id": "d5465d7e-b8b9-473d-800f-abdbfacbfd66",
+      "email": "semnijman3@gmail.com",
+      "user_id": "e8eb974a-7a4f-4983-a1f0-bf53bd3ba038",
+      "provider": "email",
+      "created_at": "2026-07-11T17:16:18.238696+00:00",
+      "updated_at": "2026-07-11T17:16:18.238696+00:00",
+      "provider_id": "e8eb974a-7a4f-4983-a1f0-bf53bd3ba038",
+      "identity_data": {
+        "sub": "e8eb974a-7a4f-4983-a1f0-bf53bd3ba038",
+        "email": "semnijman3@gmail.com",
+        "full_name": "Sem Nijman ",
+        "email_verified": false,
+        "phone_verified": false
+      },
+      "last_sign_in_at": "2026-07-11T17:16:18.238644+00:00"
+    }
+  ]
+}
+

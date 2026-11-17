@@ -1,0 +1,48 @@
+{
+  "schema": "public",
+  "table": "user_roles",
+  "row_count": 8,
+  "rows": [
+    {
+      "id": "2fd518e0-98be-4db6-8722-1720b45d1905",
+      "role": "customer",
+      "user_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f"
+    },
+    {
+      "id": "4f308df1-b78b-490b-82a8-bbdf30aa8eb7",
+      "role": "admin",
+      "user_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f"
+    },
+    {
+      "id": "a4c314c4-7d44-465a-a4a8-88fb53f221bd",
+      "role": "customer",
+      "user_id": "96a06c94-74fb-40a3-8c8c-82a5ad1f1a99"
+    },
+    {
+      "id": "087e8bb1-c485-40a2-846d-bf69f53ffb8c",
+      "role": "customer",
+      "user_id": "562db348-2b33-4672-b02d-204dfd4e9150"
+    },
+    {
+      "id": "4fe2947b-072b-45da-9564-d00a0fbb8fd6",
+      "role": "customer",
+      "user_id": "250b5450-d19b-48c0-8a66-e1a0b2b6f1ba"
+    },
+    {
+      "id": "f7bbc695-411e-4935-8587-edbf745ad6fc",
+      "role": "customer",
+      "user_id": "8253c540-a339-4f6f-b9bd-b4aad8267d9b"
+    },
+    {
+      "id": "dc425e6d-d1da-4b8f-b0e9-1434e2bb503b",
+      "role": "customer",
+      "user_id": "ecf6b00f-92fa-4c46-a5a3-f31b97c2ba6c"
+    },
+    {
+      "id": "05e5ad9c-efcd-425d-99f3-757f16441a2d",
+      "role": "customer",
+      "user_id": "e8eb974a-7a4f-4983-a1f0-bf53bd3ba038"
+    }
+  ]
+}
+

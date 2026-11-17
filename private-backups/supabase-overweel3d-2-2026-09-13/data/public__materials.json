@@ -1,0 +1,35 @@
+{
+  "schema": "public",
+  "table": "materials",
+  "row_count": 3,
+  "rows": [
+    {
+      "id": "pla",
+      "name": "PLA",
+      "active": true,
+      "created_at": "2026-08-22T20:40:52.076558+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-22T20:40:52.076558+00:00",
+      "price_per_gram": 0.08
+    },
+    {
+      "id": "petg",
+      "name": "PETG",
+      "active": true,
+      "created_at": "2026-08-22T20:40:52.076558+00:00",
+      "sort_order": 10,
+      "updated_at": "2026-08-22T20:40:52.076558+00:00",
+      "price_per_gram": 0.09
+    },
+    {
+      "id": "tpu",
+      "name": "TPU",
+      "active": true,
+      "created_at": "2026-08-22T20:40:52.076558+00:00",
+      "sort_order": 20,
+      "updated_at": "2026-08-22T20:40:52.076558+00:00",
+      "price_per_gram": 0.12
+    }
+  ]
+}
+

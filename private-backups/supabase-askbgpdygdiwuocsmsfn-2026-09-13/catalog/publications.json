@@ -1,0 +1,23 @@
+[
+  {
+    "pubname": "supabase_realtime",
+    "owner": "postgres",
+    "puballtables": false,
+    "pubinsert": true,
+    "pubupdate": true,
+    "pubdelete": true,
+    "pubtruncate": true,
+    "pubviaroot": false
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "owner": "supabase_admin",
+    "puballtables": false,
+    "pubinsert": true,
+    "pubupdate": true,
+    "pubdelete": true,
+    "pubtruncate": true,
+    "pubviaroot": false
+  }
+]
+

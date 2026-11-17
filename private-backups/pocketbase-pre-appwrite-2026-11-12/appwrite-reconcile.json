@@ -1,0 +1,272 @@
+{
+  "app_settings": {
+    "source": 6,
+    "target_before": 6,
+    "deleted": 0,
+    "target_after": 6
+  },
+  "blog_posts": {
+    "source": 11,
+    "target_before": 11,
+    "deleted": 0,
+    "target_after": 11
+  },
+  "categories": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "delivery_appointments": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "discount_codes": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "discount_redemptions": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "email_campaigns": {
+    "source": 27,
+    "target_before": 27,
+    "deleted": 0,
+    "target_after": 27
+  },
+  "exported_orders": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "filament_colors": {
+    "source": 16,
+    "target_before": 16,
+    "deleted": 0,
+    "target_after": 16
+  },
+  "filament_inventory": {
+    "source": 311,
+    "target_before": 311,
+    "deleted": 0,
+    "target_after": 311
+  },
+  "gift_card_redemptions": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "gift_cards": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "loyalty_transactions": {
+    "source": 2,
+    "target_before": 2,
+    "deleted": 0,
+    "target_after": 2
+  },
+  "materials": {
+    "source": 3,
+    "target_before": 3,
+    "deleted": 0,
+    "target_after": 3
+  },
+  "newsletter_subscribers": {
+    "source": 2,
+    "target_before": 2,
+    "deleted": 0,
+    "target_after": 2
+  },
+  "newsletter_subscriptions": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "onedrive_tokens": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "order_3mf_plate_mappings": {
+    "source": 22,
+    "target_before": 22,
+    "deleted": 0,
+    "target_after": 22
+  },
+  "order_events": {
+    "source": 78,
+    "target_before": 78,
+    "deleted": 0,
+    "target_after": 78
+  },
+  "order_files": {
+    "source": 4,
+    "target_before": 4,
+    "deleted": 0,
+    "target_after": 4
+  },
+  "order_messages": {
+    "source": 2,
+    "target_before": 2,
+    "deleted": 0,
+    "target_after": 2
+  },
+  "orders": {
+    "source": 8,
+    "target_before": 8,
+    "deleted": 0,
+    "target_after": 8
+  },
+  "portfolio_project_media": {
+    "source": 37,
+    "target_before": 37,
+    "deleted": 0,
+    "target_after": 37
+  },
+  "portfolio_projects": {
+    "source": 4,
+    "target_before": 4,
+    "deleted": 0,
+    "target_after": 4
+  },
+  "print_jobs": {
+    "source": 25,
+    "target_before": 25,
+    "deleted": 0,
+    "target_after": 25
+  },
+  "print_runs": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "printer_ams_slots": {
+    "source": 12,
+    "target_before": 12,
+    "deleted": 0,
+    "target_after": 12
+  },
+  "printer_pairing_codes": {
+    "source": 9,
+    "target_before": 9,
+    "deleted": 0,
+    "target_after": 9
+  },
+  "printer_queue_items": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "printer_sd_files": {
+    "source": 33,
+    "target_before": 33,
+    "deleted": 0,
+    "target_after": 33
+  },
+  "printers": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "product_categories": {
+    "source": 4,
+    "target_before": 4,
+    "deleted": 0,
+    "target_after": 4
+  },
+  "product_color_availability": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "product_images": {
+    "source": 32,
+    "target_before": 32,
+    "deleted": 0,
+    "target_after": 32
+  },
+  "product_options": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "product_reviews": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "product_variants": {
+    "source": 9,
+    "target_before": 9,
+    "deleted": 0,
+    "target_after": 9
+  },
+  "products": {
+    "source": 6,
+    "target_before": 6,
+    "deleted": 0,
+    "target_after": 6
+  },
+  "saved_carts": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "social_media_grants": {
+    "source": 0,
+    "target_before": 0,
+    "deleted": 0,
+    "target_after": 0
+  },
+  "social_post_history": {
+    "source": 347,
+    "target_before": 347,
+    "deleted": 0,
+    "target_after": 347
+  },
+  "social_post_jobs": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "social_publisher_sessions": {
+    "source": 2,
+    "target_before": 2,
+    "deleted": 0,
+    "target_after": 2
+  },
+  "social_publisher_settings": {
+    "source": 1,
+    "target_before": 1,
+    "deleted": 0,
+    "target_after": 1
+  },
+  "storage_files": {
+    "source": 68,
+    "target_before": 68,
+    "deleted": 0,
+    "target_after": 68
+  }
+}

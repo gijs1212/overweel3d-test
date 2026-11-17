@@ -1,0 +1,41 @@
+{
+  "schema": "cron",
+  "table": "job",
+  "row_count": 3,
+  "rows": [
+    {
+      "jobid": 1,
+      "active": true,
+      "command": "\n  select net.http_post(\n    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')\n      || '/functions/v1/send-abandoned-cart-reminders',\n    headers := jsonb_build_object(\n      'Content-Type', 'application/json',\n      'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key'),\n      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key')\n    ),\n    body := jsonb_build_object('scheduled_at', now()),\n    timeout_milliseconds := 10000\n  ) as request_id;\n  ",
+      "jobname": "send-abandoned-cart-reminders-hourly",
+      "database": "postgres",
+      "nodename": "localhost",
+      "nodeport": 5432,
+      "schedule": "17 * * * *",
+      "username": "postgres"
+    },
+    {
+      "jobid": 3,
+      "active": true,
+      "command": "\n  select net.http_post(\n    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')\n      || '/functions/v1/check-offline-printers',\n    headers := jsonb_build_object(\n      'Content-Type', 'application/json',\n      'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key'),\n      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key')\n    ),\n    body := jsonb_build_object('scheduled_at', now()),\n    timeout_milliseconds := 10000\n  ) as request_id;\n  ",
+      "jobname": "check-offline-printers-every-ten-minutes",
+      "database": "postgres",
+      "nodename": "localhost",
+      "nodeport": 5432,
+      "schedule": "*/10 * * * *",
+      "username": "postgres"
+    },
+    {
+      "jobid": 4,
+      "active": true,
+      "command": "\n    update public.printer_pairing_codes\n    set bambu_access_code = null,\n        slicer_cert_pem = null,\n        slicer_key_pem = null,\n        slicer_crl_pem = null\n    where expires_at <= now()\n      and (\n        bambu_access_code is not null\n        or slicer_cert_pem is not null\n        or slicer_key_pem is not null\n        or slicer_crl_pem is not null\n      );\n  ",
+      "jobname": "cleanup_printer_pairing_secrets",
+      "database": "postgres",
+      "nodename": "localhost",
+      "nodeport": 5432,
+      "schedule": "*/5 * * * *",
+      "username": "postgres"
+    }
+  ]
+}
+

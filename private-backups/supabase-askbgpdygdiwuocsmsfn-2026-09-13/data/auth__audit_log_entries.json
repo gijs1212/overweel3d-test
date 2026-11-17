@@ -1,0 +1,7 @@
+{
+  "schema": "auth",
+  "table": "audit_log_entries",
+  "row_count": 0,
+  "rows": []
+}
+

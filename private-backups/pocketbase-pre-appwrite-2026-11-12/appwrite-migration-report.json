@@ -1,0 +1,493 @@
+{
+  "ok": true,
+  "generated_at": "2026-11-15T13:04:48Z",
+  "collections": {
+    "app_settings": {
+      "source": 6,
+      "target": 6,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "blog_posts": {
+      "source": 11,
+      "target": 11,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "categories": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "delivery_appointments": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "discount_codes": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "discount_redemptions": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "email_campaigns": {
+      "source": 27,
+      "target": 27,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "exported_orders": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "filament_colors": {
+      "source": 16,
+      "target": 16,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "filament_inventory": {
+      "source": 311,
+      "target": 311,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "gift_card_redemptions": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "gift_cards": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "loyalty_transactions": {
+      "source": 2,
+      "target": 2,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "materials": {
+      "source": 3,
+      "target": 3,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "newsletter_subscribers": {
+      "source": 2,
+      "target": 2,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "newsletter_subscriptions": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "onedrive_tokens": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "order_3mf_plate_mappings": {
+      "source": 22,
+      "target": 22,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "order_events": {
+      "source": 78,
+      "target": 78,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "order_files": {
+      "source": 4,
+      "target": 4,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "order_messages": {
+      "source": 2,
+      "target": 2,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "orders": {
+      "source": 8,
+      "target": 8,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "portfolio_project_media": {
+      "source": 37,
+      "target": 37,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "portfolio_projects": {
+      "source": 4,
+      "target": 4,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "print_jobs": {
+      "source": 25,
+      "target": 25,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "print_runs": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "printer_ams_slots": {
+      "source": 12,
+      "target": 12,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "printer_pairing_codes": {
+      "source": 9,
+      "target": 9,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "printer_queue_items": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "printer_sd_files": {
+      "source": 33,
+      "target": 33,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "printers": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "product_categories": {
+      "source": 4,
+      "target": 4,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "product_color_availability": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "product_images": {
+      "source": 32,
+      "target": 32,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "product_options": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "product_reviews": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "product_variants": {
+      "source": 9,
+      "target": 9,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "products": {
+      "source": 6,
+      "target": 6,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "saved_carts": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "social_media_grants": {
+      "source": 0,
+      "target": 0,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "social_post_history": {
+      "source": 347,
+      "target": 347,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": true
+    },
+    "social_post_jobs": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": true
+    },
+    "social_publisher_sessions": {
+      "source": 2,
+      "target": 2,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": true
+    },
+    "social_publisher_settings": {
+      "source": 1,
+      "target": 1,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": true
+    },
+    "storage_files": {
+      "source": 68,
+      "target": 68,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true,
+      "source_snapshot_match": true,
+      "runtime_mutable": false
+    },
+    "profiles": {
+      "source": 7,
+      "target": 7,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true
+    },
+    "user_roles": {
+      "source": 7,
+      "target": 7,
+      "missing": 0,
+      "extra": 0,
+      "payload_mismatches": 0,
+      "match": true
+    }
+  },
+  "users": {
+    "created": 7,
+    "recreated": 0,
+    "updated": 0,
+    "source": 7,
+    "password_match": 0,
+    "password_mismatch": 0,
+    "password_unavailable": 0
+  },
+  "files": {
+    "source": 68,
+    "uploaded": 68,
+    "skipped": 0,
+    "missing": 0,
+    "target": 68,
+    "extra": 0,
+    "size_mismatches": 0,
+    "match": true
+  },
+  "errors": [],
+  "warnings": []
+}

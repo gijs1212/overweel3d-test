@@ -1,0 +1,101 @@
+[
+  {
+    "pubname": "supabase_realtime",
+    "schemaname": "public",
+    "tablename": "filament_inventory",
+    "attnames": "{filament_color_id,total_weight_grams,spool_capacity_grams,remaining_percent,source_printer_id,source_ams_unit,source_slot_number,tray_uuid,last_seen_at,created_at,updated_at,id,inventory_key,material,color_name,color_hex,manual_weight_grams}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime",
+    "schemaname": "public",
+    "tablename": "print_jobs",
+    "attnames": "{id,order_id,printer_id,plate_number,plate_name,expected_file_name,three_mf_storage_path,three_mf_signature,material,colors,estimated_duration_minutes,estimated_filament_grams,runs_required,runs_completed,status,scheduled_at,started_at,completed_at,approved_at,approved_by,observed_file_name,comparison,created_at,updated_at,source_order_file_id,suggested_at,plate_mapping_id,source_plate_number,active}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime",
+    "schemaname": "public",
+    "tablename": "printer_ams_slots",
+    "attnames": "{id,printer_id,ams_unit,slot_number,material,color_name,color_hex,tray_uuid,remaining_grams,remaining_percent,spool_capacity_grams,raw_status,updated_at}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime",
+    "schemaname": "public",
+    "tablename": "printer_queue_items",
+    "attnames": "{id,printer_id,sd_file_id,sd_file_path,file_name,plate_number,position,required_colors,ams_mapping,status,blocked_reason,calibration_enabled,command_claimed_at,started_at,completed_at,bridge_error,created_by,created_at,updated_at}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime",
+    "schemaname": "public",
+    "tablename": "printer_sd_files",
+    "attnames": "{id,printer_id,path,display_name,size_bytes,modified_at,plates,available,last_seen_at,created_at,updated_at,detected_material,detected_color_name,detected_filaments,metadata_request_id,metadata_completed_request_id,metadata_last_error,metadata_requested_plate_number}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime",
+    "schemaname": "public",
+    "tablename": "printers",
+    "attnames": "{id,name,model,device_serial,bridge_token_hash,status,current_file,current_plate,progress,remaining_minutes,current_layer,total_layers,nozzle_temperature,bed_temperature,chamber_temperature,maintenance_note,last_seen_at,raw_status,created_at,updated_at,connection_mode,offline_since,offline_alert_sent_at,bridge_refresh_token_hash,bridge_token_refreshed_at,camera_status,camera_last_seen_at,plate_check_status,sd_card_last_seen_at,plate_state_changed_at,ftps_scan_paths,ftps_directory_listing,ftps_last_error,ftps_scan_requested_at,ftps_folder_scan_requested_at,ftps_scan_request_id,ftps_folder_scan_request_id,ftps_scan_completed_request_id,ftps_folder_scan_completed_request_id,print_start_request_id,print_start_completed_request_id,host_pc_status,host_pc_checked_at,host_pc_uptime_seconds}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_09",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_10",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_11",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_12",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_13",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_14",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_15",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  },
+  {
+    "pubname": "supabase_realtime_messages_publication",
+    "schemaname": "realtime",
+    "tablename": "messages_2026_09_16",
+    "attnames": "{topic,extension,payload,event,private,updated_at,inserted_at,id,binary_payload,skip_broadcast}",
+    "rowfilter": null
+  }
+]
+

@@ -1,0 +1,18 @@
+{
+  "id": "fe66766d-0f15-425a-952a-1fdfc53eaf1c",
+  "slug": "printer-status-ingest",
+  "name": "printer-status-ingest",
+  "status": "ACTIVE",
+  "version": 15,
+  "created_at": 1787430434365,
+  "updated_at": 1789247827109,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_fe66766d-0f15-425a-952a-1fdfc53eaf1c_15/source/index.ts",
+  "ezbr_sha256": "5e7fc49598d2e12e9355699aec37005ef64f53bedf0760deb16ea0f3e1adf4aa",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

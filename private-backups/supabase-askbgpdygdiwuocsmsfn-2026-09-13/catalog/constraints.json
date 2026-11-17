@@ -1,0 +1,3603 @@
+[
+  {
+    "schema_name": "auth",
+    "table_name": "audit_log_entries",
+    "conname": "audit_log_entries_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_authorization_url_https",
+    "contype": "c",
+    "definition": "CHECK (authorization_url IS NULL OR authorization_url ~~ 'https://%'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_authorization_url_length",
+    "contype": "c",
+    "definition": "CHECK (authorization_url IS NULL OR char_length(authorization_url) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_client_id_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(client_id) >= 1 AND char_length(client_id) <= 512)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_discovery_url_length",
+    "contype": "c",
+    "definition": "CHECK (discovery_url IS NULL OR char_length(discovery_url) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_identifier_format",
+    "contype": "c",
+    "definition": "CHECK (identifier ~ '^[a-z0-9][a-z0-9:-]{0,48}[a-z0-9]$'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_identifier_key",
+    "contype": "u",
+    "definition": "UNIQUE (identifier)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_issuer_length",
+    "contype": "c",
+    "definition": "CHECK (issuer IS NULL OR char_length(issuer) >= 1 AND char_length(issuer) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_jwks_uri_https",
+    "contype": "c",
+    "definition": "CHECK (jwks_uri IS NULL OR jwks_uri ~~ 'https://%'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_jwks_uri_length",
+    "contype": "c",
+    "definition": "CHECK (jwks_uri IS NULL OR char_length(jwks_uri) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_name_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(name) >= 1 AND char_length(name) <= 100)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_oauth2_requires_endpoints",
+    "contype": "c",
+    "definition": "CHECK (provider_type <> 'oauth2'::text OR authorization_url IS NOT NULL AND token_url IS NOT NULL AND userinfo_url IS NOT NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_oidc_discovery_url_https",
+    "contype": "c",
+    "definition": "CHECK (provider_type <> 'oidc'::text OR discovery_url IS NULL OR discovery_url ~~ 'https://%'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_oidc_issuer_https",
+    "contype": "c",
+    "definition": "CHECK (provider_type <> 'oidc'::text OR issuer IS NULL OR issuer ~~ 'https://%'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_oidc_requires_issuer",
+    "contype": "c",
+    "definition": "CHECK (provider_type <> 'oidc'::text OR issuer IS NOT NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_provider_type_check",
+    "contype": "c",
+    "definition": "CHECK (provider_type = ANY (ARRAY['oauth2'::text, 'oidc'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_token_url_https",
+    "contype": "c",
+    "definition": "CHECK (token_url IS NULL OR token_url ~~ 'https://%'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_token_url_length",
+    "contype": "c",
+    "definition": "CHECK (token_url IS NULL OR char_length(token_url) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_userinfo_url_https",
+    "contype": "c",
+    "definition": "CHECK (userinfo_url IS NULL OR userinfo_url ~~ 'https://%'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "custom_oauth_providers",
+    "conname": "custom_oauth_providers_userinfo_url_length",
+    "contype": "c",
+    "definition": "CHECK (userinfo_url IS NULL OR char_length(userinfo_url) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "flow_state",
+    "conname": "flow_state_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "identities",
+    "conname": "identities_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "identities",
+    "conname": "identities_provider_id_provider_unique",
+    "contype": "u",
+    "definition": "UNIQUE (provider_id, provider)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "identities",
+    "conname": "identities_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "instances",
+    "conname": "instances_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_amr_claims",
+    "conname": "amr_id_pk",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_amr_claims",
+    "conname": "mfa_amr_claims_session_id_authentication_method_pkey",
+    "contype": "u",
+    "definition": "UNIQUE (session_id, authentication_method)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_amr_claims",
+    "conname": "mfa_amr_claims_session_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (session_id) REFERENCES auth.sessions(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_challenges",
+    "conname": "mfa_challenges_auth_factor_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (factor_id) REFERENCES auth.mfa_factors(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_challenges",
+    "conname": "mfa_challenges_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_factors",
+    "conname": "mfa_factors_last_challenged_at_key",
+    "contype": "u",
+    "definition": "UNIQUE (last_challenged_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_factors",
+    "conname": "mfa_factors_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "mfa_factors",
+    "conname": "mfa_factors_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_authorization_code_key",
+    "contype": "u",
+    "definition": "UNIQUE (authorization_code)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_authorization_code_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(authorization_code) <= 255)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_authorization_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (authorization_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_client_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (client_id) REFERENCES auth.oauth_clients(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_code_challenge_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(code_challenge) <= 128)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_expires_at_future",
+    "contype": "c",
+    "definition": "CHECK (expires_at > created_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_nonce_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(nonce) <= 255)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_redirect_uri_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(redirect_uri) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_resource_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(resource) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_scope_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(scope) <= 4096)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_state_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(state) <= 4096)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_authorizations",
+    "conname": "oauth_authorizations_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_client_states",
+    "conname": "oauth_client_states_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_clients",
+    "conname": "oauth_clients_client_name_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(client_name) <= 1024)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_clients",
+    "conname": "oauth_clients_client_uri_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(client_uri) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_clients",
+    "conname": "oauth_clients_logo_uri_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(logo_uri) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_clients",
+    "conname": "oauth_clients_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_clients",
+    "conname": "oauth_clients_token_endpoint_auth_method_check",
+    "contype": "c",
+    "definition": "CHECK (token_endpoint_auth_method = ANY (ARRAY['client_secret_basic'::text, 'client_secret_post'::text, 'none'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_client_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (client_id) REFERENCES auth.oauth_clients(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_revoked_after_granted",
+    "contype": "c",
+    "definition": "CHECK (revoked_at IS NULL OR revoked_at >= granted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_scopes_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(scopes) <= 2048)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_scopes_not_empty",
+    "contype": "c",
+    "definition": "CHECK (char_length(TRIM(BOTH FROM scopes)) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_user_client_unique",
+    "contype": "u",
+    "definition": "UNIQUE (user_id, client_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "oauth_consents",
+    "conname": "oauth_consents_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "one_time_tokens",
+    "conname": "one_time_tokens_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "one_time_tokens",
+    "conname": "one_time_tokens_token_hash_check",
+    "contype": "c",
+    "definition": "CHECK (char_length(token_hash) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "one_time_tokens",
+    "conname": "one_time_tokens_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "refresh_tokens",
+    "conname": "refresh_tokens_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "refresh_tokens",
+    "conname": "refresh_tokens_session_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (session_id) REFERENCES auth.sessions(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "refresh_tokens",
+    "conname": "refresh_tokens_token_unique",
+    "contype": "u",
+    "definition": "UNIQUE (token)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_providers",
+    "conname": "entity_id not empty",
+    "contype": "c",
+    "definition": "CHECK (char_length(entity_id) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_providers",
+    "conname": "metadata_url not empty",
+    "contype": "c",
+    "definition": "CHECK (metadata_url = NULL::text OR char_length(metadata_url) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_providers",
+    "conname": "metadata_xml not empty",
+    "contype": "c",
+    "definition": "CHECK (char_length(metadata_xml) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_providers",
+    "conname": "saml_providers_entity_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (entity_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_providers",
+    "conname": "saml_providers_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_providers",
+    "conname": "saml_providers_sso_provider_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (sso_provider_id) REFERENCES auth.sso_providers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_relay_states",
+    "conname": "request_id not empty",
+    "contype": "c",
+    "definition": "CHECK (char_length(request_id) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_relay_states",
+    "conname": "saml_relay_states_flow_state_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (flow_state_id) REFERENCES auth.flow_state(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_relay_states",
+    "conname": "saml_relay_states_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "saml_relay_states",
+    "conname": "saml_relay_states_sso_provider_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (sso_provider_id) REFERENCES auth.sso_providers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "schema_migrations",
+    "conname": "schema_migrations_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (version)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sessions",
+    "conname": "sessions_oauth_client_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (oauth_client_id) REFERENCES auth.oauth_clients(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sessions",
+    "conname": "sessions_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sessions",
+    "conname": "sessions_scopes_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(scopes) <= 4096)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sessions",
+    "conname": "sessions_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sso_domains",
+    "conname": "domain not empty",
+    "contype": "c",
+    "definition": "CHECK (char_length(domain) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sso_domains",
+    "conname": "sso_domains_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sso_domains",
+    "conname": "sso_domains_sso_provider_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (sso_provider_id) REFERENCES auth.sso_providers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sso_providers",
+    "conname": "resource_id not empty",
+    "contype": "c",
+    "definition": "CHECK (resource_id = NULL::text OR char_length(resource_id) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "sso_providers",
+    "conname": "sso_providers_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "users",
+    "conname": "users_email_change_confirm_status_check",
+    "contype": "c",
+    "definition": "CHECK (email_change_confirm_status >= 0 AND email_change_confirm_status <= 2)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "users",
+    "conname": "users_phone_key",
+    "contype": "u",
+    "definition": "UNIQUE (phone)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "users",
+    "conname": "users_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "webauthn_challenges",
+    "conname": "webauthn_challenges_challenge_type_check",
+    "contype": "c",
+    "definition": "CHECK (challenge_type = ANY (ARRAY['signup'::text, 'registration'::text, 'authentication'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "webauthn_challenges",
+    "conname": "webauthn_challenges_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "webauthn_challenges",
+    "conname": "webauthn_challenges_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "webauthn_credentials",
+    "conname": "webauthn_credentials_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "auth",
+    "table_name": "webauthn_credentials",
+    "conname": "webauthn_credentials_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "cron",
+    "table_name": "job",
+    "conname": "job_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (jobid)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "cron",
+    "table_name": "job",
+    "conname": "jobname_username_uniq",
+    "contype": "u",
+    "definition": "UNIQUE (jobname, username)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "cron",
+    "table_name": "job_run_details",
+    "conname": "job_run_details_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (runid)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "app_settings",
+    "conname": "app_settings_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (key)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "app_settings",
+    "conname": "app_settings_updated_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "blog_posts",
+    "conname": "blog_posts_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "blog_posts",
+    "conname": "blog_posts_slug_key",
+    "contype": "u",
+    "definition": "UNIQUE (slug)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "blog_posts",
+    "conname": "blog_posts_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['draft'::text, 'published'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "categories",
+    "conname": "categories_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "delivery_appointments",
+    "conname": "delivery_appointments_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "delivery_appointments",
+    "conname": "delivery_appointments_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "delivery_appointments",
+    "conname": "delivery_appointments_proposed_by_check",
+    "contype": "c",
+    "definition": "CHECK (proposed_by = ANY (ARRAY['customer'::text, 'admin'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "delivery_appointments",
+    "conname": "delivery_appointments_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'cancelled'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_category_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_code_key",
+    "contype": "u",
+    "definition": "UNIQUE (code)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_discount_type_check",
+    "contype": "c",
+    "definition": "CHECK (discount_type = ANY (ARRAY['percentage'::text, 'fixed'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_minimum_order_amount_check",
+    "contype": "c",
+    "definition": "CHECK (minimum_order_amount >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_parent_code_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (parent_code_id) REFERENCES discount_codes(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_per_customer_limit_check",
+    "contype": "c",
+    "definition": "CHECK (per_customer_limit IS NULL OR per_customer_limit > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_product_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_codes",
+    "conname": "discount_codes_source_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (source_order_id) REFERENCES orders(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_redemptions",
+    "conname": "discount_redemptions_discount_amount_check",
+    "contype": "c",
+    "definition": "CHECK (discount_amount >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_redemptions",
+    "conname": "discount_redemptions_discount_code_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (discount_code_id) REFERENCES discount_codes(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_redemptions",
+    "conname": "discount_redemptions_discount_code_id_order_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (discount_code_id, order_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_redemptions",
+    "conname": "discount_redemptions_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_redemptions",
+    "conname": "discount_redemptions_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "discount_redemptions",
+    "conname": "discount_redemptions_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_audience_check",
+    "contype": "c",
+    "definition": "CHECK (audience = ANY (ARRAY['newsletter'::text, 'all_customers'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_change_type_check",
+    "contype": "c",
+    "definition": "CHECK (change_type IS NULL OR (change_type = ANY (ARRAY['new'::text, 'removed'::text])))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_counts_nonnegative",
+    "contype": "c",
+    "definition": "CHECK (recipient_count >= 0 AND sent_count >= 0 AND failed_count >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_created_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE RESTRICT",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['sending'::text, 'sent'::text, 'partial'::text, 'failed'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "email_campaigns",
+    "conname": "email_campaigns_template_kind_check",
+    "contype": "c",
+    "definition": "CHECK (template_kind = ANY (ARRAY['color'::text, 'material'::text, 'article'::text, 'custom'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "exported_orders",
+    "conname": "exported_orders_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "exported_orders",
+    "conname": "exported_orders_order_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (order_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "exported_orders",
+    "conname": "exported_orders_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_colors",
+    "conname": "filament_colors_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_filament_color_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (filament_color_id) REFERENCES filament_colors(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_inventory_key_key",
+    "contype": "u",
+    "definition": "UNIQUE (inventory_key)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_manual_weight_grams_check",
+    "contype": "c",
+    "definition": "CHECK (manual_weight_grams IS NULL OR manual_weight_grams >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_remaining_percent_check",
+    "contype": "c",
+    "definition": "CHECK (remaining_percent IS NULL OR remaining_percent >= 0::numeric AND remaining_percent <= 100::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_source_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (source_printer_id) REFERENCES printers(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_spool_capacity_grams_check",
+    "contype": "c",
+    "definition": "CHECK (spool_capacity_grams > 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "filament_inventory",
+    "conname": "filament_inventory_total_weight_grams_check",
+    "contype": "c",
+    "definition": "CHECK (total_weight_grams >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_card_redemptions",
+    "conname": "gift_card_redemptions_amount_check",
+    "contype": "c",
+    "definition": "CHECK (amount > 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_card_redemptions",
+    "conname": "gift_card_redemptions_gift_card_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (gift_card_id) REFERENCES gift_cards(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_card_redemptions",
+    "conname": "gift_card_redemptions_gift_card_id_order_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (gift_card_id, order_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_card_redemptions",
+    "conname": "gift_card_redemptions_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_card_redemptions",
+    "conname": "gift_card_redemptions_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_card_redemptions",
+    "conname": "gift_card_redemptions_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_cards",
+    "conname": "gift_cards_code_key",
+    "contype": "u",
+    "definition": "UNIQUE (code)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_cards",
+    "conname": "gift_cards_created_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_cards",
+    "conname": "gift_cards_current_balance_check",
+    "contype": "c",
+    "definition": "CHECK (current_balance >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_cards",
+    "conname": "gift_cards_initial_balance_check",
+    "contype": "c",
+    "definition": "CHECK (initial_balance > 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "gift_cards",
+    "conname": "gift_cards_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "loyalty_transactions",
+    "conname": "loyalty_transactions_kind_check",
+    "contype": "c",
+    "definition": "CHECK (kind = ANY (ARRAY['earned'::text, 'redeemed'::text, 'adjustment'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "loyalty_transactions",
+    "conname": "loyalty_transactions_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "loyalty_transactions",
+    "conname": "loyalty_transactions_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "loyalty_transactions",
+    "conname": "loyalty_transactions_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "materials",
+    "conname": "materials_name_key",
+    "contype": "u",
+    "definition": "UNIQUE (name)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "materials",
+    "conname": "materials_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "materials",
+    "conname": "materials_price_per_gram_check",
+    "contype": "c",
+    "definition": "CHECK (price_per_gram >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscribers",
+    "conname": "newsletter_subscribers_email_key",
+    "contype": "u",
+    "definition": "UNIQUE (email)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscribers",
+    "conname": "newsletter_subscribers_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "conname": "newsletter_subscriptions_email_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(email) >= 3 AND char_length(email) <= 254)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "conname": "newsletter_subscriptions_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "conname": "newsletter_subscriptions_source_allowed",
+    "contype": "c",
+    "definition": "CHECK (source = ANY (ARRAY['popup'::text, 'footer'::text, 'website'::text, 'profile'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "conname": "newsletter_subscriptions_source_length",
+    "contype": "c",
+    "definition": "CHECK (char_length(source) >= 1 AND char_length(source) <= 50)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "conname": "newsletter_subscriptions_unsubscribe_state",
+    "contype": "c",
+    "definition": "CHECK (active AND unsubscribed_at IS NULL OR NOT active AND unsubscribed_at IS NOT NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "newsletter_subscriptions",
+    "conname": "newsletter_subscriptions_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_colors_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(colors) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_logical_plate_number_check",
+    "contype": "c",
+    "definition": "CHECK (logical_plate_number IS NULL OR logical_plate_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_order_file_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_file_id) REFERENCES order_files(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_order_file_id_source_plate_number_key",
+    "contype": "u",
+    "definition": "UNIQUE (order_file_id, source_plate_number)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_runs_completed_check",
+    "contype": "c",
+    "definition": "CHECK (runs_completed >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_runs_required_check",
+    "contype": "c",
+    "definition": "CHECK (runs_required > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_3mf_plate_mappings",
+    "conname": "order_3mf_plate_mappings_source_plate_number_check",
+    "contype": "c",
+    "definition": "CHECK (source_plate_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_events",
+    "conname": "order_events_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_events",
+    "conname": "order_events_performed_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (performed_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_events",
+    "conname": "order_events_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_files",
+    "conname": "order_files_file_purpose_check",
+    "contype": "c",
+    "definition": "CHECK (file_purpose = ANY (ARRAY['order_attachment'::text, 'customer_upload'::text, 'production_3mf'::text, 'plate_preview'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_files",
+    "conname": "order_files_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_files",
+    "conname": "order_files_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_messages",
+    "conname": "order_messages_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_messages",
+    "conname": "order_messages_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_messages",
+    "conname": "order_messages_sender_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (sender_id) REFERENCES auth.users(id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "order_messages",
+    "conname": "order_messages_sender_type_check",
+    "contype": "c",
+    "definition": "CHECK (sender_type = ANY (ARRAY['customer'::text, 'admin'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_applied_discount_code_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (applied_discount_code) REFERENCES discount_codes(code) ON UPDATE CASCADE ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_catalog_items_array_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(catalog_items) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_customer_order_token_key",
+    "contype": "u",
+    "definition": "UNIQUE (customer_order_token)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_filament_used_g_check",
+    "contype": "c",
+    "definition": "CHECK (filament_used_g IS NULL OR filament_used_g >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_gift_card_amount_check",
+    "contype": "c",
+    "definition": "CHECK (gift_card_amount >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_link_view_count_nonnegative",
+    "contype": "c",
+    "definition": "CHECK (link_view_count >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_loyalty_points_awarded_check",
+    "contype": "c",
+    "definition": "CHECK (loyalty_points_awarded >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_material_cost_check",
+    "contype": "c",
+    "definition": "CHECK (material_cost IS NULL OR material_cost >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_order_number_key",
+    "contype": "u",
+    "definition": "UNIQUE (order_number)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_plate_print_statuses_array",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(plate_print_statuses) = 'array'::text AND jsonb_array_length(plate_print_statuses) = total_plates)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_print_duration_minutes_check",
+    "contype": "c",
+    "definition": "CHECK (print_duration_minutes IS NULL OR print_duration_minutes >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_total_plates_nonnegative",
+    "contype": "c",
+    "definition": "CHECK (total_plates >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_total_products_nonnegative",
+    "contype": "c",
+    "definition": "CHECK (total_products >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "orders",
+    "conname": "orders_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "portfolio_project_media",
+    "conname": "portfolio_project_media_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "portfolio_project_media",
+    "conname": "portfolio_project_media_project_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (project_id) REFERENCES portfolio_projects(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "portfolio_project_media",
+    "conname": "portfolio_project_media_storage_path_key",
+    "contype": "u",
+    "definition": "UNIQUE (storage_path)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "portfolio_projects",
+    "conname": "portfolio_projects_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "portfolio_projects",
+    "conname": "portfolio_projects_title_check",
+    "contype": "c",
+    "definition": "CHECK (char_length(TRIM(BOTH FROM title)) >= 1 AND char_length(TRIM(BOTH FROM title)) <= 120)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_approved_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (approved_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_colors_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(colors) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_estimated_duration_minutes_check",
+    "contype": "c",
+    "definition": "CHECK (estimated_duration_minutes IS NULL OR estimated_duration_minutes >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_estimated_filament_grams_check",
+    "contype": "c",
+    "definition": "CHECK (estimated_filament_grams IS NULL OR estimated_filament_grams >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_plate_mapping_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (plate_mapping_id) REFERENCES order_3mf_plate_mappings(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_plate_number_check",
+    "contype": "c",
+    "definition": "CHECK (plate_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (printer_id) REFERENCES printers(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_runs_completed_check",
+    "contype": "c",
+    "definition": "CHECK (runs_completed >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_runs_required_check",
+    "contype": "c",
+    "definition": "CHECK (runs_required > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_source_order_file_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (source_order_file_id) REFERENCES order_files(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_source_plate_number_check",
+    "contype": "c",
+    "definition": "CHECK (source_plate_number IS NULL OR source_plate_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_jobs",
+    "conname": "print_jobs_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['queued'::text, 'suggested'::text, 'approved'::text, 'printing'::text, 'paused'::text, 'awaiting_next_run'::text, 'completed'::text, 'mismatch'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_filament_used_grams_check",
+    "contype": "c",
+    "definition": "CHECK (filament_used_grams IS NULL OR filament_used_grams >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_print_job_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (print_job_id) REFERENCES print_jobs(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_print_job_id_run_number_key",
+    "contype": "u",
+    "definition": "UNIQUE (print_job_id, run_number)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (printer_id) REFERENCES printers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_run_number_check",
+    "contype": "c",
+    "definition": "CHECK (run_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "print_runs",
+    "conname": "print_runs_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['printing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "conname": "printer_ams_slots_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "conname": "printer_ams_slots_printer_id_ams_unit_slot_number_key",
+    "contype": "u",
+    "definition": "UNIQUE (printer_id, ams_unit, slot_number)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "conname": "printer_ams_slots_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (printer_id) REFERENCES printers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "conname": "printer_ams_slots_remaining_grams_check",
+    "contype": "c",
+    "definition": "CHECK (remaining_grams IS NULL OR remaining_grams >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "conname": "printer_ams_slots_remaining_percent_check",
+    "contype": "c",
+    "definition": "CHECK (remaining_percent IS NULL OR remaining_percent >= 0::numeric AND remaining_percent <= 100::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_ams_slots",
+    "conname": "printer_ams_slots_spool_capacity_grams_check",
+    "contype": "c",
+    "definition": "CHECK (spool_capacity_grams > 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_codes_code_hash_check",
+    "contype": "c",
+    "definition": "CHECK (code_hash ~ '^[0-9a-f]{64}$'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_codes_code_hash_key",
+    "contype": "u",
+    "definition": "UNIQUE (code_hash)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_codes_created_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_codes_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_codes_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (printer_id) REFERENCES printers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_ftps_port_check",
+    "contype": "c",
+    "definition": "CHECK (ftps_port >= 1 AND ftps_port <= 65535)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_ftps_username_check",
+    "contype": "c",
+    "definition": "CHECK (length(TRIM(BOTH FROM ftps_username)) >= 1 AND length(TRIM(BOTH FROM ftps_username)) <= 64)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_slicer_cert_size_check",
+    "contype": "c",
+    "definition": "CHECK (slicer_cert_pem IS NULL OR octet_length(slicer_cert_pem) <= 131072)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_slicer_crl_size_check",
+    "contype": "c",
+    "definition": "CHECK (slicer_crl_pem IS NULL OR octet_length(slicer_crl_pem) <= 131072)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_pairing_codes",
+    "conname": "printer_pairing_slicer_key_size_check",
+    "contype": "c",
+    "definition": "CHECK (slicer_key_pem IS NULL OR octet_length(slicer_key_pem) <= 131072)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_created_by_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_file_name_check",
+    "contype": "c",
+    "definition": "CHECK (length(TRIM(BOTH FROM file_name)) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_plate_number_check",
+    "contype": "c",
+    "definition": "CHECK (plate_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (printer_id) REFERENCES printers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_required_colors_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(required_colors) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_sd_file_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (sd_file_id) REFERENCES printer_sd_files(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_sd_file_path_check",
+    "contype": "c",
+    "definition": "CHECK (length(TRIM(BOTH FROM sd_file_path)) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_queue_items",
+    "conname": "printer_queue_items_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['queued'::text, 'blocked'::text, 'starting'::text, 'printing'::text, 'completed'::text, 'failed'::text, 'paused'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_detected_filaments_array",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(detected_filaments) = 'array'::text AND jsonb_array_length(detected_filaments) <= 32)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_display_name_check",
+    "contype": "c",
+    "definition": "CHECK (length(TRIM(BOTH FROM display_name)) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_metadata_requested_plate_number_check",
+    "contype": "c",
+    "definition": "CHECK (metadata_requested_plate_number IS NULL OR metadata_requested_plate_number > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_path_check",
+    "contype": "c",
+    "definition": "CHECK (length(TRIM(BOTH FROM path)) > 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_plates_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(plates) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_printer_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (printer_id) REFERENCES printers(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_printer_id_path_key",
+    "contype": "u",
+    "definition": "UNIQUE (printer_id, path)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printer_sd_files",
+    "conname": "printer_sd_files_size_bytes_check",
+    "contype": "c",
+    "definition": "CHECK (size_bytes IS NULL OR size_bytes >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_bridge_refresh_token_hash_check",
+    "contype": "c",
+    "definition": "CHECK (bridge_refresh_token_hash IS NULL OR bridge_refresh_token_hash ~ '^[0-9a-f]{64}$'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_camera_status_check",
+    "contype": "c",
+    "definition": "CHECK (camera_status = ANY (ARRAY['available'::text, 'unavailable'::text, 'error'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_connection_mode_check",
+    "contype": "c",
+    "definition": "CHECK (connection_mode = ANY (ARRAY['lan_bridge'::text, 'bambu_connect'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_device_serial_key",
+    "contype": "u",
+    "definition": "UNIQUE (device_serial)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_ftps_directory_listing_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(ftps_directory_listing) = 'array'::text AND jsonb_array_length(ftps_directory_listing) <= 5000)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_ftps_scan_paths_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(ftps_scan_paths) = 'array'::text AND jsonb_array_length(ftps_scan_paths) >= 1 AND jsonb_array_length(ftps_scan_paths) <= 25)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_host_pc_status_check",
+    "contype": "c",
+    "definition": "CHECK (host_pc_status = ANY (ARRAY['unknown'::text, 'on'::text, 'off'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_plate_check_status_check",
+    "contype": "c",
+    "definition": "CHECK (plate_check_status = ANY (ARRAY['correct'::text, 'attention'::text, 'unknown'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_progress_check",
+    "contype": "c",
+    "definition": "CHECK (progress >= 0::numeric AND progress <= 100::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "printers",
+    "conname": "printers_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['offline'::text, 'idle'::text, 'printing'::text, 'paused'::text, 'error'::text, 'maintenance'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_categories",
+    "conname": "product_categories_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_color_availability",
+    "conname": "product_color_availability_color_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (color_id) REFERENCES filament_colors(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_color_availability",
+    "conname": "product_color_availability_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_color_availability",
+    "conname": "product_color_availability_product_id_color_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (product_id, color_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_color_availability",
+    "conname": "product_color_availability_product_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_images",
+    "conname": "product_images_media_type_check",
+    "contype": "c",
+    "definition": "CHECK (media_type = ANY (ARRAY['image'::text, 'video'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_images",
+    "conname": "product_images_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_images",
+    "conname": "product_images_product_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_choices_array_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(choices) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_color_slot_labels_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(color_slot_labels) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_color_slots_check",
+    "contype": "c",
+    "definition": "CHECK (color_slots >= 0 AND color_slots <= 12)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_max_length_check",
+    "contype": "c",
+    "definition": "CHECK (max_length IS NULL OR max_length >= 1 AND max_length <= 5000)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_price_adjustment_check",
+    "contype": "c",
+    "definition": "CHECK (price_adjustment >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_product_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_options",
+    "conname": "product_options_type_check",
+    "contype": "c",
+    "definition": "CHECK (type = ANY (ARRAY['text'::text, 'textarea'::text, 'select'::text, 'radio'::text, 'checkbox'::text, 'photo'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_order_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_photos_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(photos) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_product_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_product_id_order_id_user_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (product_id, order_id, user_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_rating_check",
+    "contype": "c",
+    "definition": "CHECK (rating >= 1 AND rating <= 5)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_reviews",
+    "conname": "product_reviews_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_variants",
+    "conname": "product_variants_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_variants",
+    "conname": "product_variants_product_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "product_variants",
+    "conname": "product_variants_product_id_name_key",
+    "contype": "u",
+    "definition": "UNIQUE (product_id, name)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "conname": "products_category_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE SET NULL",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "conname": "products_color_selection_mode_check",
+    "contype": "c",
+    "definition": "CHECK (color_selection_mode = ANY (ARRAY['single'::text, 'multiple'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "conname": "products_color_slot_labels_limit_check",
+    "contype": "c",
+    "definition": "CHECK (cardinality(color_slot_labels) <= 12)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "conname": "products_material_mode_check",
+    "contype": "c",
+    "definition": "CHECK (material_mode = ANY (ARRAY['fixed'::text, 'selected'::text, 'all'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "conname": "products_max_colors_check",
+    "contype": "c",
+    "definition": "CHECK (max_colors >= 1 AND max_colors <= 12)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "products",
+    "conname": "products_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "profiles",
+    "conname": "profiles_loyalty_points_check",
+    "contype": "c",
+    "definition": "CHECK (loyalty_points >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "profiles",
+    "conname": "profiles_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "profiles",
+    "conname": "profiles_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "profiles",
+    "conname": "profiles_user_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (user_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_items_check",
+    "contype": "c",
+    "definition": "CHECK (jsonb_typeof(items) = 'array'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_reminder_count_check",
+    "contype": "c",
+    "definition": "CHECK (reminder_count >= 0)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_status_check",
+    "contype": "c",
+    "definition": "CHECK (status = ANY (ARRAY['active'::text, 'converted'::text, 'abandoned'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_subtotal_check",
+    "contype": "c",
+    "definition": "CHECK (subtotal >= 0::numeric)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "saved_carts",
+    "conname": "saved_carts_user_id_key",
+    "contype": "u",
+    "definition": "UNIQUE (user_id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "user_roles",
+    "conname": "user_roles_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "user_roles",
+    "conname": "user_roles_user_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "public",
+    "table_name": "user_roles",
+    "conname": "user_roles_user_id_role_key",
+    "contype": "u",
+    "definition": "UNIQUE (user_id, role)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL) NOT VALID",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": false
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages",
+    "conname": "messages_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_09",
+    "conname": "messages_2026_09_09_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_09",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_10",
+    "conname": "messages_2026_09_10_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_10",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_11",
+    "conname": "messages_2026_09_11_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_11",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_12",
+    "conname": "messages_2026_09_12_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_12",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_13",
+    "conname": "messages_2026_09_13_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_13",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_14",
+    "conname": "messages_2026_09_14_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_14",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_15",
+    "conname": "messages_2026_09_15_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_15",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_16",
+    "conname": "messages_2026_09_16_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id, inserted_at)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "messages_2026_09_16",
+    "conname": "messages_payload_exclusive",
+    "contype": "c",
+    "definition": "CHECK (payload IS NULL OR binary_payload IS NULL)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "schema_migrations",
+    "conname": "schema_migrations_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (version)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "subscription",
+    "conname": "pk_subscription",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "realtime",
+    "table_name": "subscription",
+    "conname": "subscription_action_filter_check",
+    "contype": "c",
+    "definition": "CHECK (action_filter = ANY (ARRAY['*'::text, 'INSERT'::text, 'UPDATE'::text, 'DELETE'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets",
+    "conname": "buckets_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets",
+    "conname": "buckets_versioning_dark_check",
+    "contype": "c",
+    "definition": "CHECK (versioning_status = 'DISABLED'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets",
+    "conname": "buckets_versioning_standard_only_check",
+    "contype": "c",
+    "definition": "CHECK (type = 'STANDARD'::storage.buckettype OR versioning_status = 'DISABLED'::text)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets",
+    "conname": "buckets_versioning_status_check",
+    "contype": "c",
+    "definition": "CHECK (versioning_status = ANY (ARRAY['DISABLED'::text, 'ENABLED'::text, 'SUSPENDED'::text]))",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets_analytics",
+    "conname": "buckets_analytics_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "buckets_vectors",
+    "conname": "buckets_vectors_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "migrations",
+    "conname": "migrations_name_key",
+    "contype": "u",
+    "definition": "UNIQUE (name)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "migrations",
+    "conname": "migrations_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "objects",
+    "conname": "objects_bucketId_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "objects",
+    "conname": "objects_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "s3_multipart_uploads",
+    "conname": "s3_multipart_uploads_bucket_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "s3_multipart_uploads",
+    "conname": "s3_multipart_uploads_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "s3_multipart_uploads_parts",
+    "conname": "s3_multipart_uploads_parts_bucket_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "s3_multipart_uploads_parts",
+    "conname": "s3_multipart_uploads_parts_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "s3_multipart_uploads_parts",
+    "conname": "s3_multipart_uploads_parts_upload_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (upload_id) REFERENCES storage.s3_multipart_uploads(id) ON DELETE CASCADE",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "vector_indexes",
+    "conname": "vector_indexes_bucket_id_fkey",
+    "contype": "f",
+    "definition": "FOREIGN KEY (bucket_id) REFERENCES storage.buckets_vectors(id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "storage",
+    "table_name": "vector_indexes",
+    "conname": "vector_indexes_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "supabase_migrations",
+    "table_name": "schema_migrations",
+    "conname": "schema_migrations_idempotency_key_key",
+    "contype": "u",
+    "definition": "UNIQUE (idempotency_key)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "supabase_migrations",
+    "table_name": "schema_migrations",
+    "conname": "schema_migrations_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (version)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  },
+  {
+    "schema_name": "vault",
+    "table_name": "secrets",
+    "conname": "secrets_pkey",
+    "contype": "p",
+    "definition": "PRIMARY KEY (id)",
+    "condeferrable": false,
+    "condeferred": false,
+    "convalidated": true
+  }
+]
+

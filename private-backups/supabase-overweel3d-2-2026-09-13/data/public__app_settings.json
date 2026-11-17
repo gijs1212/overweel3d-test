@@ -1,0 +1,79 @@
+{
+  "schema": "public",
+  "table": "app_settings",
+  "row_count": 6,
+  "rows": [
+    {
+      "key": "abandoned_cart_enabled",
+      "value": true,
+      "created_at": "2026-08-22T19:07:21.755635+00:00",
+      "updated_at": "2026-08-22T19:07:21.755635+00:00",
+      "updated_by": null,
+      "description": "Schakelt herinneringen voor verlaten winkelmandjes in of uit."
+    },
+    {
+      "key": "abandoned_cart_hours",
+      "value": 24,
+      "created_at": "2026-08-22T19:07:21.755635+00:00",
+      "updated_at": "2026-08-22T19:07:21.755635+00:00",
+      "updated_by": null,
+      "description": "Aantal uren voordat een winkelmandherinnering wordt verstuurd."
+    },
+    {
+      "key": "newsletter_enabled",
+      "value": false,
+      "created_at": "2026-08-22T19:07:21.755635+00:00",
+      "updated_at": "2026-08-22T20:26:47.361667+00:00",
+      "updated_by": null,
+      "description": "Schakelt automatische en handmatige nieuwsbrieven in of uit."
+    },
+    {
+      "key": "auto_pricing_test_config",
+      "value": {
+        "slicer": {
+          "top_layers": 5,
+          "wall_loops": 3,
+          "bottom_layers": 4,
+          "brim_width_mm": 0,
+          "line_width_mm": 0.42,
+          "infill_pattern": "grid",
+          "infill_percent": 20,
+          "layer_height_mm": 0.2,
+          "print_speed_mm_s": 150,
+          "supports_enabled": false,
+          "nozzle_diameter_mm": 0.4,
+          "first_layer_speed_mm_s": 50,
+          "support_density_percent": 15
+        },
+        "margin_percent": 50,
+        "filament_price_per_kg": {
+          "PLA": 23,
+          "TPU": 25,
+          "PETG": 24
+        },
+        "failure_buffer_percent": 10
+      },
+      "created_at": "2026-08-23T17:19:36.05476+00:00",
+      "updated_at": "2026-08-23T17:51:18.651847+00:00",
+      "updated_by": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "description": "Afgeschermde testinstellingen voor de automatische prijsberekening in het admin dashboard."
+    },
+    {
+      "key": "loyalty_points_per_euro",
+      "value": 1,
+      "created_at": "2026-08-22T19:07:21.755635+00:00",
+      "updated_at": "2026-08-27T10:11:32.063089+00:00",
+      "updated_by": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "description": "Aantal loyaliteitspunten per uitgegeven euro."
+    },
+    {
+      "key": "loyalty_euros_per_point",
+      "value": 0.05,
+      "created_at": "2026-08-23T09:42:48.444346+00:00",
+      "updated_at": "2026-08-27T10:11:32.063089+00:00",
+      "updated_by": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "description": "Aantal euro korting per ingewisseld loyaliteitspunt."
+    }
+  ]
+}
+

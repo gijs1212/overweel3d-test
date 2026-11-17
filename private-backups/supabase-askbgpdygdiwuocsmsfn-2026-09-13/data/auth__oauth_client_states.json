@@ -1,0 +1,7 @@
+{
+  "schema": "auth",
+  "table": "oauth_client_states",
+  "row_count": 0,
+  "rows": []
+}
+

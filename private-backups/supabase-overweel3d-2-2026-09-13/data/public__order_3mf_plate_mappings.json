@@ -1,0 +1,406 @@
+{
+  "schema": "public",
+  "table": "order_3mf_plate_mappings",
+  "row_count": 22,
+  "rows": [
+    {
+      "id": "00aeaac5-92ee-4d72-b6da-e4c01bae0c35",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 1,
+      "logical_plate_number": 1,
+      "preview_storage_path": null
+    },
+    {
+      "id": "fe5959a6-6c18-4b02-962f-4e18a9d29e5b",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 2,
+      "logical_plate_number": 2,
+      "preview_storage_path": null
+    },
+    {
+      "id": "5a507bd5-c170-4c39-b366-7499ebeeb3e0",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 3,
+      "logical_plate_number": 3,
+      "preview_storage_path": null
+    },
+    {
+      "id": "172be19a-bf27-4c0d-9671-e1c41b097e96",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 4,
+      "logical_plate_number": 4,
+      "preview_storage_path": null
+    },
+    {
+      "id": "dacdeb85-4aab-4166-b906-b75001e1c7b6",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 5,
+      "logical_plate_number": 5,
+      "preview_storage_path": null
+    },
+    {
+      "id": "8fb8d949-f9f0-4cb2-91e3-ee0375a00f73",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 6,
+      "logical_plate_number": 6,
+      "preview_storage_path": null
+    },
+    {
+      "id": "2443ef7f-9fd7-4f7b-a7b7-a83847458340",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 7,
+      "logical_plate_number": 7,
+      "preview_storage_path": null
+    },
+    {
+      "id": "a2af03cc-0012-47d1-afce-0a7b27ab490a",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 8,
+      "logical_plate_number": 8,
+      "preview_storage_path": null
+    },
+    {
+      "id": "c543d114-7080-4f76-b857-315d948e91ba",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 9,
+      "logical_plate_number": 9,
+      "preview_storage_path": null
+    },
+    {
+      "id": "92fbfbc7-7186-4c53-8a69-d27c7c38b59b",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 10,
+      "logical_plate_number": 10,
+      "preview_storage_path": null
+    },
+    {
+      "id": "9017f3a3-e990-44d7-86e2-ec5c3c44cb52",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 11,
+      "logical_plate_number": 11,
+      "preview_storage_path": null
+    },
+    {
+      "id": "9f743a9c-2c3f-4139-ac1f-993843002bd3",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 12,
+      "logical_plate_number": 12,
+      "preview_storage_path": null
+    },
+    {
+      "id": "f46b2ca9-da03-4161-8293-e4f540eb2476",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 13,
+      "logical_plate_number": 13,
+      "preview_storage_path": null
+    },
+    {
+      "id": "9e80f4f1-4dd3-4baf-a5bd-66c0888b3fc2",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 14,
+      "logical_plate_number": 14,
+      "preview_storage_path": null
+    },
+    {
+      "id": "34bac0d1-914a-4587-ad20-780528d34d13",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 15,
+      "logical_plate_number": 15,
+      "preview_storage_path": null
+    },
+    {
+      "id": "bf1a4185-a69a-4d4c-8c77-5f4c92f1159b",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 16,
+      "logical_plate_number": 16,
+      "preview_storage_path": null
+    },
+    {
+      "id": "18ca4011-ca3e-44f7-a4a6-7ae5804541e3",
+      "active": true,
+      "colors": [
+        {
+          "hex": "#000000",
+          "name": "TPU"
+        },
+        {
+          "hex": "#FFFFFF",
+          "name": "PLA"
+        },
+        {
+          "hex": "#C12E1F",
+          "name": "PLA"
+        },
+        {
+          "hex": "#FEC600",
+          "name": "PLA"
+        }
+      ],
+      "order_id": "e8025ed5-42fb-4d15-97df-6612e17f99e7",
+      "created_at": "2026-08-25T17:26:55.019106+00:00",
+      "updated_at": "2026-08-30T12:48:22.187454+00:00",
+      "order_file_id": "2128bd07-2189-4ca5-b4ab-d742cf563da3",
+      "runs_required": 5,
+      "runs_completed": 5,
+      "source_file_name": "sleutelhanger.3mf",
+      "source_plate_number": 1,
+      "logical_plate_number": 1,
+      "preview_storage_path": "OW3D-00031/selected-plate-previews/2128bd07-2189-4ca5-b4ab-d742cf563da3-plate-1-e47e4aa3-185c-45b3-be3a-06ef5b4db341.png"
+    },
+    {
+      "id": "df69dc73-83e2-4374-9f59-1e73ecfa9742",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 17,
+      "logical_plate_number": 17,
+      "preview_storage_path": null
+    },
+    {
+      "id": "5b140ca8-872b-4d07-9aa4-fdf57e39c4e2",
+      "active": true,
+      "colors": [],
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "created_at": "2026-08-25T10:04:01.345585+00:00",
+      "updated_at": "2026-08-26T16:47:48.893755+00:00",
+      "order_file_id": "09db10b4-df38-4f8f-8f87-6e5e7291ca59",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "jeanet.3mf",
+      "source_plate_number": 18,
+      "logical_plate_number": 18,
+      "preview_storage_path": null
+    },
+    {
+      "id": "c2ded643-cbe5-48e1-87f2-3720713a70b0",
+      "active": true,
+      "colors": [
+        {
+          "hex": "#000000",
+          "name": "TPU"
+        },
+        {
+          "hex": "#FFFFFF",
+          "name": "PLA"
+        },
+        {
+          "hex": "#C12E1F",
+          "name": "PLA"
+        },
+        {
+          "hex": "#FEC600",
+          "name": "PLA"
+        }
+      ],
+      "order_id": "e8025ed5-42fb-4d15-97df-6612e17f99e7",
+      "created_at": "2026-08-25T17:26:55.019106+00:00",
+      "updated_at": "2026-08-30T12:48:22.187454+00:00",
+      "order_file_id": "2128bd07-2189-4ca5-b4ab-d742cf563da3",
+      "runs_required": 2,
+      "runs_completed": 2,
+      "source_file_name": "sleutelhanger.3mf",
+      "source_plate_number": 2,
+      "logical_plate_number": 2,
+      "preview_storage_path": "OW3D-00031/selected-plate-previews/2128bd07-2189-4ca5-b4ab-d742cf563da3-plate-2-cbe90709-8089-44b0-836a-30f262e700d8.png"
+    },
+    {
+      "id": "7e50d162-f14a-4b4f-a464-ea45d1c2ecf8",
+      "active": true,
+      "colors": [
+        {
+          "hex": "#000000",
+          "name": "TPU"
+        },
+        {
+          "hex": "#FFFFFF",
+          "name": "PLA"
+        },
+        {
+          "hex": "#C12E1F",
+          "name": "PLA"
+        },
+        {
+          "hex": "#FEC600",
+          "name": "PLA"
+        }
+      ],
+      "order_id": "e8025ed5-42fb-4d15-97df-6612e17f99e7",
+      "created_at": "2026-08-25T17:26:55.019106+00:00",
+      "updated_at": "2026-08-30T12:48:22.187454+00:00",
+      "order_file_id": "2128bd07-2189-4ca5-b4ab-d742cf563da3",
+      "runs_required": 1,
+      "runs_completed": 1,
+      "source_file_name": "sleutelhanger.3mf",
+      "source_plate_number": 4,
+      "logical_plate_number": 4,
+      "preview_storage_path": "OW3D-00031/selected-plate-previews/2128bd07-2189-4ca5-b4ab-d742cf563da3-plate-4-84565ba3-ca52-44d8-9249-45acf9f21f86.png"
+    },
+    {
+      "id": "2b6204b4-97bd-4552-af32-9ebd76610442",
+      "active": true,
+      "colors": [
+        {
+          "hex": "#000000",
+          "name": "TPU"
+        },
+        {
+          "hex": "#FFFFFF",
+          "name": "PLA"
+        },
+        {
+          "hex": "#C12E1F",
+          "name": "PLA"
+        },
+        {
+          "hex": "#FEC600",
+          "name": "PLA"
+        }
+      ],
+      "order_id": "e8025ed5-42fb-4d15-97df-6612e17f99e7",
+      "created_at": "2026-08-25T17:26:55.019106+00:00",
+      "updated_at": "2026-08-30T12:48:22.187454+00:00",
+      "order_file_id": "2128bd07-2189-4ca5-b4ab-d742cf563da3",
+      "runs_required": 2,
+      "runs_completed": 2,
+      "source_file_name": "sleutelhanger.3mf",
+      "source_plate_number": 3,
+      "logical_plate_number": 3,
+      "preview_storage_path": "OW3D-00031/selected-plate-previews/2128bd07-2189-4ca5-b4ab-d742cf563da3-plate-3-19a9eeb9-7893-4fbb-88e1-c5ec3c3494b1.png"
+    }
+  ]
+}
+

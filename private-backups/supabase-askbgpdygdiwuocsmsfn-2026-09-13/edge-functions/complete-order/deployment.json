@@ -1,0 +1,18 @@
+{
+  "id": "048f100c-c520-4076-b4b1-98cd2bf1d2ad",
+  "slug": "complete-order",
+  "name": "complete-order",
+  "status": "ACTIVE",
+  "version": 22,
+  "created_at": 1773081595793,
+  "updated_at": 1787826376843,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_048f100c-c520-4076-b4b1-98cd2bf1d2ad_22/source/index.ts",
+  "ezbr_sha256": "49dd755d7ab007ea4261bda021d42cc015ecbf75d9fedee2dbe4de1371897365",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

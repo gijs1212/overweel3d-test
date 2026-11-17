@@ -1,0 +1,338 @@
+[
+  {
+    "schema_name": "auth",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,anon=U/supabase_admin,authenticated=U/supabase_admin,service_role=U/supabase_admin,supabase_auth_admin=UC/supabase_admin,dashboard_user=UC/supabase_admin,postgres=U/supabase_admin}"
+  },
+  {
+    "schema_name": "cron",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,postgres=U*/supabase_admin}"
+  },
+  {
+    "schema_name": "extensions",
+    "owner": "postgres",
+    "acl": "{postgres=UC/postgres,anon=U/postgres,authenticated=U/postgres,service_role=U/postgres,dashboard_user=UC/postgres}"
+  },
+  {
+    "schema_name": "graphql",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,postgres=U*/supabase_admin,anon=U/supabase_admin,authenticated=U/supabase_admin,service_role=U/supabase_admin}"
+  },
+  {
+    "schema_name": "graphql_public",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,postgres=U*/supabase_admin,anon=U/supabase_admin,authenticated=U/supabase_admin,service_role=U/supabase_admin}"
+  },
+  {
+    "schema_name": "information_schema",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,=U/supabase_admin}"
+  },
+  {
+    "schema_name": "net",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,=U/supabase_admin,supabase_functions_admin=U/supabase_admin,postgres=U/supabase_admin,anon=U/supabase_admin,authenticated=U/supabase_admin,service_role=U/supabase_admin}"
+  },
+  {
+    "schema_name": "pg_catalog",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,=U/supabase_admin}"
+  },
+  {
+    "schema_name": "pg_toast",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_0",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_1",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_10",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_11",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_13",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_14",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_15",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_16",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_17",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_18",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_19",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_20",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_21",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_22",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_23",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_24",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_25",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_26",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_28",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_29",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_3",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_31",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_32",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_33",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_34",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_35",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_36",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_37",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_38",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_39",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_4",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_40",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_41",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_42",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_43",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_44",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_46",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_48",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_49",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_50",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_51",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_53",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_54",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_55",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_56",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_57",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_58",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_59",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_6",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_7",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_8",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pg_toast_temp_9",
+    "owner": "supabase_admin",
+    "acl": null
+  },
+  {
+    "schema_name": "pgbouncer",
+    "owner": "pgbouncer",
+    "acl": null
+  },
+  {
+    "schema_name": "public",
+    "owner": "pg_database_owner",
+    "acl": "{pg_database_owner=UC/pg_database_owner,=U/pg_database_owner,postgres=U/pg_database_owner,anon=U/pg_database_owner,authenticated=U/pg_database_owner,service_role=U/pg_database_owner}"
+  },
+  {
+    "schema_name": "realtime",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,postgres=U*/supabase_admin,anon=U/supabase_admin,authenticated=U/supabase_admin,service_role=U/supabase_admin,supabase_realtime_admin=UC/supabase_admin}"
+  },
+  {
+    "schema_name": "storage",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,postgres=U*/supabase_admin,anon=U/supabase_admin,authenticated=U/supabase_admin,service_role=U/supabase_admin,supabase_storage_admin=U*C*/supabase_admin,dashboard_user=UC/supabase_admin}"
+  },
+  {
+    "schema_name": "supabase_migrations",
+    "owner": "postgres",
+    "acl": null
+  },
+  {
+    "schema_name": "vault",
+    "owner": "supabase_admin",
+    "acl": "{supabase_admin=UC/supabase_admin,postgres=U*/supabase_admin,service_role=U/supabase_admin}"
+  }
+]
+

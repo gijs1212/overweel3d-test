@@ -1,0 +1,18 @@
+{
+  "id": "32d92ddb-92e4-4dee-8b54-c7d0f058ef3f",
+  "slug": "send-abandoned-cart-reminders",
+  "name": "send-abandoned-cart-reminders",
+  "status": "ACTIVE",
+  "version": 1,
+  "created_at": 1787430429281,
+  "updated_at": 1787430429281,
+  "verify_jwt": true,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_32d92ddb-92e4-4dee-8b54-c7d0f058ef3f_1/source/index.ts",
+  "ezbr_sha256": "93f09e53ed578adf26dc0bdca137c3f25ad82d425303b1e2eb40406ef1be2773",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

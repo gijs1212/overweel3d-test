@@ -1,0 +1,17 @@
+{
+  "project_name": "overweel3d-2",
+  "project_ref": "askbgpdygdiwuocsmsfn",
+  "region": "eu-west-1",
+  "postgres_version": "17.6.1.063",
+  "created_at": "2026-09-13",
+  "export_format": "logical-json-and-source-snapshot",
+  "database_size_reported": "22 MB",
+  "exported_tables": 88,
+  "database_functions": 159,
+  "edge_functions": 27,
+  "auth_users": 7,
+  "storage_buckets": 2,
+  "storage_objects_metadata": 69,
+  "storage_binary_objects_included": false,
+  "platform_secrets_included": false
+}

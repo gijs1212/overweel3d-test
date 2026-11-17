@@ -1,0 +1,26 @@
+{
+  "schema": "public",
+  "table": "product_categories",
+  "row_count": 2,
+  "rows": [
+    {
+      "id": "ed5d269b-f842-4414-8408-ec5519c0c09f",
+      "name": "cadeau's",
+      "active": true,
+      "created_at": "2026-08-21T20:54:11.277961+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-21T20:54:11.277961+00:00",
+      "description": ""
+    },
+    {
+      "id": "a19c63b5-a028-4b9a-b138-34d20ff6e900",
+      "name": "spellen",
+      "active": true,
+      "created_at": "2026-08-21T21:02:50.916634+00:00",
+      "sort_order": 0,
+      "updated_at": "2026-08-21T21:02:50.916634+00:00",
+      "description": ""
+    }
+  ]
+}
+

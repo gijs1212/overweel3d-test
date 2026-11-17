@@ -1,0 +1,206 @@
+{
+  "schema": "public",
+  "table": "portfolio_project_media",
+  "row_count": 18,
+  "rows": [
+    {
+      "id": "cc6ea20b-679b-4f15-95c5-2487105f1612",
+      "is_cover": true,
+      "file_size": 6055310,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:04.195422+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 0,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/9d25badd-4eeb-4584-852a-0aea1493651a-IMG_8345.jpeg",
+      "original_filename": "IMG_8345.jpeg"
+    },
+    {
+      "id": "d637c3a2-e6d9-4db7-a165-224740ae408c",
+      "is_cover": false,
+      "file_size": 6362916,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:04.879627+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 1,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/59c639f1-6b77-4542-aea3-cf41d005f955-IMG_8344.jpeg",
+      "original_filename": "IMG_8344.jpeg"
+    },
+    {
+      "id": "4eddb0ef-b036-489e-afdf-a68143050f0b",
+      "is_cover": false,
+      "file_size": 5973960,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:05.498281+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 2,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/30c85241-9a78-4c5a-9c00-94de29c78913-IMG_8346.jpeg",
+      "original_filename": "IMG_8346.jpeg"
+    },
+    {
+      "id": "7ae00f87-2196-4cd2-ba15-182bf3e1f5bc",
+      "is_cover": false,
+      "file_size": 5787722,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:06.313616+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 3,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/4da02004-4e37-43e6-8a1e-64f64007aa64-IMG_8347.jpeg",
+      "original_filename": "IMG_8347.jpeg"
+    },
+    {
+      "id": "f1d5d85e-3aa7-467f-ad1f-c56e71ef8012",
+      "is_cover": false,
+      "file_size": 2368639,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:06.926465+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 4,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/295dd9f9-be48-4065-accf-2e3cf486d299-IMG_8348.jpeg",
+      "original_filename": "IMG_8348.jpeg"
+    },
+    {
+      "id": "4c1065ca-abc0-4e22-bb62-e7147a9b2d5e",
+      "is_cover": false,
+      "file_size": 2531043,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:07.305155+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 5,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/f8522fca-c865-49e9-a544-f6c6a46fa761-IMG_8349.jpeg",
+      "original_filename": "IMG_8349.jpeg"
+    },
+    {
+      "id": "428900eb-1aa6-48ab-957b-b6abda817a7a",
+      "is_cover": false,
+      "file_size": 2314008,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:08:07.649097+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 6,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/3a6af3cf-12a3-48e2-8ce6-1fe477d3835c-IMG_8350.jpeg",
+      "original_filename": "IMG_8350.jpeg"
+    },
+    {
+      "id": "fb8f9f66-ddc2-4a7f-84b8-9e85aa8fa9a8",
+      "is_cover": false,
+      "file_size": 38861970,
+      "mime_type": "video/quicktime",
+      "created_at": "2026-08-27T09:08:11.431749+00:00",
+      "project_id": "b221ae72-ea4f-4878-820d-182ff3d9d23f",
+      "sort_order": 7,
+      "storage_path": "portfolio/b221ae72-ea4f-4878-820d-182ff3d9d23f/adb7b23f-7523-4b07-93f9-f3caee8bd653-IMG_8351.mov",
+      "original_filename": "IMG_8351.mov"
+    },
+    {
+      "id": "883091e7-1bff-41b2-bde5-ff99075ef15e",
+      "is_cover": true,
+      "file_size": 3938212,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:09:31.000934+00:00",
+      "project_id": "3609e1d0-6e3b-495a-8f9a-89154dfb499a",
+      "sort_order": 0,
+      "storage_path": "portfolio/3609e1d0-6e3b-495a-8f9a-89154dfb499a/698e03ef-f791-4859-8b3e-2dd3eb669db8-IMG_8340.jpeg",
+      "original_filename": "IMG_8340.jpeg"
+    },
+    {
+      "id": "0c1a6b3c-eb13-4476-adb2-02bae00ad8a8",
+      "is_cover": false,
+      "file_size": 5374129,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:09:31.617775+00:00",
+      "project_id": "3609e1d0-6e3b-495a-8f9a-89154dfb499a",
+      "sort_order": 1,
+      "storage_path": "portfolio/3609e1d0-6e3b-495a-8f9a-89154dfb499a/e712330d-ca4a-4f5f-9af5-cfed8c5aeac1-IMG_8338.jpeg",
+      "original_filename": "IMG_8338.jpeg"
+    },
+    {
+      "id": "416eb83e-495b-43ca-9534-c293cc9bd20b",
+      "is_cover": true,
+      "file_size": 4357324,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:09:49.128825+00:00",
+      "project_id": "5ec88ff1-424a-4a5e-8aab-cede80286f02",
+      "sort_order": 0,
+      "storage_path": "portfolio/5ec88ff1-424a-4a5e-8aab-cede80286f02/0c797ece-c3cb-40aa-a076-00cf565ea083-IMG_8336.jpeg",
+      "original_filename": "IMG_8336.jpeg"
+    },
+    {
+      "id": "c1ade457-d7e9-4965-9ceb-85af00ff612a",
+      "is_cover": false,
+      "file_size": 4336224,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:09:49.636375+00:00",
+      "project_id": "5ec88ff1-424a-4a5e-8aab-cede80286f02",
+      "sort_order": 1,
+      "storage_path": "portfolio/5ec88ff1-424a-4a5e-8aab-cede80286f02/573dfc3c-0ce3-4c99-aa69-52c8a13615eb-IMG_8335.jpeg",
+      "original_filename": "IMG_8335.jpeg"
+    },
+    {
+      "id": "771cc40f-b350-4556-a2a7-05ac3f945373",
+      "is_cover": true,
+      "file_size": 3064673,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:10:30.766351+00:00",
+      "project_id": "ad05b802-e6b8-4c93-9263-a9b351c278c1",
+      "sort_order": 0,
+      "storage_path": "portfolio/ad05b802-e6b8-4c93-9263-a9b351c278c1/d288811d-b204-46de-9773-5c955b2798d3-IMG_8329.jpeg",
+      "original_filename": "IMG_8329.jpeg"
+    },
+    {
+      "id": "48ac68d7-2315-4866-bbdb-adcfb2edf43a",
+      "is_cover": false,
+      "file_size": 2570125,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:10:31.2078+00:00",
+      "project_id": "ad05b802-e6b8-4c93-9263-a9b351c278c1",
+      "sort_order": 1,
+      "storage_path": "portfolio/ad05b802-e6b8-4c93-9263-a9b351c278c1/32aa6095-17cf-42aa-a343-e0c38aaca88d-IMG_8330.jpeg",
+      "original_filename": "IMG_8330.jpeg"
+    },
+    {
+      "id": "218b3209-8b6e-4604-8648-922ea3d5e89d",
+      "is_cover": false,
+      "file_size": 5437727,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:10:32.237441+00:00",
+      "project_id": "ad05b802-e6b8-4c93-9263-a9b351c278c1",
+      "sort_order": 2,
+      "storage_path": "portfolio/ad05b802-e6b8-4c93-9263-a9b351c278c1/b84c6b46-cde9-4c87-b20c-745d7fc7f305-IMG_8327.jpeg",
+      "original_filename": "IMG_8327.jpeg"
+    },
+    {
+      "id": "9ebe8343-6872-4fd5-8880-0ec4fe133681",
+      "is_cover": true,
+      "file_size": 4016285,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:10:55.074984+00:00",
+      "project_id": "022cf7ba-cbc4-45d5-87f0-af2d6605f54d",
+      "sort_order": 0,
+      "storage_path": "portfolio/022cf7ba-cbc4-45d5-87f0-af2d6605f54d/320630f7-16ef-4987-8220-7987282aa78f-IMG_8333.jpeg",
+      "original_filename": "IMG_8333.jpeg"
+    },
+    {
+      "id": "0e356209-be12-4251-9cb3-5bfe07a89d6a",
+      "is_cover": false,
+      "file_size": 3831133,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:10:55.695348+00:00",
+      "project_id": "022cf7ba-cbc4-45d5-87f0-af2d6605f54d",
+      "sort_order": 1,
+      "storage_path": "portfolio/022cf7ba-cbc4-45d5-87f0-af2d6605f54d/0b6504d7-8a14-434c-9370-931a8686096c-IMG_8332.jpeg",
+      "original_filename": "IMG_8332.jpeg"
+    },
+    {
+      "id": "92712d78-6443-48be-9257-bd79bd132c9a",
+      "is_cover": false,
+      "file_size": 3625809,
+      "mime_type": "image/jpeg",
+      "created_at": "2026-08-27T09:10:56.406167+00:00",
+      "project_id": "022cf7ba-cbc4-45d5-87f0-af2d6605f54d",
+      "sort_order": 2,
+      "storage_path": "portfolio/022cf7ba-cbc4-45d5-87f0-af2d6605f54d/b9929fdb-6e11-4362-8d8f-5272f5fca785-IMG_8331.jpeg",
+      "original_filename": "IMG_8331.jpeg"
+    }
+  ]
+}
+

@@ -1,0 +1,163 @@
+{
+  "schema": "public",
+  "table": "products",
+  "row_count": 3,
+  "rows": [
+    {
+      "id": "ca918798-6121-459b-8e7e-fa88e80e971b",
+      "name": "Tetr_s",
+      "price": 17.5,
+      "active": true,
+      "colors": [
+        "c51ada91-33d4-4f5b-9eab-25d2cb2cda7b",
+        "bfee054c-57fa-41ee-8308-1637ca154b45",
+        "2c4c1949-888d-427b-bf8d-b7d1cb74a9f2",
+        "a28c54df-0042-4228-8bd8-2440d555ad77",
+        "4a4952d3-3937-4257-acb6-53832d4a3964",
+        "f2eb3f70-fde3-4b04-af46-34f3d8cb523a",
+        "cdfcead6-3967-4bca-a3ee-25b3fa4beba4",
+        "878606cf-c4de-4e6d-8e9e-7d50573c4093",
+        "76fa8cdd-e507-4f01-b585-bccbfac4714b",
+        "36d3d372-2da7-4b6e-ad81-01c08d6eae71",
+        "8928940b-3009-4713-a115-711fd892cd08"
+      ],
+      "photos": [
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/1b0525d0-633a-41b5-ade6-471d33cc846f-IMG_8302.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/c3919588-b89a-4998-b934-a7e579735d95-IMG_8303.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/64dbf0dd-480d-4fee-bfa9-2fba940d60d1-IMG_8304.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/30a03673-b3e8-4d1d-a74c-93eaddd65799-IMG_8305.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/4ed21e3e-be25-43cb-af9b-6049ad3776c6-IMG_8306.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/40b54af9-88e3-48f7-aa70-e10d74841689-IMG_8307.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/d3550ebe-abb2-432f-8c34-43b0173448a7-IMG_8308.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/8d38db2e-164f-4b15-898e-151eac9aae0e-IMG_8309.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/01a858b7-9a79-4b6e-94e7-76a8b1a9eed1-IMG_8310.JPEG",
+        "products/ca918798-6121-459b-8e7e-fa88e80e971b/b8ad6b59-3fa9-4a95-a646-5cf50e3bf35e-IMG_8311.JPEG"
+      ],
+      "materials": [
+        "pla"
+      ],
+      "created_at": "2026-08-21T21:20:54.998073+00:00",
+      "max_colors": 7,
+      "updated_at": "2026-08-23T20:23:59.591907+00:00",
+      "category_id": "a19c63b5-a028-4b9a-b138-34d20ff6e900",
+      "description": "Het spel waar je blokjes stapelt en de toren moet balanceren. hoe meer risico je neemt, hoe spanneder het wordt. Je gooit met de dobbelsteen en dan zie je een vorm, die moet je pakken en op de toren zetten. Alleen het blokje wat je zelf geplaatst hebt mag vallen, alles meer en dan heb je verloren. Met meer mensen wordt het nog spannender!",
+      "custom_fields": [],
+      "material_mode": "fixed",
+      "color_required": true,
+      "material_fixed": true,
+      "color_slot_labels": [
+        "bodem",
+        "blokjes 1",
+        "blokjes 2",
+        "blokjes 3",
+        "blokjes 4",
+        "blokjes 5",
+        "blokjes 6"
+      ],
+      "colors_configured": true,
+      "custom_text_label": "Aangepaste tekst",
+      "multicolor_allowed": true,
+      "custom_text_enabled": false,
+      "color_selection_mode": "multiple",
+      "custom_text_max_length": 50,
+      "customer_photo_required": false
+    },
+    {
+      "id": "2eb4b83c-2537-4ccc-8580-79f548baaff2",
+      "name": "zelf sorterend 4 op een rij",
+      "price": 17.5,
+      "active": true,
+      "colors": [
+        "c51ada91-33d4-4f5b-9eab-25d2cb2cda7b",
+        "76fa8cdd-e507-4f01-b585-bccbfac4714b",
+        "878606cf-c4de-4e6d-8e9e-7d50573c4093",
+        "2c4c1949-888d-427b-bf8d-b7d1cb74a9f2",
+        "bfee054c-57fa-41ee-8308-1637ca154b45",
+        "a28c54df-0042-4228-8bd8-2440d555ad77",
+        "4a4952d3-3937-4257-acb6-53832d4a3964",
+        "f2eb3f70-fde3-4b04-af46-34f3d8cb523a",
+        "cdfcead6-3967-4bca-a3ee-25b3fa4beba4",
+        "36d3d372-2da7-4b6e-ad81-01c08d6eae71"
+      ],
+      "photos": [
+        "products/2eb4b83c-2537-4ccc-8580-79f548baaff2/9e08be63-3d38-4257-8bc7-2f7f29fec8cf-IMG_8312.JPEG",
+        "products/2eb4b83c-2537-4ccc-8580-79f548baaff2/2fb3c5f2-fbb9-4722-be38-23718700a0c5-IMG_8313.JPEG",
+        "products/2eb4b83c-2537-4ccc-8580-79f548baaff2/feb58e39-0bd1-4b1f-96ce-144be2b90012-IMG_8314.JPEG",
+        "products/2eb4b83c-2537-4ccc-8580-79f548baaff2/0cafdf0e-e053-4b72-9164-16a69074d4a9-IMG_8315.MP4"
+      ],
+      "materials": [
+        "pla"
+      ],
+      "created_at": "2026-08-21T21:10:15.980989+00:00",
+      "max_colors": 3,
+      "updated_at": "2026-08-21T21:10:17.593521+00:00",
+      "category_id": "a19c63b5-a028-4b9a-b138-34d20ff6e900",
+      "description": "",
+      "custom_fields": [],
+      "material_mode": "fixed",
+      "color_required": true,
+      "material_fixed": true,
+      "color_slot_labels": [
+        "kleur frame en bak",
+        "stenen persoon 1",
+        "stenen persoon 2"
+      ],
+      "colors_configured": true,
+      "custom_text_label": "Aangepaste tekst",
+      "multicolor_allowed": true,
+      "custom_text_enabled": false,
+      "color_selection_mode": "multiple",
+      "custom_text_max_length": 50,
+      "customer_photo_required": false
+    },
+    {
+      "id": "b52d447d-6271-443c-a124-59302b7d3c40",
+      "name": "roos",
+      "price": 4,
+      "active": true,
+      "colors": [
+        "c51ada91-33d4-4f5b-9eab-25d2cb2cda7b",
+        "76fa8cdd-e507-4f01-b585-bccbfac4714b",
+        "878606cf-c4de-4e6d-8e9e-7d50573c4093",
+        "cdfcead6-3967-4bca-a3ee-25b3fa4beba4",
+        "f2eb3f70-fde3-4b04-af46-34f3d8cb523a",
+        "2c4c1949-888d-427b-bf8d-b7d1cb74a9f2",
+        "4a4952d3-3937-4257-acb6-53832d4a3964",
+        "a28c54df-0042-4228-8bd8-2440d555ad77",
+        "bfee054c-57fa-41ee-8308-1637ca154b45",
+        "36d3d372-2da7-4b6e-ad81-01c08d6eae71"
+      ],
+      "photos": [
+        "products/1781722315533-IMG_7533.jpg",
+        "products/1781722315994-IMG_7534.jpg",
+        "products/1781722316312-IMG_7532.jpg",
+        "products/1781722316777-IMG_7531.jpg"
+      ],
+      "materials": [
+        "pla"
+      ],
+      "created_at": "2026-04-09T17:31:31.484872+00:00",
+      "max_colors": 3,
+      "updated_at": "2026-08-22T08:50:31.345493+00:00",
+      "category_id": null,
+      "description": "dit is een gepersonaliseerde roos. Perfect als cadeau, examencadeau (zie opdracht) en nog veel meer!",
+      "custom_fields": [],
+      "material_mode": "fixed",
+      "color_required": true,
+      "material_fixed": true,
+      "color_slot_labels": [
+        "rozenknop",
+        "steel",
+        "tekst op steel"
+      ],
+      "colors_configured": true,
+      "custom_text_label": "tekst op stam",
+      "multicolor_allowed": true,
+      "custom_text_enabled": true,
+      "color_selection_mode": "multiple",
+      "custom_text_max_length": 25,
+      "customer_photo_required": false
+    }
+  ]
+}
+

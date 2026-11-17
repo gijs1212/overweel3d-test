@@ -1,0 +1,81 @@
+[
+  {
+    "schemaname": "auth",
+    "sequencename": "refresh_tokens_id_seq",
+    "sequenceowner": "supabase_auth_admin",
+    "data_type": "bigint",
+    "start_value": 1,
+    "min_value": 1,
+    "max_value": "9223372036854775807",
+    "increment_by": 1,
+    "cycle": false,
+    "cache_size": 1,
+    "last_value": 257
+  },
+  {
+    "schemaname": "cron",
+    "sequencename": "jobid_seq",
+    "sequenceowner": "supabase_admin",
+    "data_type": "bigint",
+    "start_value": 1,
+    "min_value": 1,
+    "max_value": "9223372036854775807",
+    "increment_by": 1,
+    "cycle": false,
+    "cache_size": 1,
+    "last_value": 4
+  },
+  {
+    "schemaname": "cron",
+    "sequencename": "runid_seq",
+    "sequenceowner": "supabase_admin",
+    "data_type": "bigint",
+    "start_value": 1,
+    "min_value": 1,
+    "max_value": "9223372036854775807",
+    "increment_by": 1,
+    "cycle": false,
+    "cache_size": 1,
+    "last_value": 4080
+  },
+  {
+    "schemaname": "net",
+    "sequencename": "http_request_queue_id_seq",
+    "sequenceowner": "supabase_admin",
+    "data_type": "bigint",
+    "start_value": 1,
+    "min_value": 1,
+    "max_value": "9223372036854775807",
+    "increment_by": 1,
+    "cycle": false,
+    "cache_size": 1,
+    "last_value": 723
+  },
+  {
+    "schemaname": "public",
+    "sequencename": "order_number_seq",
+    "sequenceowner": "postgres",
+    "data_type": "bigint",
+    "start_value": 1,
+    "min_value": 1,
+    "max_value": "9223372036854775807",
+    "increment_by": 1,
+    "cycle": false,
+    "cache_size": 1,
+    "last_value": 37
+  },
+  {
+    "schemaname": "realtime",
+    "sequencename": "subscription_id_seq",
+    "sequenceowner": "supabase_realtime_admin",
+    "data_type": "bigint",
+    "start_value": 1,
+    "min_value": 1,
+    "max_value": "9223372036854775807",
+    "increment_by": 1,
+    "cycle": false,
+    "cache_size": 1,
+    "last_value": 692
+  }
+]
+

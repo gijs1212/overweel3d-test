@@ -1,0 +1,7 @@
+{
+  "schema": "auth",
+  "table": "webauthn_challenges",
+  "row_count": 0,
+  "rows": []
+}
+

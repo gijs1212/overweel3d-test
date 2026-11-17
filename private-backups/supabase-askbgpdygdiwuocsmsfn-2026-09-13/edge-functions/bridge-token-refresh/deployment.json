@@ -1,0 +1,18 @@
+{
+  "id": "3950f21e-4656-4388-8d42-5480a5b0e8cb",
+  "slug": "bridge-token-refresh",
+  "name": "bridge-token-refresh",
+  "status": "ACTIVE",
+  "version": 1,
+  "created_at": 1788966272823,
+  "updated_at": 1788966272823,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_3950f21e-4656-4388-8d42-5480a5b0e8cb_1/source/index.ts",
+  "ezbr_sha256": "3c27ea2fe83746c76bdbd4882b8cdf34e84d29166b898a09f0bbf06131625ad6",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

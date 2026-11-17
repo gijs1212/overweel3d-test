@@ -1,0 +1,57 @@
+{
+  "schema": "public",
+  "table": "printers",
+  "row_count": 1,
+  "rows": [
+    {
+      "id": "12d7e518-2f56-4b22-ad6c-4b39da9aaba3",
+      "name": "P1S",
+      "model": "Bambu Lab P1S",
+      "status": "offline",
+      "progress": 0,
+      "created_at": "2026-09-13T12:44:58.852765+00:00",
+      "raw_status": {},
+      "updated_at": "2026-09-13T12:44:58.852765+00:00",
+      "current_file": null,
+      "last_seen_at": null,
+      "total_layers": null,
+      "camera_status": "unavailable",
+      "current_layer": null,
+      "current_plate": null,
+      "device_serial": "01P00C590102306",
+      "offline_since": null,
+      "host_pc_status": "unknown",
+      "bed_temperature": null,
+      "connection_mode": "bambu_connect",
+      "ftps_last_error": null,
+      "ftps_scan_paths": [
+        "/",
+        "/cache"
+      ],
+      "maintenance_note": "",
+      "bridge_token_hash": null,
+      "remaining_minutes": null,
+      "host_pc_checked_at": null,
+      "nozzle_temperature": null,
+      "plate_check_status": "unknown",
+      "camera_last_seen_at": null,
+      "chamber_temperature": null,
+      "ftps_scan_request_id": 0,
+      "sd_card_last_seen_at": null,
+      "offline_alert_sent_at": null,
+      "ftps_directory_listing": [],
+      "ftps_scan_requested_at": null,
+      "host_pc_uptime_seconds": null,
+      "plate_state_changed_at": null,
+      "print_start_request_id": 0,
+      "bridge_refresh_token_hash": null,
+      "bridge_token_refreshed_at": null,
+      "ftps_folder_scan_request_id": 0,
+      "ftps_folder_scan_requested_at": null,
+      "ftps_scan_completed_request_id": 0,
+      "print_start_completed_request_id": 0,
+      "ftps_folder_scan_completed_request_id": 0
+    }
+  ]
+}
+

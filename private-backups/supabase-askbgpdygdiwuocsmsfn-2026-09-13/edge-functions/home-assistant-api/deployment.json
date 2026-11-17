@@ -1,0 +1,17 @@
+{
+  "id": "1de938ab-4686-4ad2-b6fd-6a2674d188ef",
+  "slug": "home-assistant-api",
+  "name": "home-assistant-api",
+  "status": "ACTIVE",
+  "version": 2,
+  "created_at": 1787486678968,
+  "updated_at": 1787486880181,
+  "verify_jwt": false,
+  "import_map": false,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_1de938ab-4686-4ad2-b6fd-6a2674d188ef_2/source/index.ts",
+  "ezbr_sha256": "e17efef94176d923c80137604803909c5b91a0958f9c410a5e6a3c688a81e08f",
+  "files": [
+    "index.ts"
+  ]
+}
+

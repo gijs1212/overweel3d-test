@@ -1,0 +1,18 @@
+{
+  "id": "c92fbe06-b2de-4fab-9fb0-6eea3b093508",
+  "slug": "send-order-email",
+  "name": "send-order-email",
+  "status": "ACTIVE",
+  "version": 29,
+  "created_at": 1772910558188,
+  "updated_at": 1787826181009,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_c92fbe06-b2de-4fab-9fb0-6eea3b093508_29/source/index.ts",
+  "ezbr_sha256": "4082dfe95f1679710d5be9a7fd78e5e90e0104e54be20d7a6af1af386594e521",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

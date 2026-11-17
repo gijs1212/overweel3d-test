@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "created_at": "2026-11-15T13:18:54Z",
+  "database_sha256": "58393c0abd80b65eb769b13b305a333f216ed55c6b589a3d5a55fad179107321",
+  "users": 7,
+  "collections": [
+    {
+      "id": "pbc_3126690926",
+      "name": "app_settings",
+      "type": "base",
+      "records": 6
+    },
+    {
+      "id": "pbc_2248329634",
+      "name": "blog_posts",
+      "type": "base",
+      "records": 11
+    },
+    {
+      "id": "pbc_3292755704",
+      "name": "categories",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_3869458167",
+      "name": "delivery_appointments",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_3916196941",
+      "name": "discount_codes",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_4128896109",
+      "name": "discount_redemptions",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_2184447689",
+      "name": "email_campaigns",
+      "type": "base",
+      "records": 27
+    },
+    {
+      "id": "pbc_1810585338",
+      "name": "exported_orders",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_1790600954",
+      "name": "filament_colors",
+      "type": "base",
+      "records": 16
+    },
+    {
+      "id": "pbc_724357088",
+      "name": "filament_inventory",
+      "type": "base",
+      "records": 311
+    },
+    {
+      "id": "pbc_2235323685",
+      "name": "gift_card_redemptions",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_4015667414",
+      "name": "gift_cards",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_4195092123",
+      "name": "loyalty_transactions",
+      "type": "base",
+      "records": 2
+    },
+    {
+      "id": "pbc_4282183725",
+      "name": "materials",
+      "type": "base",
+      "records": 3
+    },
+    {
+      "id": "pbc_2371097426",
+      "name": "newsletter_subscribers",
+      "type": "base",
+      "records": 2
+    },
+    {
+      "id": "pbc_4263645220",
+      "name": "newsletter_subscriptions",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_2397861347",
+      "name": "onedrive_tokens",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_4104850907",
+      "name": "order_3mf_plate_mappings",
+      "type": "base",
+      "records": 22
+    },
+    {
+      "id": "pbc_3348104089",
+      "name": "order_events",
+      "type": "base",
+      "records": 78
+    },
+    {
+      "id": "pbc_1968838608",
+      "name": "order_files",
+      "type": "base",
+      "records": 4
+    },
+    {
+      "id": "pbc_487688624",
+      "name": "order_messages",
+      "type": "base",
+      "records": 2
+    },
+    {
+      "id": "pbc_3527180448",
+      "name": "orders",
+      "type": "base",
+      "records": 8
+    },
+    {
+      "id": "pbc_48100425",
+      "name": "portfolio_project_media",
+      "type": "base",
+      "records": 37
+    },
+    {
+      "id": "pbc_1244923350",
+      "name": "portfolio_projects",
+      "type": "base",
+      "records": 4
+    },
+    {
+      "id": "pbc_2183929617",
+      "name": "print_jobs",
+      "type": "base",
+      "records": 25
+    },
+    {
+      "id": "pbc_2860845515",
+      "name": "print_runs",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_290361513",
+      "name": "printer_ams_slots",
+      "type": "base",
+      "records": 12
+    },
+    {
+      "id": "pbc_3400371620",
+      "name": "printer_pairing_codes",
+      "type": "base",
+      "records": 9
+    },
+    {
+      "id": "pbc_3953398814",
+      "name": "printer_queue_items",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_1820795747",
+      "name": "printer_sd_files",
+      "type": "base",
+      "records": 33
+    },
+    {
+      "id": "pbc_2239120814",
+      "name": "printers",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_3283744169",
+      "name": "product_categories",
+      "type": "base",
+      "records": 4
+    },
+    {
+      "id": "pbc_2047581787",
+      "name": "product_color_availability",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_2777188953",
+      "name": "product_images",
+      "type": "base",
+      "records": 32
+    },
+    {
+      "id": "pbc_1872759973",
+      "name": "product_options",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_3605339437",
+      "name": "product_reviews",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_1715963891",
+      "name": "product_variants",
+      "type": "base",
+      "records": 9
+    },
+    {
+      "id": "pbc_4092854851",
+      "name": "products",
+      "type": "base",
+      "records": 6
+    },
+    {
+      "id": "pbc_3542266561",
+      "name": "saved_carts",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_1153618621",
+      "name": "social_media_grants",
+      "type": "base",
+      "records": 0
+    },
+    {
+      "id": "pbc_2252622029",
+      "name": "social_post_history",
+      "type": "base",
+      "records": 347
+    },
+    {
+      "id": "pbc_1308617020",
+      "name": "social_post_jobs",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_4126410908",
+      "name": "social_publisher_sessions",
+      "type": "base",
+      "records": 2
+    },
+    {
+      "id": "pbc_2328966474",
+      "name": "social_publisher_settings",
+      "type": "base",
+      "records": 1
+    },
+    {
+      "id": "pbc_2195043336",
+      "name": "storage_files",
+      "type": "base",
+      "records": 68
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "public",
+  "table": "order_messages",
+  "row_count": 2,
+  "rows": [
+    {
+      "id": "2e7295e0-cffe-4a13-a1bb-df6fae74d475",
+      "read": false,
+      "message": "hoi",
+      "order_id": "6186113d-ed58-4254-8cdc-2ed0898eee77",
+      "sender_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "created_at": "2026-04-02T17:47:30.957106+00:00",
+      "sender_type": "admin"
+    },
+    {
+      "id": "c752aaa7-99f9-4b0c-adeb-e617c412bb7b",
+      "read": false,
+      "message": "Ik ben klaar met printen, is het goed dat je het op 5 september meeneemt?",
+      "order_id": "1aa75098-cf60-4080-832e-5cc65341b973",
+      "sender_id": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "created_at": "2026-08-26T16:48:29.088232+00:00",
+      "sender_type": "admin"
+    }
+  ]
+}
+

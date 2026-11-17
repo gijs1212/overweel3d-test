@@ -1,0 +1,18 @@
+{
+  "id": "f738f136-f26e-4c67-94dc-7794d2e6af72",
+  "slug": "generate-blog-post",
+  "name": "generate-blog-post",
+  "status": "ACTIVE",
+  "version": 12,
+  "created_at": 1775142969260,
+  "updated_at": 1787312615919,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_f738f136-f26e-4c67-94dc-7794d2e6af72_12/source/generate-blog-post/index.ts",
+  "ezbr_sha256": "9e8aabffde4c061c661ce84883eb426b37ad213b9680873c2b690264e2b956e4",
+  "files": [
+    "generate-blog-post/index.ts",
+    "generate-blog-post/import_map.json"
+  ]
+}
+

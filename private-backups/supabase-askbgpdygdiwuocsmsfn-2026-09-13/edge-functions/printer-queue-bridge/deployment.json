@@ -1,0 +1,18 @@
+{
+  "id": "7114ce36-ca41-4342-8d67-9ed654dc4520",
+  "slug": "printer-queue-bridge",
+  "name": "printer-queue-bridge",
+  "status": "ACTIVE",
+  "version": 17,
+  "created_at": 1788966294038,
+  "updated_at": 1789295458607,
+  "verify_jwt": false,
+  "import_map": true,
+  "entrypoint_path": "/tmp/user_fn_askbgpdygdiwuocsmsfn_7114ce36-ca41-4342-8d67-9ed654dc4520_17/source/index.ts",
+  "ezbr_sha256": "610bfa3cc089b8d163ea0334a9c4860b51ccafc36210311bb4b8fe679d5c6870",
+  "files": [
+    "index.ts",
+    "deno.json"
+  ]
+}
+

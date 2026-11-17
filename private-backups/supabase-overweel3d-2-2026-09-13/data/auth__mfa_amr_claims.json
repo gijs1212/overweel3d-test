@@ -1,0 +1,288 @@
+{
+  "schema": "auth",
+  "table": "mfa_amr_claims",
+  "row_count": 40,
+  "rows": [
+    {
+      "id": "60d1d5c5-6d28-4211-b7df-d9c76950525c",
+      "created_at": "2026-03-11T08:36:19.934142+00:00",
+      "session_id": "f4177eb8-6284-47d7-94d6-ba9811f43b1a",
+      "updated_at": "2026-03-11T08:36:19.934142+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "c5049d3c-0f2d-412e-809e-aca04997bb78",
+      "created_at": "2026-03-11T08:36:25.562387+00:00",
+      "session_id": "5bb90d48-3171-4a06-b983-c7feaa6993f5",
+      "updated_at": "2026-03-11T08:36:25.562387+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "dd813088-0d65-4bc9-a7d6-765b7bc7231a",
+      "created_at": "2026-04-02T17:42:05.506837+00:00",
+      "session_id": "f4f70afc-05ce-4760-ad50-194a4d9f84f0",
+      "updated_at": "2026-04-02T17:42:05.506837+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "cefa30e5-7a70-40e6-9939-1258fa6a727e",
+      "created_at": "2026-04-02T17:45:19.792168+00:00",
+      "session_id": "ef312b57-28cd-4184-bad6-11ef95d3444d",
+      "updated_at": "2026-04-02T17:45:19.792168+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "ff00c609-9265-4f2f-b284-38d59893dbde",
+      "created_at": "2026-04-03T17:58:14.252689+00:00",
+      "session_id": "7b3e136e-2670-413c-a57f-6f8d7c89c02a",
+      "updated_at": "2026-04-03T17:58:14.252689+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "097a3308-d97a-43aa-a2d4-3fb096019547",
+      "created_at": "2026-04-03T18:04:55.115308+00:00",
+      "session_id": "e65c4d22-44a9-457f-90a6-66ce0a369cd3",
+      "updated_at": "2026-04-03T18:04:55.115308+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "44a2c2ab-a6f0-4b9c-b7a5-91eba3838da6",
+      "created_at": "2026-04-06T12:12:41.601673+00:00",
+      "session_id": "67adcda3-595f-455f-b336-de723d4f4b54",
+      "updated_at": "2026-04-06T12:12:41.601673+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "137f1e2d-52e9-488c-a7fa-91c56a58aac9",
+      "created_at": "2026-06-02T14:42:48.363651+00:00",
+      "session_id": "50179f09-9d1f-4647-9dcf-55ba423389a1",
+      "updated_at": "2026-06-02T14:42:48.363651+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "0004be81-5d14-46d4-8be7-d2df5077a1e1",
+      "created_at": "2026-06-02T14:43:11.62663+00:00",
+      "session_id": "87b2d79a-2977-45c3-8633-635f20f1089e",
+      "updated_at": "2026-06-02T14:43:11.62663+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "b9170591-af44-4367-a758-ced267838f89",
+      "created_at": "2026-06-02T14:57:29.657386+00:00",
+      "session_id": "b6a7e13f-b5f0-4cbc-ae71-02b69ac52025",
+      "updated_at": "2026-06-02T14:57:29.657386+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "1d85b5d5-1931-426b-bc2d-997a924d2f21",
+      "created_at": "2026-06-11T19:29:29.24852+00:00",
+      "session_id": "288d9a1b-27d8-4015-926e-79f059fde4f8",
+      "updated_at": "2026-06-11T19:29:29.24852+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "3a8755e3-a24f-4e91-8ac1-b57a7a640f31",
+      "created_at": "2026-06-17T16:51:23.409852+00:00",
+      "session_id": "82d88dab-c665-4359-a6a8-e40fb9f632da",
+      "updated_at": "2026-06-17T16:51:23.409852+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "77d49c0e-1b9e-49cc-9a89-0e7dd549112f",
+      "created_at": "2026-06-17T18:51:10.660312+00:00",
+      "session_id": "afd61f7f-9e11-4a37-a831-d5e5d1fb1bab",
+      "updated_at": "2026-06-17T18:51:10.660312+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "b7bf6ade-5ac6-4e61-b573-055bd26893fb",
+      "created_at": "2026-07-03T13:37:00.656446+00:00",
+      "session_id": "3a647abe-f201-47c5-8e21-54c469dd5532",
+      "updated_at": "2026-07-03T13:37:00.656446+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "6aabfa51-e78e-4d4a-a419-eb0fe16c4ebc",
+      "created_at": "2026-07-03T19:05:49.226167+00:00",
+      "session_id": "e85e50b2-744c-49be-b1ed-28138120ba01",
+      "updated_at": "2026-07-03T19:05:49.226167+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "bcbcf50a-6d4b-4c14-9d66-82fdbd479d0b",
+      "created_at": "2026-07-11T17:16:18.330352+00:00",
+      "session_id": "efd6e5b7-8633-4442-b3af-d67a97092c33",
+      "updated_at": "2026-07-11T17:16:18.330352+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "34b46eb8-27c9-414a-9a11-adc14137f9ec",
+      "created_at": "2026-08-18T14:10:38.315439+00:00",
+      "session_id": "69cc195c-ed3f-4054-ad4c-188b8c073c4f",
+      "updated_at": "2026-08-18T14:10:38.315439+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "364fc581-d655-469b-a685-eefde2b19355",
+      "created_at": "2026-08-18T20:11:37.35949+00:00",
+      "session_id": "344e9dd4-db01-4d87-a786-c0414b4ed2e5",
+      "updated_at": "2026-08-18T20:11:37.35949+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "7e45845b-b32f-4148-8dcc-35c56ac8b6d3",
+      "created_at": "2026-08-20T18:07:37.853107+00:00",
+      "session_id": "6d50a43b-535e-4255-8a2d-aa3cd7394d27",
+      "updated_at": "2026-08-20T18:07:37.853107+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "c207d5f8-18ec-49fb-95b5-4695dc183a35",
+      "created_at": "2026-08-21T11:20:10.738044+00:00",
+      "session_id": "a69d29b2-8bb2-4c12-8f49-6b8660cf0f6b",
+      "updated_at": "2026-08-21T11:20:10.738044+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "212fb2ef-ac76-4912-9e95-b6dfd6bf3947",
+      "created_at": "2026-08-21T12:50:30.809726+00:00",
+      "session_id": "3e859473-c13f-4661-8eb7-28603c46167c",
+      "updated_at": "2026-08-21T12:50:30.809726+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "7f9207a2-1a31-4841-a486-cf2dc7340316",
+      "created_at": "2026-08-21T15:20:23.634805+00:00",
+      "session_id": "e492791d-48ea-472e-9764-9eba35a8e041",
+      "updated_at": "2026-08-21T15:20:23.634805+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "6ea90db6-ea08-4a46-9cb2-5d25111de4d5",
+      "created_at": "2026-08-21T16:18:58.622987+00:00",
+      "session_id": "e7bf8aed-461b-42f2-941e-c3bdc3b92b1e",
+      "updated_at": "2026-08-21T16:18:58.622987+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "acbc45b7-2ddc-4b58-9075-0df9389d64fa",
+      "created_at": "2026-08-21T16:43:25.427231+00:00",
+      "session_id": "b31f27fa-ad1f-4b5b-a157-bf821e0d9c3c",
+      "updated_at": "2026-08-21T16:43:25.427231+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "da9dce21-5b32-4762-8e48-9634189f08de",
+      "created_at": "2026-08-21T17:19:36.654252+00:00",
+      "session_id": "78294570-e37f-45b0-bfed-79f831436aa7",
+      "updated_at": "2026-08-21T17:19:36.654252+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "f28f4d81-080b-4beb-8e30-25f0adf6b801",
+      "created_at": "2026-08-21T18:19:12.922991+00:00",
+      "session_id": "107a7b2c-cf02-4c97-a46b-e91c0635fdb5",
+      "updated_at": "2026-08-21T18:19:12.922991+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "5c745e32-abb0-4159-9a9f-3143b274a83e",
+      "created_at": "2026-08-21T18:47:18.85993+00:00",
+      "session_id": "76d034f0-75fb-4538-879b-83d2416515d0",
+      "updated_at": "2026-08-21T18:47:18.85993+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "f2ce6c86-a3ab-451f-8884-ee28cd675189",
+      "created_at": "2026-08-21T19:14:52.839644+00:00",
+      "session_id": "c962505a-3455-4d8c-b6c5-554430951600",
+      "updated_at": "2026-08-21T19:14:52.839644+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "0d7b3bb0-eb9f-49c5-9947-22e962bd51ab",
+      "created_at": "2026-08-21T20:30:12.01823+00:00",
+      "session_id": "06ff21c1-3005-4ddb-8bff-86981ce6c9e6",
+      "updated_at": "2026-08-21T20:30:12.01823+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "9bacec39-5bc4-444d-abfa-c2b62b9c0b8d",
+      "created_at": "2026-08-21T20:36:41.042107+00:00",
+      "session_id": "f5afa6c5-acd8-4ada-a59b-c1262fea36f1",
+      "updated_at": "2026-08-21T20:36:41.042107+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "d3fce851-7d2e-4bd3-821e-3b28d55b03b7",
+      "created_at": "2026-08-21T21:28:20.005929+00:00",
+      "session_id": "02dfe267-ae5d-4563-9466-1a8d68f84372",
+      "updated_at": "2026-08-21T21:28:20.005929+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "ea0d6407-accd-4399-a2b8-6a46046eb1c1",
+      "created_at": "2026-08-22T08:48:55.294815+00:00",
+      "session_id": "112149cf-9efe-49da-ad9f-3f79ac01ed4e",
+      "updated_at": "2026-08-22T08:48:55.294815+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "2caac388-fd6a-4bc3-b867-67cd9925fb2d",
+      "created_at": "2026-08-23T09:57:38.338507+00:00",
+      "session_id": "1f01096e-e584-469a-9919-eb2b3d8c8e17",
+      "updated_at": "2026-08-23T09:57:38.338507+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "742e41c5-a3d6-49f5-a23f-5332f09b0913",
+      "created_at": "2026-08-23T11:09:19.766693+00:00",
+      "session_id": "5da8407a-a8af-4fe2-9163-c8de2dd7ecf5",
+      "updated_at": "2026-08-23T11:09:19.766693+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "bac1176a-b61a-4edf-8707-14870b7af485",
+      "created_at": "2026-08-23T15:09:56.160117+00:00",
+      "session_id": "fde7e7aa-9a8f-48ab-bd76-c48dd0863949",
+      "updated_at": "2026-08-23T15:09:56.160117+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "2e5c8408-4364-4299-8a19-eac9bf160a7b",
+      "created_at": "2026-08-23T15:10:53.221385+00:00",
+      "session_id": "fe006e51-1d61-413f-97de-738b8bac685c",
+      "updated_at": "2026-08-23T15:10:53.221385+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "857c1c64-f8d7-402a-aa0d-c49a24671cf9",
+      "created_at": "2026-08-24T17:17:27.359799+00:00",
+      "session_id": "54fac952-7402-4ef8-9cb2-ac6c3ea6978d",
+      "updated_at": "2026-08-24T17:17:27.359799+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "8c50eeb7-d4ef-47c8-9e9c-98bbf95302f0",
+      "created_at": "2026-09-09T15:22:40.586134+00:00",
+      "session_id": "5a026007-01dd-4c04-b00f-028454e93271",
+      "updated_at": "2026-09-09T15:22:40.586134+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "2512fc07-a238-4ac2-8bd2-c93a8aba3ecc",
+      "created_at": "2026-09-10T11:44:10.446404+00:00",
+      "session_id": "49859631-1871-49c0-878a-3189c6d76771",
+      "updated_at": "2026-09-10T11:44:10.446404+00:00",
+      "authentication_method": "password"
+    },
+    {
+      "id": "d16da753-1d7e-4833-8cad-741f589704ff",
+      "created_at": "2026-09-10T20:09:37.508139+00:00",
+      "session_id": "7b9d26f0-eb6d-468e-9580-5fdfda6e8896",
+      "updated_at": "2026-09-10T20:09:37.508139+00:00",
+      "authentication_method": "password"
+    }
+  ]
+}
+

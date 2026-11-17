@@ -1,0 +1,24 @@
+{
+  "schema": "public",
+  "table": "printer_pairing_codes",
+  "row_count": 1,
+  "rows": [
+    {
+      "id": "e6af36c8-70c4-4d76-ad8c-6b2c3ad6a13b",
+      "code_hash": "ab36c32f19140c3e10241f9ca8d6c3d704d2cf81742586ba1f03a13f974f391a",
+      "ftps_port": 990,
+      "bambu_host": "192.168.2.3",
+      "created_at": "2026-09-13T12:46:09.298992+00:00",
+      "created_by": "fe04749e-3bf9-42f5-bee4-840c1738a17f",
+      "expires_at": "2026-09-13T13:01:09.198+00:00",
+      "printer_id": "12d7e518-2f56-4b22-ad6c-4b39da9aaba3",
+      "redeemed_at": null,
+      "ftps_username": "bblp",
+      "slicer_crl_pem": null,
+      "slicer_key_pem": null,
+      "slicer_cert_pem": null,
+      "bambu_access_code": null
+    }
+  ]
+}
+
